@@ -4,7 +4,6 @@ use std::{
 };
 
 use axum::{
-    handler::HandlerWithoutStateExt,
     routing::{
         get,
         post,
@@ -18,8 +17,6 @@ use clap::{
 };
 use tracing::{
     info,
-    info_span,
-    Instrument,
     Level,
 };
 use tracing_subscriber::{
@@ -49,7 +46,7 @@ struct Opt {
     #[clap(
         long,
         value_name = "address:port",
-        default_value = "127.0.0.1:16222",
+        default_value = "127.0.0.1:16223",
         env = "TRIVY_WEB_BINDING"
     )]
     pub binding: SocketAddr,
@@ -74,7 +71,10 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     let addr = opt.binding;
     info!("Listening on http://{addr}");
 
-    let app = Router::new().route("/", get(handler::root));
+    let app = Router::new()
+        .route("/", get(handler::root))
+        .route("/js/htmx/1.9.4/htmx.min.js.gz", get(handler::js_htmx_1_9_4))
+        .route("/clicked", post(handler::clicked));
 
     Server::bind(&addr).serve(app.into_make_service()).await?;
 

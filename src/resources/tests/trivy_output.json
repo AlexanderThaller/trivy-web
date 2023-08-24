@@ -1,0 +1,3569 @@
+{
+  "SchemaVersion": 2,
+  "ArtifactName": "linuxserver/code-server:latest",
+  "ArtifactType": "container_image",
+  "Metadata": {
+    "OS": {
+      "Family": "ubuntu",
+      "Name": "22.04"
+    },
+    "ImageID": "sha256:c452b585969a3e95a336ce7945b6ce55ede8ae94ccf92b5669e702f286b656e0",
+    "DiffIDs": [
+      "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe",
+      "sha256:fdb5ab56c74a9275db7af70260d667d6c5c1fbb9395119f9f53586b3b2860e76",
+      "sha256:fc1b5773d3eb1562c11962c4f713ab22f02c4c8e010ca4ee874fa680c6ad7b6a",
+      "sha256:06abb7a8f6ff50833ab6ef4d4d0d0705c3cd4740b75238ce57ea7416ba2eb6ae",
+      "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091",
+      "sha256:93eb71e4ac4a29b68099969d0e41442f299be980bdaf265f6b5e9e539e50891b",
+      "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f",
+      "sha256:03c0436f56b34a0dd75109be0bedc9f5ef334105d597e20df2fd8daf5e8115e1"
+    ],
+    "RepoTags": [
+      "linuxserver/code-server:latest"
+    ],
+    "RepoDigests": [
+      "linuxserver/code-server@sha256:db900338f383082b1674249348a0d73e9aa25c62fd5d7d4c85e6cf3c83c0f9a6"
+    ],
+    "ImageConfig": {
+      "architecture": "amd64",
+      "created": "2023-08-19T20:19:27.125964327Z",
+      "history": [
+        {
+          "created": "2023-08-15T23:28:26.112251814Z",
+          "created_by": "COPY /root-out/ / # buildkit",
+          "comment": "buildkit.dockerfile.v0"
+        },
+        {
+          "created": "2023-08-15T23:28:26.22005778Z",
+          "created_by": "ARG BUILD_DATE",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-15T23:28:26.22005778Z",
+          "created_by": "ARG VERSION",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-15T23:28:26.22005778Z",
+          "created_by": "ARG MODS_VERSION=v3",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-15T23:28:26.22005778Z",
+          "created_by": "ARG PKG_INST_VERSION=v1",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-15T23:28:26.22005778Z",
+          "created_by": "LABEL build_version=Linuxserver.io version:- f08f783d-ls77 Build-date:- 2023-08-15T23:27:23+00:00",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-15T23:28:26.22005778Z",
+          "created_by": "LABEL maintainer=TheLamer",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-15T23:28:26.22005778Z",
+          "created_by": "ADD https://raw.githubusercontent.com/linuxserver/docker-mods/mod-scripts/docker-mods.v3 /docker-mods # buildkit",
+          "comment": "buildkit.dockerfile.v0"
+        },
+        {
+          "created": "2023-08-15T23:28:26.343676785Z",
+          "created_by": "ADD https://raw.githubusercontent.com/linuxserver/docker-mods/mod-scripts/package-install.v1 /etc/s6-overlay/s6-rc.d/init-mods-package-install/run # buildkit",
+          "comment": "buildkit.dockerfile.v0"
+        },
+        {
+          "created": "2023-08-15T23:28:26.343676785Z",
+          "created_by": "ARG DEBIAN_FRONTEND=noninteractive",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-15T23:28:26.343676785Z",
+          "created_by": "ENV HOME=/root LANGUAGE=en_US.UTF-8 LANG=en_US.UTF-8 TERM=xterm S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0 S6_VERBOSITY=1 S6_STAGE2_HOOK=/docker-mods VIRTUAL_ENV=/lsiopy PATH=/lsiopy/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-15T23:28:26.452699452Z",
+          "created_by": "COPY sources.list /etc/apt/ # buildkit",
+          "comment": "buildkit.dockerfile.v0"
+        },
+        {
+          "created": "2023-08-15T23:28:52.101470834Z",
+          "created_by": "RUN |5 BUILD_DATE=2023-08-15T23:27:23+00:00 VERSION=f08f783d-ls77 MODS_VERSION=v3 PKG_INST_VERSION=v1 DEBIAN_FRONTEND=noninteractive /bin/sh -c echo \"**** Ripped from Ubuntu Docker Logic ****\" \u0026\u0026   set -xe \u0026\u0026   echo '#!/bin/sh'     \u003e /usr/sbin/policy-rc.d \u0026\u0026   echo 'exit 101'     \u003e\u003e /usr/sbin/policy-rc.d \u0026\u0026   chmod +x     /usr/sbin/policy-rc.d \u0026\u0026   dpkg-divert --local --rename --add /sbin/initctl \u0026\u0026   cp -a     /usr/sbin/policy-rc.d     /sbin/initctl \u0026\u0026   sed -i     's/^exit.*/exit 0/'     /sbin/initctl \u0026\u0026   echo 'force-unsafe-io'     \u003e /etc/dpkg/dpkg.cfg.d/docker-apt-speedup \u0026\u0026   echo 'DPkg::Post-Invoke { \"rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true\"; };'     \u003e /etc/apt/apt.conf.d/docker-clean \u0026\u0026   echo 'APT::Update::Post-Invoke { \"rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true\"; };'     \u003e\u003e /etc/apt/apt.conf.d/docker-clean \u0026\u0026   echo 'Dir::Cache::pkgcache \"\"; Dir::Cache::srcpkgcache \"\";'     \u003e\u003e /etc/apt/apt.conf.d/docker-clean \u0026\u0026   echo 'Acquire::Languages \"none\";'     \u003e /etc/apt/apt.conf.d/docker-no-languages \u0026\u0026   echo 'Acquire::GzipIndexes \"true\"; Acquire::CompressionTypes::Order:: \"gz\";'     \u003e /etc/apt/apt.conf.d/docker-gzip-indexes \u0026\u0026   echo 'Apt::AutoRemove::SuggestsImportant \"false\";'     \u003e /etc/apt/apt.conf.d/docker-autoremove-suggests \u0026\u0026   mkdir -p /run/systemd \u0026\u0026   echo 'docker'     \u003e /run/systemd/container \u0026\u0026   echo \"**** install apt-utils and locales ****\" \u0026\u0026   apt-get update \u0026\u0026   apt-get install -y     apt-utils     locales \u0026\u0026   echo \"**** install packages ****\" \u0026\u0026   apt-get install -y     curl     gnupg     jq     netcat     tzdata \u0026\u0026   echo \"**** generate locale ****\" \u0026\u0026   locale-gen en_US.UTF-8 \u0026\u0026   echo \"**** create abc user and make our folders ****\" \u0026\u0026   useradd -u 911 -U -d /config -s /bin/false abc \u0026\u0026   usermod -G users abc \u0026\u0026   mkdir -p     /app     /config     /defaults     /lsiopy \u0026\u0026   echo \"**** cleanup ****\" \u0026\u0026   apt-get autoremove \u0026\u0026   apt-get clean \u0026\u0026   rm -rf     /tmp/*     /var/lib/apt/lists/*     /var/tmp/*     /var/log/* # buildkit",
+          "comment": "buildkit.dockerfile.v0"
+        },
+        {
+          "created": "2023-08-15T23:28:52.686809288Z",
+          "created_by": "COPY root/ / # buildkit",
+          "comment": "buildkit.dockerfile.v0"
+        },
+        {
+          "created": "2023-08-15T23:28:52.686809288Z",
+          "created_by": "ENTRYPOINT [\"/init\"]",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-19T20:19:27.032126569Z",
+          "created_by": "ENV LSIO_FIRST_PARTY=true",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-19T20:19:27.032126569Z",
+          "created_by": "ARG BUILD_DATE",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-19T20:19:27.032126569Z",
+          "created_by": "ARG VERSION",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-19T20:19:27.032126569Z",
+          "created_by": "ARG CODE_RELEASE",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-19T20:19:27.032126569Z",
+          "created_by": "LABEL build_version=Linuxserver.io version:- 4.16.1-ls172 Build-date:- 2023-08-19T20:17:05+00:00",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-19T20:19:27.032126569Z",
+          "created_by": "LABEL maintainer=aptalca",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-19T20:19:27.032126569Z",
+          "created_by": "ARG DEBIAN_FRONTEND=noninteractive",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-19T20:19:27.032126569Z",
+          "created_by": "ENV HOME=/config",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        },
+        {
+          "created": "2023-08-19T20:19:27.032126569Z",
+          "created_by": "RUN |4 BUILD_DATE=2023-08-19T20:17:05+00:00 VERSION=4.16.1-ls172 CODE_RELEASE=4.16.1 DEBIAN_FRONTEND=noninteractive /bin/sh -c echo \"**** install runtime dependencies ****\" \u0026\u0026   apt-get update \u0026\u0026   apt-get install -y     git     jq     libatomic1     nano     net-tools     netcat     sudo \u0026\u0026   echo \"**** install code-server ****\" \u0026\u0026   if [ -z ${CODE_RELEASE+x} ]; then     CODE_RELEASE=$(curl -sX GET https://api.github.com/repos/coder/code-server/releases/latest       | awk '/tag_name/{print $4;exit}' FS='[\"\"]' | sed 's|^v||');   fi \u0026\u0026   mkdir -p /app/code-server \u0026\u0026   curl -o     /tmp/code-server.tar.gz -L     \"https://github.com/coder/code-server/releases/download/v${CODE_RELEASE}/code-server-${CODE_RELEASE}-linux-amd64.tar.gz\" \u0026\u0026   tar xf /tmp/code-server.tar.gz -C     /app/code-server --strip-components=1 \u0026\u0026   echo \"**** clean up ****\" \u0026\u0026   apt-get clean \u0026\u0026   rm -rf     /config/*     /tmp/*     /var/lib/apt/lists/*     /var/tmp/* # buildkit",
+          "comment": "buildkit.dockerfile.v0"
+        },
+        {
+          "created": "2023-08-19T20:19:27.125964327Z",
+          "created_by": "COPY /root / # buildkit",
+          "comment": "buildkit.dockerfile.v0"
+        },
+        {
+          "created": "2023-08-19T20:19:27.125964327Z",
+          "created_by": "EXPOSE map[8443/tcp:{}]",
+          "comment": "buildkit.dockerfile.v0",
+          "empty_layer": true
+        }
+      ],
+      "os": "linux",
+      "rootfs": {
+        "type": "layers",
+        "diff_ids": [
+          "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe",
+          "sha256:fdb5ab56c74a9275db7af70260d667d6c5c1fbb9395119f9f53586b3b2860e76",
+          "sha256:fc1b5773d3eb1562c11962c4f713ab22f02c4c8e010ca4ee874fa680c6ad7b6a",
+          "sha256:06abb7a8f6ff50833ab6ef4d4d0d0705c3cd4740b75238ce57ea7416ba2eb6ae",
+          "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091",
+          "sha256:93eb71e4ac4a29b68099969d0e41442f299be980bdaf265f6b5e9e539e50891b",
+          "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f",
+          "sha256:03c0436f56b34a0dd75109be0bedc9f5ef334105d597e20df2fd8daf5e8115e1"
+        ]
+      },
+      "config": {
+        "Entrypoint": [
+          "/init"
+        ],
+        "Env": [
+          "PATH=/lsiopy/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+          "HOME=/config",
+          "LANGUAGE=en_US.UTF-8",
+          "LANG=en_US.UTF-8",
+          "TERM=xterm",
+          "S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0",
+          "S6_VERBOSITY=1",
+          "S6_STAGE2_HOOK=/docker-mods",
+          "VIRTUAL_ENV=/lsiopy",
+          "LSIO_FIRST_PARTY=true"
+        ],
+        "Labels": {
+          "build_version": "Linuxserver.io version:- 4.16.1-ls172 Build-date:- 2023-08-19T20:17:05+00:00",
+          "maintainer": "aptalca",
+          "org.opencontainers.image.authors": "linuxserver.io",
+          "org.opencontainers.image.created": "2023-08-19T20:17:05+00:00",
+          "org.opencontainers.image.description": "[Code-server](https://coder.com) is VS Code running on a remote server, accessible through the browser.  - Code on your Chromebook, tablet, and laptop with a consistent dev environment.  - If you have a Windows or Mac workstation, more easily develop for Linux.  - Take advantage of large cloud servers to speed up tests, compilations, downloads, and more.  - Preserve battery life when you're on the go.  - All intensive computation runs on your server.  - You're no longer running excess instances of Chrome.",
+          "org.opencontainers.image.documentation": "https://docs.linuxserver.io/images/docker-code-server",
+          "org.opencontainers.image.licenses": "GPL-3.0-only",
+          "org.opencontainers.image.ref.name": "6d2cacc4c880ab4953ebaac4a29618df044b8096",
+          "org.opencontainers.image.revision": "6d2cacc4c880ab4953ebaac4a29618df044b8096",
+          "org.opencontainers.image.source": "https://github.com/linuxserver/docker-code-server",
+          "org.opencontainers.image.title": "Code-server",
+          "org.opencontainers.image.url": "https://github.com/linuxserver/docker-code-server/packages",
+          "org.opencontainers.image.vendor": "linuxserver.io",
+          "org.opencontainers.image.version": "4.16.1-ls172"
+        },
+        "WorkingDir": "/",
+        "ExposedPorts": {
+          "8443/tcp": {}
+        }
+      }
+    }
+  },
+  "Results": [
+    {
+      "Target": "linuxserver/code-server:latest (ubuntu 22.04)",
+      "Class": "os-pkgs",
+      "Type": "ubuntu",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2022-3715",
+          "PkgID": "bash@5.1-6ubuntu1",
+          "PkgName": "bash",
+          "InstalledVersion": "5.1-6ubuntu1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3715",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "a heap-buffer-overflow in valid_parameter_transform",
+          "Description": "A flaw was found in the bash package, where a heap-buffer overflow can occur in valid parameter_transform. This issue may lead to memory problems.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 7.8
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:H",
+              "V3Score": 6.6
+            }
+          },
+          "References": [
+            "https://access.redhat.com/errata/RHSA-2023:0340",
+            "https://access.redhat.com/security/cve/CVE-2022-3715",
+            "https://bugzilla.redhat.com/2126720",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2126720",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3715",
+            "https://errata.almalinux.org/9/ALSA-2023-0340.html",
+            "https://errata.rockylinux.org/RLSA-2023:0340",
+            "https://linux.oracle.com/cve/CVE-2022-3715.html",
+            "https://linux.oracle.com/errata/ELSA-2023-0340.html",
+            "https://lists.gnu.org/archive/html/bug-bash/2022-08/msg00147.html",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3715",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3715"
+          ],
+          "PublishedDate": "2023-01-05T15:15:00Z",
+          "LastModifiedDate": "2023-02-24T18:38:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2016-2781",
+          "PkgID": "coreutils@8.32-4.1ubuntu1",
+          "PkgName": "coreutils",
+          "InstalledVersion": "8.32-4.1ubuntu1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2016-2781",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "coreutils: Non-privileged session can escape to the parent session in chroot",
+          "Description": "chroot in GNU coreutils, when used with --userspec, allows local users to escape to the parent session via a crafted TIOCSTI ioctl call, which pushes characters to the terminal's input buffer.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-20"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:L/AC:L/Au:N/C:N/I:P/A:N",
+              "V3Vector": "CVSS:3.0/AV:L/AC:L/PR:L/UI:N/S:C/C:N/I:H/A:N",
+              "V2Score": 2.1,
+              "V3Score": 6.5
+            },
+            "redhat": {
+              "V2Vector": "AV:L/AC:H/Au:N/C:C/I:C/A:C",
+              "V3Vector": "CVSS:3.0/AV:L/AC:L/PR:N/UI:R/S:C/C:H/I:H/A:H",
+              "V2Score": 6.2,
+              "V3Score": 8.6
+            }
+          },
+          "References": [
+            "http://seclists.org/oss-sec/2016/q1/452",
+            "http://www.openwall.com/lists/oss-security/2016/02/28/2",
+            "http://www.openwall.com/lists/oss-security/2016/02/28/3",
+            "https://access.redhat.com/security/cve/CVE-2016-2781",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2016-2781",
+            "https://lists.apache.org/thread.html/rf9fa47ab66495c78bb4120b0754dd9531ca2ff0430f6685ac9b07772@%3Cdev.mina.apache.org%3E",
+            "https://lore.kernel.org/patchwork/patch/793178/",
+            "https://nvd.nist.gov/vuln/detail/CVE-2016-2781",
+            "https://www.cve.org/CVERecord?id=CVE-2016-2781"
+          ],
+          "PublishedDate": "2017-02-07T15:59:00Z",
+          "LastModifiedDate": "2021-02-25T17:15:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-3219",
+          "PkgID": "dirmngr@2.2.27-3ubuntu2.1",
+          "PkgName": "dirmngr",
+          "InstalledVersion": "2.2.27-3ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3219",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "denial of service issue (resource consumption) using compressed packets",
+          "Description": "GnuPG can be made to spin on a relatively small input by (for example) crafting a public key with thousands of signatures attached, compressed down to just a few KB.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-3219",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2127010",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3219",
+            "https://dev.gnupg.org/D556",
+            "https://dev.gnupg.org/T5993",
+            "https://marc.info/?l=oss-security\u0026m=165696590211434\u0026w=4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3219",
+            "https://security.netapp.com/advisory/ntap-20230324-0001/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3219"
+          ],
+          "PublishedDate": "2023-02-23T20:15:00Z",
+          "LastModifiedDate": "2023-05-26T16:31:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2018-1000021",
+          "PkgID": "git@1:2.34.1-1ubuntu1.10",
+          "PkgName": "git",
+          "InstalledVersion": "1:2.34.1-1ubuntu1.10",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2018-1000021",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "git: client prints server-sent ANSI escape codes to the terminal, allowing for unverified messages to potentially execute arbitrary commands",
+          "Description": "GIT version 2.15.1 and earlier contains a Input Validation Error vulnerability in Client that can result in problems including messing up terminal configuration to RCE. This attack appear to be exploitable via The user must interact with a malicious git server, (or have their traffic modified in a MITM attack).",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-20"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:N/AC:M/Au:N/C:P/I:P/A:P",
+              "V3Vector": "CVSS:3.0/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H",
+              "V2Score": 6.8,
+              "V3Score": 8.8
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.0/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:L/A:L",
+              "V3Score": 5
+            }
+          },
+          "References": [
+            "http://www.batterystapl.es/2018/01/security-implications-of-ansi-escape.html",
+            "https://access.redhat.com/security/cve/CVE-2018-1000021",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2018-1000021",
+            "https://nvd.nist.gov/vuln/detail/CVE-2018-1000021",
+            "https://www.cve.org/CVERecord?id=CVE-2018-1000021"
+          ],
+          "PublishedDate": "2018-02-09T23:29:00Z",
+          "LastModifiedDate": "2018-03-06T19:34:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2018-1000021",
+          "PkgID": "git-man@1:2.34.1-1ubuntu1.10",
+          "PkgName": "git-man",
+          "InstalledVersion": "1:2.34.1-1ubuntu1.10",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2018-1000021",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "git: client prints server-sent ANSI escape codes to the terminal, allowing for unverified messages to potentially execute arbitrary commands",
+          "Description": "GIT version 2.15.1 and earlier contains a Input Validation Error vulnerability in Client that can result in problems including messing up terminal configuration to RCE. This attack appear to be exploitable via The user must interact with a malicious git server, (or have their traffic modified in a MITM attack).",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-20"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:N/AC:M/Au:N/C:P/I:P/A:P",
+              "V3Vector": "CVSS:3.0/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H",
+              "V2Score": 6.8,
+              "V3Score": 8.8
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.0/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:L/A:L",
+              "V3Score": 5
+            }
+          },
+          "References": [
+            "http://www.batterystapl.es/2018/01/security-implications-of-ansi-escape.html",
+            "https://access.redhat.com/security/cve/CVE-2018-1000021",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2018-1000021",
+            "https://nvd.nist.gov/vuln/detail/CVE-2018-1000021",
+            "https://www.cve.org/CVERecord?id=CVE-2018-1000021"
+          ],
+          "PublishedDate": "2018-02-09T23:29:00Z",
+          "LastModifiedDate": "2018-03-06T19:34:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-3219",
+          "PkgID": "gnupg@2.2.27-3ubuntu2.1",
+          "PkgName": "gnupg",
+          "InstalledVersion": "2.2.27-3ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3219",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "denial of service issue (resource consumption) using compressed packets",
+          "Description": "GnuPG can be made to spin on a relatively small input by (for example) crafting a public key with thousands of signatures attached, compressed down to just a few KB.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-3219",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2127010",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3219",
+            "https://dev.gnupg.org/D556",
+            "https://dev.gnupg.org/T5993",
+            "https://marc.info/?l=oss-security\u0026m=165696590211434\u0026w=4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3219",
+            "https://security.netapp.com/advisory/ntap-20230324-0001/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3219"
+          ],
+          "PublishedDate": "2023-02-23T20:15:00Z",
+          "LastModifiedDate": "2023-05-26T16:31:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-3219",
+          "PkgID": "gnupg-l10n@2.2.27-3ubuntu2.1",
+          "PkgName": "gnupg-l10n",
+          "InstalledVersion": "2.2.27-3ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3219",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "denial of service issue (resource consumption) using compressed packets",
+          "Description": "GnuPG can be made to spin on a relatively small input by (for example) crafting a public key with thousands of signatures attached, compressed down to just a few KB.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-3219",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2127010",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3219",
+            "https://dev.gnupg.org/D556",
+            "https://dev.gnupg.org/T5993",
+            "https://marc.info/?l=oss-security\u0026m=165696590211434\u0026w=4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3219",
+            "https://security.netapp.com/advisory/ntap-20230324-0001/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3219"
+          ],
+          "PublishedDate": "2023-02-23T20:15:00Z",
+          "LastModifiedDate": "2023-05-26T16:31:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-3219",
+          "PkgID": "gnupg-utils@2.2.27-3ubuntu2.1",
+          "PkgName": "gnupg-utils",
+          "InstalledVersion": "2.2.27-3ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3219",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "denial of service issue (resource consumption) using compressed packets",
+          "Description": "GnuPG can be made to spin on a relatively small input by (for example) crafting a public key with thousands of signatures attached, compressed down to just a few KB.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-3219",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2127010",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3219",
+            "https://dev.gnupg.org/D556",
+            "https://dev.gnupg.org/T5993",
+            "https://marc.info/?l=oss-security\u0026m=165696590211434\u0026w=4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3219",
+            "https://security.netapp.com/advisory/ntap-20230324-0001/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3219"
+          ],
+          "PublishedDate": "2023-02-23T20:15:00Z",
+          "LastModifiedDate": "2023-05-26T16:31:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-3219",
+          "PkgID": "gpg@2.2.27-3ubuntu2.1",
+          "PkgName": "gpg",
+          "InstalledVersion": "2.2.27-3ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3219",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "denial of service issue (resource consumption) using compressed packets",
+          "Description": "GnuPG can be made to spin on a relatively small input by (for example) crafting a public key with thousands of signatures attached, compressed down to just a few KB.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-3219",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2127010",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3219",
+            "https://dev.gnupg.org/D556",
+            "https://dev.gnupg.org/T5993",
+            "https://marc.info/?l=oss-security\u0026m=165696590211434\u0026w=4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3219",
+            "https://security.netapp.com/advisory/ntap-20230324-0001/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3219"
+          ],
+          "PublishedDate": "2023-02-23T20:15:00Z",
+          "LastModifiedDate": "2023-05-26T16:31:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-3219",
+          "PkgID": "gpg-agent@2.2.27-3ubuntu2.1",
+          "PkgName": "gpg-agent",
+          "InstalledVersion": "2.2.27-3ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3219",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "denial of service issue (resource consumption) using compressed packets",
+          "Description": "GnuPG can be made to spin on a relatively small input by (for example) crafting a public key with thousands of signatures attached, compressed down to just a few KB.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-3219",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2127010",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3219",
+            "https://dev.gnupg.org/D556",
+            "https://dev.gnupg.org/T5993",
+            "https://marc.info/?l=oss-security\u0026m=165696590211434\u0026w=4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3219",
+            "https://security.netapp.com/advisory/ntap-20230324-0001/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3219"
+          ],
+          "PublishedDate": "2023-02-23T20:15:00Z",
+          "LastModifiedDate": "2023-05-26T16:31:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-3219",
+          "PkgID": "gpg-wks-client@2.2.27-3ubuntu2.1",
+          "PkgName": "gpg-wks-client",
+          "InstalledVersion": "2.2.27-3ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3219",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "denial of service issue (resource consumption) using compressed packets",
+          "Description": "GnuPG can be made to spin on a relatively small input by (for example) crafting a public key with thousands of signatures attached, compressed down to just a few KB.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-3219",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2127010",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3219",
+            "https://dev.gnupg.org/D556",
+            "https://dev.gnupg.org/T5993",
+            "https://marc.info/?l=oss-security\u0026m=165696590211434\u0026w=4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3219",
+            "https://security.netapp.com/advisory/ntap-20230324-0001/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3219"
+          ],
+          "PublishedDate": "2023-02-23T20:15:00Z",
+          "LastModifiedDate": "2023-05-26T16:31:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-3219",
+          "PkgID": "gpg-wks-server@2.2.27-3ubuntu2.1",
+          "PkgName": "gpg-wks-server",
+          "InstalledVersion": "2.2.27-3ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3219",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "denial of service issue (resource consumption) using compressed packets",
+          "Description": "GnuPG can be made to spin on a relatively small input by (for example) crafting a public key with thousands of signatures attached, compressed down to just a few KB.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-3219",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2127010",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3219",
+            "https://dev.gnupg.org/D556",
+            "https://dev.gnupg.org/T5993",
+            "https://marc.info/?l=oss-security\u0026m=165696590211434\u0026w=4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3219",
+            "https://security.netapp.com/advisory/ntap-20230324-0001/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3219"
+          ],
+          "PublishedDate": "2023-02-23T20:15:00Z",
+          "LastModifiedDate": "2023-05-26T16:31:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-3219",
+          "PkgID": "gpgconf@2.2.27-3ubuntu2.1",
+          "PkgName": "gpgconf",
+          "InstalledVersion": "2.2.27-3ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3219",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "denial of service issue (resource consumption) using compressed packets",
+          "Description": "GnuPG can be made to spin on a relatively small input by (for example) crafting a public key with thousands of signatures attached, compressed down to just a few KB.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-3219",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2127010",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3219",
+            "https://dev.gnupg.org/D556",
+            "https://dev.gnupg.org/T5993",
+            "https://marc.info/?l=oss-security\u0026m=165696590211434\u0026w=4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3219",
+            "https://security.netapp.com/advisory/ntap-20230324-0001/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3219"
+          ],
+          "PublishedDate": "2023-02-23T20:15:00Z",
+          "LastModifiedDate": "2023-05-26T16:31:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-3219",
+          "PkgID": "gpgsm@2.2.27-3ubuntu2.1",
+          "PkgName": "gpgsm",
+          "InstalledVersion": "2.2.27-3ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3219",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "denial of service issue (resource consumption) using compressed packets",
+          "Description": "GnuPG can be made to spin on a relatively small input by (for example) crafting a public key with thousands of signatures attached, compressed down to just a few KB.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-3219",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2127010",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3219",
+            "https://dev.gnupg.org/D556",
+            "https://dev.gnupg.org/T5993",
+            "https://marc.info/?l=oss-security\u0026m=165696590211434\u0026w=4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3219",
+            "https://security.netapp.com/advisory/ntap-20230324-0001/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3219"
+          ],
+          "PublishedDate": "2023-02-23T20:15:00Z",
+          "LastModifiedDate": "2023-05-26T16:31:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-3219",
+          "PkgID": "gpgv@2.2.27-3ubuntu2.1",
+          "PkgName": "gpgv",
+          "InstalledVersion": "2.2.27-3ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-3219",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "denial of service issue (resource consumption) using compressed packets",
+          "Description": "GnuPG can be made to spin on a relatively small input by (for example) crafting a public key with thousands of signatures attached, compressed down to just a few KB.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-3219",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=2127010",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-3219",
+            "https://dev.gnupg.org/D556",
+            "https://dev.gnupg.org/T5993",
+            "https://marc.info/?l=oss-security\u0026m=165696590211434\u0026w=4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-3219",
+            "https://security.netapp.com/advisory/ntap-20230324-0001/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-3219"
+          ],
+          "PublishedDate": "2023-02-23T20:15:00Z",
+          "LastModifiedDate": "2023-05-26T16:31:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2016-20013",
+          "PkgID": "libc-bin@2.35-0ubuntu3.1",
+          "PkgName": "libc-bin",
+          "InstalledVersion": "2.35-0ubuntu3.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2016-20013",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Description": "sha256crypt and sha512crypt through 0.6 allow attackers to cause a denial of service (CPU consumption) because the algorithm's runtime is proportional to the square of the length of the password.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-770"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:N/C:N/I:N/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V2Score": 5,
+              "V3Score": 7.5
+            }
+          },
+          "References": [
+            "https://akkadia.org/drepper/SHA-crypt.txt",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2016-20013",
+            "https://pthree.org/2018/05/23/do-not-use-sha256crypt-sha512crypt-theyre-dangerous/",
+            "https://twitter.com/solardiz/status/795601240151457793"
+          ],
+          "PublishedDate": "2022-02-19T05:15:00Z",
+          "LastModifiedDate": "2022-03-03T16:43:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2016-20013",
+          "PkgID": "libc6@2.35-0ubuntu3.1",
+          "PkgName": "libc6",
+          "InstalledVersion": "2.35-0ubuntu3.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2016-20013",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Description": "sha256crypt and sha512crypt through 0.6 allow attackers to cause a denial of service (CPU consumption) because the algorithm's runtime is proportional to the square of the length of the password.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-770"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:N/C:N/I:N/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V2Score": 5,
+              "V3Score": 7.5
+            }
+          },
+          "References": [
+            "https://akkadia.org/drepper/SHA-crypt.txt",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2016-20013",
+            "https://pthree.org/2018/05/23/do-not-use-sha256crypt-sha512crypt-theyre-dangerous/",
+            "https://twitter.com/solardiz/status/795601240151457793"
+          ],
+          "PublishedDate": "2022-02-19T05:15:00Z",
+          "LastModifiedDate": "2022-03-03T16:43:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-36054",
+          "PkgID": "libgssapi-krb5-2@1.19.2-2ubuntu0.2",
+          "PkgName": "libgssapi-krb5-2",
+          "InstalledVersion": "1.19.2-2ubuntu0.2",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-36054",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "Denial of service through freeing uninitialized pointer",
+          "Description": "lib/kadm5/kadm_rpc_xdr.c in MIT Kerberos 5 (aka krb5) before 1.20.2 and 1.21.x before 1.21.1 frees an uninitialized pointer. A remote authenticated user can trigger a kadmind crash. This occurs because _xdr_kadm5_principal_ent_rec does not validate the relationship between n_key_data and the key_data array count.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-824"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:A/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.7
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-36054",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-36054",
+            "https://github.com/krb5/krb5/commit/ef08b09c9459551aabbe7924fb176f1583053cdd",
+            "https://github.com/krb5/krb5/compare/krb5-1.20.1-final...krb5-1.20.2-final",
+            "https://github.com/krb5/krb5/compare/krb5-1.21-final...krb5-1.21.1-final",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-36054",
+            "https://web.mit.edu/kerberos/www/advisories/",
+            "https://www.cve.org/CVERecord?id=CVE-2023-36054"
+          ],
+          "PublishedDate": "2023-08-07T19:15:00Z",
+          "LastModifiedDate": "2023-08-15T17:57:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-36054",
+          "PkgID": "libk5crypto3@1.19.2-2ubuntu0.2",
+          "PkgName": "libk5crypto3",
+          "InstalledVersion": "1.19.2-2ubuntu0.2",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-36054",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "Denial of service through freeing uninitialized pointer",
+          "Description": "lib/kadm5/kadm_rpc_xdr.c in MIT Kerberos 5 (aka krb5) before 1.20.2 and 1.21.x before 1.21.1 frees an uninitialized pointer. A remote authenticated user can trigger a kadmind crash. This occurs because _xdr_kadm5_principal_ent_rec does not validate the relationship between n_key_data and the key_data array count.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-824"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:A/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.7
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-36054",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-36054",
+            "https://github.com/krb5/krb5/commit/ef08b09c9459551aabbe7924fb176f1583053cdd",
+            "https://github.com/krb5/krb5/compare/krb5-1.20.1-final...krb5-1.20.2-final",
+            "https://github.com/krb5/krb5/compare/krb5-1.21-final...krb5-1.21.1-final",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-36054",
+            "https://web.mit.edu/kerberos/www/advisories/",
+            "https://www.cve.org/CVERecord?id=CVE-2023-36054"
+          ],
+          "PublishedDate": "2023-08-07T19:15:00Z",
+          "LastModifiedDate": "2023-08-15T17:57:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-36054",
+          "PkgID": "libkrb5-3@1.19.2-2ubuntu0.2",
+          "PkgName": "libkrb5-3",
+          "InstalledVersion": "1.19.2-2ubuntu0.2",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-36054",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "Denial of service through freeing uninitialized pointer",
+          "Description": "lib/kadm5/kadm_rpc_xdr.c in MIT Kerberos 5 (aka krb5) before 1.20.2 and 1.21.x before 1.21.1 frees an uninitialized pointer. A remote authenticated user can trigger a kadmind crash. This occurs because _xdr_kadm5_principal_ent_rec does not validate the relationship between n_key_data and the key_data array count.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-824"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:A/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.7
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-36054",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-36054",
+            "https://github.com/krb5/krb5/commit/ef08b09c9459551aabbe7924fb176f1583053cdd",
+            "https://github.com/krb5/krb5/compare/krb5-1.20.1-final...krb5-1.20.2-final",
+            "https://github.com/krb5/krb5/compare/krb5-1.21-final...krb5-1.21.1-final",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-36054",
+            "https://web.mit.edu/kerberos/www/advisories/",
+            "https://www.cve.org/CVERecord?id=CVE-2023-36054"
+          ],
+          "PublishedDate": "2023-08-07T19:15:00Z",
+          "LastModifiedDate": "2023-08-15T17:57:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-36054",
+          "PkgID": "libkrb5support0@1.19.2-2ubuntu0.2",
+          "PkgName": "libkrb5support0",
+          "InstalledVersion": "1.19.2-2ubuntu0.2",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-36054",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "Denial of service through freeing uninitialized pointer",
+          "Description": "lib/kadm5/kadm_rpc_xdr.c in MIT Kerberos 5 (aka krb5) before 1.20.2 and 1.21.x before 1.21.1 frees an uninitialized pointer. A remote authenticated user can trigger a kadmind crash. This occurs because _xdr_kadm5_principal_ent_rec does not validate the relationship between n_key_data and the key_data array count.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-824"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 6.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:A/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.7
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-36054",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-36054",
+            "https://github.com/krb5/krb5/commit/ef08b09c9459551aabbe7924fb176f1583053cdd",
+            "https://github.com/krb5/krb5/compare/krb5-1.20.1-final...krb5-1.20.2-final",
+            "https://github.com/krb5/krb5/compare/krb5-1.21-final...krb5-1.21.1-final",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-36054",
+            "https://web.mit.edu/kerberos/www/advisories/",
+            "https://www.cve.org/CVERecord?id=CVE-2023-36054"
+          ],
+          "PublishedDate": "2023-08-07T19:15:00Z",
+          "LastModifiedDate": "2023-08-15T17:57:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-2953",
+          "PkgID": "libldap-2.5-0@2.5.16+dfsg-0ubuntu0.22.04.1",
+          "PkgName": "libldap-2.5-0",
+          "InstalledVersion": "2.5.16+dfsg-0ubuntu0.22.04.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-2953",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "null pointer dereference in  ber_memalloc_x  function",
+          "Description": "A vulnerability was found in openldap. This security flaw causes a null pointer dereference in ber_memalloc_x() function.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-476"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:H",
+              "V3Score": 7.1
+            }
+          },
+          "References": [
+            "http://seclists.org/fulldisclosure/2023/Jul/47",
+            "http://seclists.org/fulldisclosure/2023/Jul/48",
+            "http://seclists.org/fulldisclosure/2023/Jul/52",
+            "https://access.redhat.com/security/cve/CVE-2023-2953",
+            "https://bugs.openldap.org/show_bug.cgi?id=9904",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-2953",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-2953",
+            "https://security.netapp.com/advisory/ntap-20230703-0005/",
+            "https://support.apple.com/kb/HT213843",
+            "https://support.apple.com/kb/HT213844",
+            "https://support.apple.com/kb/HT213845",
+            "https://ubuntu.com/security/notices/USN-6197-1",
+            "https://www.cve.org/CVERecord?id=CVE-2023-2953"
+          ],
+          "PublishedDate": "2023-05-30T22:15:00Z",
+          "LastModifiedDate": "2023-08-02T16:46:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-2953",
+          "PkgID": "libldap-common@2.5.16+dfsg-0ubuntu0.22.04.1",
+          "PkgName": "libldap-common",
+          "InstalledVersion": "2.5.16+dfsg-0ubuntu0.22.04.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-2953",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "null pointer dereference in  ber_memalloc_x  function",
+          "Description": "A vulnerability was found in openldap. This security flaw causes a null pointer dereference in ber_memalloc_x() function.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-476"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:H",
+              "V3Score": 7.1
+            }
+          },
+          "References": [
+            "http://seclists.org/fulldisclosure/2023/Jul/47",
+            "http://seclists.org/fulldisclosure/2023/Jul/48",
+            "http://seclists.org/fulldisclosure/2023/Jul/52",
+            "https://access.redhat.com/security/cve/CVE-2023-2953",
+            "https://bugs.openldap.org/show_bug.cgi?id=9904",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-2953",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-2953",
+            "https://security.netapp.com/advisory/ntap-20230703-0005/",
+            "https://support.apple.com/kb/HT213843",
+            "https://support.apple.com/kb/HT213844",
+            "https://support.apple.com/kb/HT213845",
+            "https://ubuntu.com/security/notices/USN-6197-1",
+            "https://www.cve.org/CVERecord?id=CVE-2023-2953"
+          ],
+          "PublishedDate": "2023-05-30T22:15:00Z",
+          "LastModifiedDate": "2023-08-02T16:46:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2017-11164",
+          "PkgID": "libpcre3@2:8.39-13ubuntu0.22.04.1",
+          "PkgName": "libpcre3",
+          "InstalledVersion": "2:8.39-13ubuntu0.22.04.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2017-11164",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "pcre: OP_KETRMAX feature in the match function in pcre_exec.c",
+          "Description": "In PCRE 8.41, the OP_KETRMAX feature in the match function in pcre_exec.c allows stack exhaustion (uncontrolled recursion) when processing a crafted regular expression.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-674"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:N/C:N/I:N/A:C",
+              "V3Vector": "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V2Score": 7.8,
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.0/AV:L/AC:L/PR:N/UI:R/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            }
+          },
+          "References": [
+            "http://openwall.com/lists/oss-security/2017/07/11/3",
+            "http://www.openwall.com/lists/oss-security/2023/04/11/1",
+            "http://www.openwall.com/lists/oss-security/2023/04/12/1",
+            "http://www.securityfocus.com/bid/99575",
+            "https://access.redhat.com/security/cve/CVE-2017-11164",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-11164",
+            "https://lists.apache.org/thread.html/rf9fa47ab66495c78bb4120b0754dd9531ca2ff0430f6685ac9b07772@%3Cdev.mina.apache.org%3E",
+            "https://nvd.nist.gov/vuln/detail/CVE-2017-11164",
+            "https://www.cve.org/CVERecord?id=CVE-2017-11164"
+          ],
+          "PublishedDate": "2017-07-11T03:29:00Z",
+          "LastModifiedDate": "2023-04-12T15:15:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-4016",
+          "PkgID": "libprocps8@2:3.3.17-6ubuntu2",
+          "PkgName": "libprocps8",
+          "InstalledVersion": "2:3.3.17-6ubuntu2",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-4016",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "ps buffer overflow",
+          "Description": "Under some circumstances, this weakness allows a user who has access to run the “ps” utility on a machine, the ability to write almost unlimited amounts of unfiltered data into the process heap.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 2.5
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-4016",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-4016",
+            "https://gitlab.com/procps-ng/procps",
+            "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/SUETRRT24OFGPYK6ACPM5VUGHNKH5CQ5/",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-4016",
+            "https://www.cve.org/CVERecord?id=CVE-2023-4016"
+          ],
+          "PublishedDate": "2023-08-02T05:15:00Z",
+          "LastModifiedDate": "2023-08-21T03:15:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-46908",
+          "PkgID": "libsqlite3-0@3.37.2-2ubuntu0.1",
+          "PkgName": "libsqlite3-0",
+          "InstalledVersion": "3.37.2-2ubuntu0.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-46908",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "safe mode authorizer callback allows disallowed UDFs",
+          "Description": "SQLite through 3.40.0, when relying on --safe for execution of an untrusted CLI script, does not properly implement the azProhibitedFunctions protection mechanism, and instead allows UDF functions such as WRITEFILE.",
+          "Severity": "LOW",
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:L",
+              "V3Score": 7.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:L",
+              "V3Score": 7.3
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-46908",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-46908",
+            "https://news.ycombinator.com/item?id=33948588",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-46908",
+            "https://security.netapp.com/advisory/ntap-20230203-0005/",
+            "https://sqlite.org/forum/forumpost/07beac8056151b2f",
+            "https://sqlite.org/src/info/cefc032473ac5ad2",
+            "https://www.cve.org/CVERecord?id=CVE-2022-46908"
+          ],
+          "PublishedDate": "2022-12-12T06:15:00Z",
+          "LastModifiedDate": "2023-03-07T18:21:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-2975",
+          "PkgID": "libssl3@3.0.2-0ubuntu1.10",
+          "PkgName": "libssl3",
+          "InstalledVersion": "3.0.2-0ubuntu1.10",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-2975",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "AES-SIV cipher implementation contains a bug that causes it to ignore empty associated data entries",
+          "Description": "Issue summary: The AES-SIV cipher implementation contains a bug that causes\nit to ignore empty associated data entries which are unauthenticated as\na consequence.\n\nImpact summary: Applications that use the AES-SIV algorithm and want to\nauthenticate empty data entries as associated data can be mislead by removing\nadding or reordering such empty entries as these are ignored by the OpenSSL\nimplementation. We are currently unaware of any such applications.\n\nThe AES-SIV algorithm allows for authentication of multiple associated\ndata entries along with the encryption. To authenticate empty data the\napplication has to call EVP_EncryptUpdate() (or EVP_CipherUpdate()) with\nNULL pointer as the output buffer and 0 as the input buffer length.\nThe AES-SIV implementation in OpenSSL just returns success for such a call\ninstead of performing the associated data authentication operation.\nThe empty data thus will not be authenticated.\n\nAs this issue does not affect non-empty associated data authentication and\nwe expect it to be rare for an application to use empty associated data\nentries this is qualified as Low severity issue.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-287"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+              "V3Score": 5.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+              "V3Score": 5.3
+            }
+          },
+          "References": [
+            "http://www.openwall.com/lists/oss-security/2023/07/15/1",
+            "http://www.openwall.com/lists/oss-security/2023/07/19/5",
+            "https://access.redhat.com/security/cve/CVE-2023-2975",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-2975",
+            "https://git.openssl.org/gitweb/?p=openssl.git;a=commitdiff;h=00e2f5eea29994d19293ec4e8c8775ba73678598",
+            "https://git.openssl.org/gitweb/?p=openssl.git;a=commitdiff;h=6a83f0c958811f07e0d11dfc6b5a6a98edfd5bdc",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-2975",
+            "https://security.netapp.com/advisory/ntap-20230725-0004/",
+            "https://www.cve.org/CVERecord?id=CVE-2023-2975",
+            "https://www.openssl.org/news/secadv/20230714.txt"
+          ],
+          "PublishedDate": "2023-07-14T12:15:00Z",
+          "LastModifiedDate": "2023-07-27T13:02:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-4899",
+          "PkgID": "libzstd1@1.4.8+dfsg-3build1",
+          "PkgName": "libzstd1",
+          "InstalledVersion": "1.4.8+dfsg-3build1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-4899",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "buffer overrun in util.c",
+          "Description": "A vulnerability was found in zstd v1.4.10, where an attacker can supply empty string as an argument to the command line tool to cause buffer overrun.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-400"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-4899",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-4899",
+            "https://github.com/advisories/GHSA-5c9c-6x87-f9vm",
+            "https://github.com/facebook/zstd/issues/3200",
+            "https://github.com/facebook/zstd/pull/3220",
+            "https://github.com/pypa/advisory-database/tree/main/vulns/zstd/PYSEC-2023-121.yaml",
+            "https://github.com/sergey-dryabzhinsky/python-zstd/commit/c8a619aebdbd6b838fbfef6e19325a70f631a4c6",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-4899",
+            "https://security.netapp.com/advisory/ntap-20230725-0005/",
+            "https://www.cve.org/CVERecord?id=CVE-2022-4899"
+          ],
+          "PublishedDate": "2023-03-31T20:15:00Z",
+          "LastModifiedDate": "2023-07-25T15:15:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2016-20013",
+          "PkgID": "locales@2.35-0ubuntu3.1",
+          "PkgName": "locales",
+          "InstalledVersion": "2.35-0ubuntu3.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2016-20013",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Description": "sha256crypt and sha512crypt through 0.6 allow attackers to cause a denial of service (CPU consumption) because the algorithm's runtime is proportional to the square of the length of the password.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-770"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:N/C:N/I:N/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V2Score": 5,
+              "V3Score": 7.5
+            }
+          },
+          "References": [
+            "https://akkadia.org/drepper/SHA-crypt.txt",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2016-20013",
+            "https://pthree.org/2018/05/23/do-not-use-sha256crypt-sha512crypt-theyre-dangerous/",
+            "https://twitter.com/solardiz/status/795601240151457793"
+          ],
+          "PublishedDate": "2022-02-19T05:15:00Z",
+          "LastModifiedDate": "2022-03-03T16:43:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-29383",
+          "PkgID": "login@1:4.8.1-2ubuntu2.1",
+          "PkgName": "login",
+          "InstalledVersion": "1:4.8.1-2ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-29383",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "Improper input validation in shadow-utils package utility chfn",
+          "Description": "In Shadow 4.13, it is possible to inject control characters into fields provided to the SUID program chfn (change finger). Although it is not possible to exploit this directly (e.g., adding a new user fails because \\n is in the block list), it is possible to misrepresent the /etc/passwd file when viewed. Use of \\r manipulations and Unicode characters to work around blocking of the : character make it possible to give the impression that a new user has been added. In other words, an adversary may be able to convince a system administrator to take the system offline (an indirect, social-engineered denial of service) by demonstrating that \"cat /etc/passwd\" shows a rogue user account.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-74"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:N/I:N/A:H",
+              "V3Score": 5.5
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-29383",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-29383",
+            "https://github.com/shadow-maint/shadow/commit/e5905c4b84d4fb90aefcd96ee618411ebfac663d",
+            "https://github.com/shadow-maint/shadow/pull/687",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-29383",
+            "https://www.cve.org/CVERecord?id=CVE-2023-29383",
+            "https://www.trustwave.com/en-us/resources/blogs/spiderlabs-blog/cve-2023-29383-abusing-linux-chfn-to-misrepresent-etc-passwd/",
+            "https://www.trustwave.com/en-us/resources/security-resources/security-advisories/?fid=31797"
+          ],
+          "PublishedDate": "2023-04-14T22:15:00Z",
+          "LastModifiedDate": "2023-04-24T18:05:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-28531",
+          "PkgID": "openssh-client@1:8.9p1-3ubuntu0.3",
+          "PkgName": "openssh-client",
+          "InstalledVersion": "1:8.9p1-3ubuntu0.3",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-28531",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "openssh: smartcard keys to ssh-agent without the intended per-hop destination constraints.",
+          "Description": "ssh-add in OpenSSH before 9.3 adds smartcard keys to ssh-agent without the intended per-hop destination constraints. The earliest affected version is 8.9.",
+          "Severity": "LOW",
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:H",
+              "V3Score": 9.1
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-28531",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-28531",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-28531",
+            "https://security.gentoo.org/glsa/202307-01",
+            "https://security.netapp.com/advisory/ntap-20230413-0008/",
+            "https://www.cve.org/CVERecord?id=CVE-2023-28531",
+            "https://www.openwall.com/lists/oss-security/2023/03/15/8"
+          ],
+          "PublishedDate": "2023-03-17T04:15:00Z",
+          "LastModifiedDate": "2023-07-21T19:21:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-2975",
+          "PkgID": "openssl@3.0.2-0ubuntu1.10",
+          "PkgName": "openssl",
+          "InstalledVersion": "3.0.2-0ubuntu1.10",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:2177853d3a50eaf46a9aa6f17de40bd5cfa7c58622098afdbc450a382ec3dda2",
+            "DiffID": "sha256:56c15a78adfbdd60dced18f9ffe3b92a518658ab617348dc4f905f09dce55091"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-2975",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "AES-SIV cipher implementation contains a bug that causes it to ignore empty associated data entries",
+          "Description": "Issue summary: The AES-SIV cipher implementation contains a bug that causes\nit to ignore empty associated data entries which are unauthenticated as\na consequence.\n\nImpact summary: Applications that use the AES-SIV algorithm and want to\nauthenticate empty data entries as associated data can be mislead by removing\nadding or reordering such empty entries as these are ignored by the OpenSSL\nimplementation. We are currently unaware of any such applications.\n\nThe AES-SIV algorithm allows for authentication of multiple associated\ndata entries along with the encryption. To authenticate empty data the\napplication has to call EVP_EncryptUpdate() (or EVP_CipherUpdate()) with\nNULL pointer as the output buffer and 0 as the input buffer length.\nThe AES-SIV implementation in OpenSSL just returns success for such a call\ninstead of performing the associated data authentication operation.\nThe empty data thus will not be authenticated.\n\nAs this issue does not affect non-empty associated data authentication and\nwe expect it to be rare for an application to use empty associated data\nentries this is qualified as Low severity issue.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-287"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+              "V3Score": 5.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+              "V3Score": 5.3
+            }
+          },
+          "References": [
+            "http://www.openwall.com/lists/oss-security/2023/07/15/1",
+            "http://www.openwall.com/lists/oss-security/2023/07/19/5",
+            "https://access.redhat.com/security/cve/CVE-2023-2975",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-2975",
+            "https://git.openssl.org/gitweb/?p=openssl.git;a=commitdiff;h=00e2f5eea29994d19293ec4e8c8775ba73678598",
+            "https://git.openssl.org/gitweb/?p=openssl.git;a=commitdiff;h=6a83f0c958811f07e0d11dfc6b5a6a98edfd5bdc",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-2975",
+            "https://security.netapp.com/advisory/ntap-20230725-0004/",
+            "https://www.cve.org/CVERecord?id=CVE-2023-2975",
+            "https://www.openssl.org/news/secadv/20230714.txt"
+          ],
+          "PublishedDate": "2023-07-14T12:15:00Z",
+          "LastModifiedDate": "2023-07-27T13:02:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-29383",
+          "PkgID": "passwd@1:4.8.1-2ubuntu2.1",
+          "PkgName": "passwd",
+          "InstalledVersion": "1:4.8.1-2ubuntu2.1",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-29383",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "Improper input validation in shadow-utils package utility chfn",
+          "Description": "In Shadow 4.13, it is possible to inject control characters into fields provided to the SUID program chfn (change finger). Although it is not possible to exploit this directly (e.g., adding a new user fails because \\n is in the block list), it is possible to misrepresent the /etc/passwd file when viewed. Use of \\r manipulations and Unicode characters to work around blocking of the : character make it possible to give the impression that a new user has been added. In other words, an adversary may be able to convince a system administrator to take the system offline (an indirect, social-engineered denial of service) by demonstrating that \"cat /etc/passwd\" shows a rogue user account.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-74"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N",
+              "V3Score": 3.3
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:N/I:N/A:H",
+              "V3Score": 5.5
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-29383",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-29383",
+            "https://github.com/shadow-maint/shadow/commit/e5905c4b84d4fb90aefcd96ee618411ebfac663d",
+            "https://github.com/shadow-maint/shadow/pull/687",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-29383",
+            "https://www.cve.org/CVERecord?id=CVE-2023-29383",
+            "https://www.trustwave.com/en-us/resources/blogs/spiderlabs-blog/cve-2023-29383-abusing-linux-chfn-to-misrepresent-etc-passwd/",
+            "https://www.trustwave.com/en-us/resources/security-resources/security-advisories/?fid=31797"
+          ],
+          "PublishedDate": "2023-04-14T22:15:00Z",
+          "LastModifiedDate": "2023-04-24T18:05:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2018-6952",
+          "PkgID": "patch@2.7.6-7build2",
+          "PkgName": "patch",
+          "InstalledVersion": "2.7.6-7build2",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2018-6952",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "patch: Double free of memory in pch.c:another_hunk() causes a crash",
+          "Description": "A double free exists in the another_hunk function in pch.c in GNU patch through 2.7.6.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-415"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:N/C:N/I:N/A:P",
+              "V3Vector": "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V2Score": 5,
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.0/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 3.3
+            }
+          },
+          "References": [
+            "http://www.securityfocus.com/bid/103047",
+            "https://access.redhat.com/errata/RHSA-2019:2033",
+            "https://access.redhat.com/security/cve/CVE-2018-6952",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2018-6952",
+            "https://linux.oracle.com/cve/CVE-2018-6952.html",
+            "https://linux.oracle.com/errata/ELSA-2019-2033.html",
+            "https://nvd.nist.gov/vuln/detail/CVE-2018-6952",
+            "https://savannah.gnu.org/bugs/index.php?53133",
+            "https://security.gentoo.org/glsa/201904-17",
+            "https://www.cve.org/CVERecord?id=CVE-2018-6952"
+          ],
+          "PublishedDate": "2018-02-13T19:29:00Z",
+          "LastModifiedDate": "2019-04-17T20:29:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2021-45261",
+          "PkgID": "patch@2.7.6-7build2",
+          "PkgName": "patch",
+          "InstalledVersion": "2.7.6-7build2",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2021-45261",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "Invalid Pointer via another_hunk function",
+          "Description": "An Invalid Pointer vulnerability exists in GNU patch 2.7 via the another_hunk function, which causes a Denial of Service.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-763"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:N/AC:M/Au:N/C:N/I:N/A:P",
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:N/I:N/A:H",
+              "V2Score": 4.3,
+              "V3Score": 5.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:N/I:N/A:H",
+              "V3Score": 5.5
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2021-45261",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-45261",
+            "https://nvd.nist.gov/vuln/detail/CVE-2021-45261",
+            "https://savannah.gnu.org/bugs/?61685",
+            "https://www.cve.org/CVERecord?id=CVE-2021-45261"
+          ],
+          "PublishedDate": "2021-12-22T18:15:00Z",
+          "LastModifiedDate": "2021-12-28T14:24:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-4016",
+          "PkgID": "procps@2:3.3.17-6ubuntu2",
+          "PkgName": "procps",
+          "InstalledVersion": "2:3.3.17-6ubuntu2",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:32314eda6de267099bfab4e1741b5c735e3f3c9038f0c1adb29e4515f9d9ec9f",
+            "DiffID": "sha256:cb7d97fba6c330797c2aba092409c582294f2102e610e9f5ce4b1309c7cffafe"
+          },
+          "SeveritySource": "ubuntu",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-4016",
+          "DataSource": {
+            "ID": "ubuntu",
+            "Name": "Ubuntu CVE Tracker",
+            "URL": "https://git.launchpad.net/ubuntu-cve-tracker"
+          },
+          "Title": "ps buffer overflow",
+          "Description": "Under some circumstances, this weakness allows a user who has access to run the “ps” utility on a machine, the ability to write almost unlimited amounts of unfiltered data into the process heap.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-787"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 5.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 2.5
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-4016",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-4016",
+            "https://gitlab.com/procps-ng/procps",
+            "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/SUETRRT24OFGPYK6ACPM5VUGHNKH5CQ5/",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-4016",
+            "https://www.cve.org/CVERecord?id=CVE-2023-4016"
+          ],
+          "PublishedDate": "2023-08-02T05:15:00Z",
+          "LastModifiedDate": "2023-08-21T03:15:00Z"
+        }
+      ]
+    },
+    {
+      "Target": "Node.js",
+      "Class": "lang-pkgs",
+      "Type": "node-pkg",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "GHSA-h6ch-v84p-w6p9",
+          "PkgID": "diff@1.0.0",
+          "PkgName": "diff",
+          "PkgPath": "app/code-server/lib/vscode/extensions/diff/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "3.5.0",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://github.com/advisories/GHSA-h6ch-v84p-w6p9",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Regular Expression Denial of Service (ReDoS)",
+          "Description": "A vulnerability was found in diff before v3.5.0, the affected versions of this package are vulnerable to Regular Expression Denial of Service (ReDoS) attacks.",
+          "Severity": "HIGH",
+          "References": [
+            "https://bugzilla.redhat.com/show_bug.cgi?id=1552148",
+            "https://github.com/advisories/GHSA-h6ch-v84p-w6p9",
+            "https://github.com/kpdecker/jsdiff/commit/2aec4298639bf30fb88a00b356bf404d3551b8c0",
+            "https://snyk.io/vuln/npm:diff:20180305",
+            "https://www.npmjs.com/advisories/1631",
+            "https://www.whitesourcesoftware.com/vulnerability-database/WS-2018-0590"
+          ]
+        },
+        {
+          "VulnerabilityID": "CVE-2020-7729",
+          "PkgID": "grunt@1.0.0",
+          "PkgName": "grunt",
+          "PkgPath": "app/code-server/lib/vscode/extensions/grunt/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "1.3.0",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2020-7729",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "The package grunt before 1.3.0 are vulnerable to Arbitrary Code Execut ...",
+          "Description": "The package grunt before 1.3.0 are vulnerable to Arbitrary Code Execution due to the default usage of the function load() instead of its secure replacement safeLoad() of the package js-yaml inside grunt.file.readYAML.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-1188"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:R/S:U/C:H/I:H/A:H",
+              "V3Score": 7.1
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:H/Au:S/C:P/I:P/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:R/S:U/C:H/I:H/A:H",
+              "V2Score": 4.6,
+              "V3Score": 7.1
+            }
+          },
+          "References": [
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-7729",
+            "https://github.com/advisories/GHSA-m5pj-vjjf-4m3h",
+            "https://github.com/gruntjs/grunt/blob/master/lib/grunt/file.js%23L249",
+            "https://github.com/gruntjs/grunt/commit/e350cea1724eb3476464561a380fb6a64e61e4e7",
+            "https://lists.debian.org/debian-lts-announce/2020/09/msg00008.html",
+            "https://nvd.nist.gov/vuln/detail/CVE-2020-7729",
+            "https://snyk.io/vuln/SNYK-JAVA-ORGWEBJARSNPM-607922",
+            "https://snyk.io/vuln/SNYK-JS-GRUNT-597546",
+            "https://ubuntu.com/security/notices/USN-4595-1",
+            "https://ubuntu.com/security/notices/USN-5847-1",
+            "https://usn.ubuntu.com/4595-1/"
+          ],
+          "PublishedDate": "2020-09-03T09:15:00Z",
+          "LastModifiedDate": "2022-11-16T14:05:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-1537",
+          "PkgID": "grunt@1.0.0",
+          "PkgName": "grunt",
+          "PkgPath": "app/code-server/lib/vscode/extensions/grunt/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "1.5.3",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-1537",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "race condition leading to arbitrary file write",
+          "Description": "file.copy operations in GruntJS are vulnerable to a TOCTOU race condition leading to arbitrary file write in GitHub repository gruntjs/grunt prior to 1.5.3. This vulnerability is capable of arbitrary file writes which can lead to local privilege escalation to the GruntJS user if a lower-privileged user has write access to both source and destination directories as the lower-privileged user can create a symlink to the GruntJS user's .bashrc file or replace /etc/shadow file if the GruntJS user is root.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-367"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 7
+            },
+            "nvd": {
+              "V2Vector": "AV:L/AC:M/Au:N/C:C/I:C/A:C",
+              "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:N/S:U/C:H/I:H/A:H",
+              "V2Score": 6.9,
+              "V3Score": 7
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 7.8
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-1537",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-1537",
+            "https://github.com/advisories/GHSA-rm36-94g8-835r",
+            "https://github.com/gruntjs/grunt/commit/58016ffac5ed9338b63ecc2a63710f5027362bae",
+            "https://huntr.dev/bounties/0179c3e5-bc02-4fc9-8491-a1a319b51b4d",
+            "https://lists.debian.org/debian-lts-announce/2023/04/msg00006.html",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-1537",
+            "https://ubuntu.com/security/notices/USN-5847-1",
+            "https://www.cve.org/CVERecord?id=CVE-2022-1537"
+          ],
+          "PublishedDate": "2022-05-10T14:15:00Z",
+          "LastModifiedDate": "2023-04-05T22:15:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-0436",
+          "PkgID": "grunt@1.0.0",
+          "PkgName": "grunt",
+          "PkgPath": "app/code-server/lib/vscode/extensions/grunt/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "1.5.2",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-0436",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Path Traversal in GitHub repository gruntjs/grunt prior to 1.5.2.",
+          "Description": "Path Traversal in GitHub repository gruntjs/grunt prior to 1.5.2.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-22"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N",
+              "V3Score": 5.5
+            },
+            "nvd": {
+              "V2Vector": "AV:L/AC:L/Au:N/C:P/I:N/A:N",
+              "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N",
+              "V2Score": 2.1,
+              "V3Score": 5.5
+            }
+          },
+          "References": [
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-0436",
+            "https://github.com/advisories/GHSA-j383-35pm-c5h4",
+            "https://github.com/gruntjs/grunt/commit/aad3d4521c3098fb255fb2db8f2e1d691a033665",
+            "https://github.com/gruntjs/grunt/commit/aad3d4521c3098fb255fb2db8f2e1d691a033665 (v1.5.0)",
+            "https://github.com/gruntjs/grunt/commit/b0ec6e12426fc8d5720dee1702f6a67455c5986c",
+            "https://github.com/gruntjs/grunt/pull/1740",
+            "https://github.com/gruntjs/grunt/pull/1743",
+            "https://huntr.dev/bounties/f55315e9-9f6d-4dbb-8c40-bae50c1ae92b",
+            "https://lists.debian.org/debian-lts-announce/2023/04/msg00008.html",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-0436",
+            "https://ubuntu.com/security/notices/USN-5847-1"
+          ],
+          "PublishedDate": "2022-04-12T21:15:00Z",
+          "LastModifiedDate": "2023-04-06T15:15:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2019-19919",
+          "PkgID": "handlebars@1.0.0",
+          "PkgName": "handlebars",
+          "PkgPath": "app/code-server/lib/vscode/extensions/handlebars/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "4.3.0",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2019-19919",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "nodejs-handlebars: prototype pollution leading to remote code execution via crafted payloads",
+          "Description": "Versions of handlebars prior to 4.3.0 are vulnerable to Prototype Pollution leading to Remote Code Execution. Templates may alter an Object's __proto__ and __defineGetter__ properties, which may allow an attacker to execute arbitrary code through crafted payloads.",
+          "Severity": "CRITICAL",
+          "CweIDs": [
+            "CWE-1321"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:N/C:P/I:P/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V2Score": 7.5,
+              "V3Score": 9.8
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:L/I:L/A:N",
+              "V3Score": 4.2
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2019-19919",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-19919",
+            "https://github.com/advisories/GHSA-w457-6q6x-cgp9",
+            "https://github.com/wycats/handlebars.js/commit/2078c727c627f25d4a149962f05c1e069beb18bc",
+            "https://github.com/wycats/handlebars.js/issues/1558",
+            "https://nvd.nist.gov/vuln/detail/CVE-2019-19919",
+            "https://www.cve.org/CVERecord?id=CVE-2019-19919",
+            "https://www.npmjs.com/advisories/1164",
+            "https://www.tenable.com/security/tns-2021-14"
+          ],
+          "PublishedDate": "2019-12-20T23:15:00Z",
+          "LastModifiedDate": "2022-06-03T18:48:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2021-23369",
+          "PkgID": "handlebars@1.0.0",
+          "PkgName": "handlebars",
+          "PkgPath": "app/code-server/lib/vscode/extensions/handlebars/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "4.7.7",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2021-23369",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "nodejs-handlebars: Remote code execution when compiling untrusted compile templates with strict:true option",
+          "Description": "The package handlebars before 4.7.7 are vulnerable to Remote Code Execution (RCE) when selecting certain compiling options to compile templates coming from an untrusted source.",
+          "Severity": "CRITICAL",
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:N/C:P/I:P/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V2Score": 7.5,
+              "V3Score": 9.8
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2021-23369",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-23369",
+            "https://github.com/advisories/GHSA-f2jv-r9rf-7988",
+            "https://github.com/handlebars-lang/handlebars.js/commit/b6d3de7123eebba603e321f04afdbae608e8fea8",
+            "https://github.com/handlebars-lang/handlebars.js/commit/f0589701698268578199be25285b2ebea1c1e427",
+            "https://nvd.nist.gov/vuln/detail/CVE-2021-23369",
+            "https://security.netapp.com/advisory/ntap-20210604-0008/",
+            "https://snyk.io/vuln/SNYK-JAVA-ORGWEBJARS-1074950",
+            "https://snyk.io/vuln/SNYK-JAVA-ORGWEBJARSBOWER-1074951",
+            "https://snyk.io/vuln/SNYK-JAVA-ORGWEBJARSNPM-1074952",
+            "https://snyk.io/vuln/SNYK-JS-HANDLEBARS-1056767",
+            "https://www.cve.org/CVERecord?id=CVE-2021-23369"
+          ],
+          "PublishedDate": "2021-04-12T14:15:00Z",
+          "LastModifiedDate": "2021-06-08T13:54:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2021-23383",
+          "PkgID": "handlebars@1.0.0",
+          "PkgName": "handlebars",
+          "PkgPath": "app/code-server/lib/vscode/extensions/handlebars/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "4.7.7",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2021-23383",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "nodejs-handlebars: Remote code execution when compiling untrusted compile templates with compat:true option",
+          "Description": "The package handlebars before 4.7.7 are vulnerable to Prototype Pollution when selecting certain compiling options to compile templates coming from an untrusted source.",
+          "Severity": "CRITICAL",
+          "CweIDs": [
+            "CWE-1321"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:N/C:P/I:P/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V2Score": 7.5,
+              "V3Score": 9.8
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2021-23383",
+            "https://github.com/advisories/GHSA-765h-qjxv-5f44",
+            "https://github.com/handlebars-lang/handlebars.js/commit/f0589701698268578199be25285b2ebea1c1e427",
+            "https://nvd.nist.gov/vuln/detail/CVE-2021-23383",
+            "https://security.netapp.com/advisory/ntap-20210618-0007/",
+            "https://snyk.io/vuln/SNYK-JAVA-ORGWEBJARS-1279031",
+            "https://snyk.io/vuln/SNYK-JAVA-ORGWEBJARSBOWER-1279032",
+            "https://snyk.io/vuln/SNYK-JAVA-ORGWEBJARSNPM-1279030",
+            "https://snyk.io/vuln/SNYK-JS-HANDLEBARS-1279029",
+            "https://www.cve.org/CVERecord?id=CVE-2021-23383",
+            "https://www.npmjs.com/package/handlebars"
+          ],
+          "PublishedDate": "2021-05-04T09:15:00Z",
+          "LastModifiedDate": "2021-12-03T19:59:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2019-20920",
+          "PkgID": "handlebars@1.0.0",
+          "PkgName": "handlebars",
+          "PkgPath": "app/code-server/lib/vscode/extensions/handlebars/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "4.5.3, 3.0.8",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2019-20920",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "nodejs-handlebars: lookup helper fails to properly validate templates allowing for arbitrary JavaScript execution",
+          "Description": "Handlebars before 3.0.8 and 4.x before 4.5.3 is vulnerable to Arbitrary Code Execution. The lookup helper fails to properly validate templates, allowing attackers to submit templates that execute arbitrary JavaScript. This can be used to run arbitrary code on a server processing Handlebars templates or in a victim's browser (effectively serving as XSS).",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-94"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:C/C:H/I:L/A:L",
+              "V3Score": 8.1
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:M/Au:N/C:P/I:P/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:C/C:H/I:L/A:L",
+              "V2Score": 6.8,
+              "V3Score": 8.1
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:C/C:H/I:L/A:L",
+              "V3Score": 8.1
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2019-20920",
+            "https://github.com/advisories/GHSA-3cqr-58rm-57f8",
+            "https://github.com/handlebars-lang/handlebars.js/commit/d54137810a49939fd2ad01a91a34e182ece4528e",
+            "https://nvd.nist.gov/vuln/detail/CVE-2019-20920",
+            "https://snyk.io/vuln/SNYK-JS-HANDLEBARS-534478",
+            "https://www.cve.org/CVERecord?id=CVE-2019-20920",
+            "https://www.npmjs.com/advisories/1316",
+            "https://www.npmjs.com/advisories/1324",
+            "https://www.npmjs.com/package/handlebars"
+          ],
+          "PublishedDate": "2020-09-30T18:15:00Z",
+          "LastModifiedDate": "2020-10-15T17:35:00Z"
+        },
+        {
+          "VulnerabilityID": "GHSA-2cf5-4w76-r9qv",
+          "PkgID": "handlebars@1.0.0",
+          "PkgName": "handlebars",
+          "PkgPath": "app/code-server/lib/vscode/extensions/handlebars/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "4.5.2, 3.0.8",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://github.com/advisories/GHSA-2cf5-4w76-r9qv",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Arbitrary Code Execution in handlebars",
+          "Description": "Versions of `handlebars` prior to 3.0.8 or 4.5.2 are vulnerable to Arbitrary Code Execution. The package's lookup helper fails to properly validate templates, allowing attackers to submit templates that execute arbitrary JavaScript in the system. It can be used to run arbitrary code in a server processing Handlebars templates or on a victim's browser (effectively serving as Cross-Site Scripting).\n\nThe following template can be used to demonstrate the vulnerability:  \n```{{#with \"constructor\"}}\n\t{{#with split as |a|}}\n\t\t{{pop (push \"alert('Vulnerable Handlebars JS');\")}}\n\t\t{{#with (concat (lookup join (slice 0 1)))}}\n\t\t\t{{#each (slice 2 3)}}\n\t\t\t\t{{#with (apply 0 a)}}\n\t\t\t\t\t{{.}}\n\t\t\t\t{{/with}}\n\t\t\t{{/each}}\n\t\t{{/with}}\n\t{{/with}}\n{{/with}}```\n\n\n## Recommendation\n\nUpgrade to version 3.0.8, 4.5.2 or later.",
+          "Severity": "HIGH",
+          "References": [
+            "https://github.com/advisories/GHSA-2cf5-4w76-r9qv",
+            "https://www.npmjs.com/advisories/1316"
+          ]
+        },
+        {
+          "VulnerabilityID": "GHSA-g9r4-xpmj-mj65",
+          "PkgID": "handlebars@1.0.0",
+          "PkgName": "handlebars",
+          "PkgPath": "app/code-server/lib/vscode/extensions/handlebars/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "4.5.3, 3.0.8",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://github.com/advisories/GHSA-g9r4-xpmj-mj65",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Prototype Pollution in handlebars",
+          "Description": "Versions of `handlebars` prior to 3.0.8 or 4.5.3 are vulnerable to prototype pollution. It is possible to add or modify properties to the Object prototype through a malicious template. This may allow attackers to crash the application or execute Arbitrary Code in specific conditions.\n\n\n## Recommendation\n\nUpgrade to version 3.0.8, 4.5.3 or later.",
+          "Severity": "HIGH",
+          "References": [
+            "https://github.com/advisories/GHSA-g9r4-xpmj-mj65",
+            "https://www.npmjs.com/advisories/1325"
+          ]
+        },
+        {
+          "VulnerabilityID": "GHSA-q2c6-c6pm-g3gh",
+          "PkgID": "handlebars@1.0.0",
+          "PkgName": "handlebars",
+          "PkgPath": "app/code-server/lib/vscode/extensions/handlebars/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "4.5.3, 3.0.8",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://github.com/advisories/GHSA-q2c6-c6pm-g3gh",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Arbitrary Code Execution in handlebars",
+          "Description": "Versions of `handlebars` prior to 3.0.8 or 4.5.3 are vulnerable to Arbitrary Code Execution. The package's lookup helper fails to properly validate templates, allowing attackers to submit templates that execute arbitrary JavaScript in the system. It is due to an incomplete fix for a [previous issue](https://www.npmjs.com/advisories/1316). This vulnerability can be used to run arbitrary code in a server processing Handlebars templates or on a victim's browser (effectively serving as Cross-Site Scripting).\n\n\n## Recommendation\n\nUpgrade to version 3.0.8, 4.5.3 or later.",
+          "Severity": "HIGH",
+          "References": [
+            "https://github.com/advisories/GHSA-q2c6-c6pm-g3gh",
+            "https://www.npmjs.com/advisories/1324"
+          ]
+        },
+        {
+          "VulnerabilityID": "GHSA-q42p-pg8m-cqh6",
+          "PkgID": "handlebars@1.0.0",
+          "PkgName": "handlebars",
+          "PkgPath": "app/code-server/lib/vscode/extensions/handlebars/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "3.0.7, 4.0.14, 4.1.2",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://github.com/advisories/GHSA-q42p-pg8m-cqh6",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Prototype Pollution in handlebars",
+          "Description": "Versions of `handlebars` prior to 4.0.14 are vulnerable to Prototype Pollution. Templates may alter an Objects' prototype, thus allowing an attacker to execute arbitrary code on the server.\n\n\n## Recommendation\n\nFor handlebars 4.1.x upgrade to 4.1.2 or later.\nFor handlebars 4.0.x upgrade to 4.0.14 or later.",
+          "Severity": "HIGH",
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L",
+              "V3Score": 7.3
+            }
+          },
+          "References": [
+            "https://github.com/advisories/GHSA-q42p-pg8m-cqh6",
+            "https://github.com/handlebars-lang/handlebars.js/commit/0d6d8c335ad81bad1b672fc56b6a44f6aa472dac",
+            "https://github.com/handlebars-lang/handlebars.js/commit/7372d4e9dffc9d70c09671aa28b9392a1577fd86",
+            "https://github.com/handlebars-lang/handlebars.js/commit/85c8783b34fc6d36145d8b53885ad0b9e3c3f9c4",
+            "https://github.com/handlebars-lang/handlebars.js/commit/cd38583216dce3252831916323202749431c773e",
+            "https://github.com/handlebars-lang/handlebars.js/issues/1495",
+            "https://snyk.io/vuln/SNYK-JS-HANDLEBARS-173692",
+            "https://www.npmjs.com/advisories/755"
+          ]
+        },
+        {
+          "VulnerabilityID": "CVE-2015-8861",
+          "PkgID": "handlebars@1.0.0",
+          "PkgName": "handlebars",
+          "PkgPath": "app/code-server/lib/vscode/extensions/handlebars/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "\u003e=4.0.0",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "nodejs-security-wg",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2015-8861",
+          "DataSource": {
+            "ID": "nodejs-security-wg",
+            "Name": "Node.js Ecosystem Security Working Group",
+            "URL": "https://github.com/nodejs/security-wg"
+          },
+          "Title": "The handlebars package before 4.0.0 for Node.js allows remote attacker ...",
+          "Description": "The handlebars package before 4.0.0 for Node.js allows remote attackers to conduct cross-site scripting (XSS) attacks by leveraging a template with an attribute that is not quoted.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-79"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+              "V3Score": 6.1
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:M/Au:N/C:N/I:P/A:N",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+              "V2Score": 4.3,
+              "V3Score": 6.1
+            }
+          },
+          "References": [
+            "http://www.openwall.com/lists/oss-security/2016/04/20/11",
+            "http://www.securityfocus.com/bid/96434",
+            "https://blog.srcclr.com/handlebars_vulnerability_research_findings/",
+            "https://github.com/advisories/GHSA-9prh-257w-9277",
+            "https://github.com/wycats/handlebars.js/pull/1083",
+            "https://nvd.nist.gov/vuln/detail/CVE-2015-8861",
+            "https://www.npmjs.com/advisories/61",
+            "https://www.sourceclear.com/blog/handlebars_vulnerability_research_findings/",
+            "https://www.tenable.com/security/tns-2016-18"
+          ],
+          "PublishedDate": "2017-01-23T21:59:00Z",
+          "LastModifiedDate": "2020-04-22T12:54:00Z"
+        },
+        {
+          "VulnerabilityID": "NSWG-ECO-519",
+          "PkgID": "handlebars@1.0.0",
+          "PkgName": "handlebars",
+          "PkgPath": "app/code-server/lib/vscode/extensions/handlebars/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "\u003e=4.6.0",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "nodejs-security-wg",
+          "PrimaryURL": "https://hackerone.com/reports/726364",
+          "DataSource": {
+            "ID": "nodejs-security-wg",
+            "Name": "Node.js Ecosystem Security Working Group",
+            "URL": "https://github.com/nodejs/security-wg"
+          },
+          "Title": "Denial of Service",
+          "Description": "Crash Node.js process from handlebars using a small and simple source",
+          "Severity": "MEDIUM",
+          "References": [
+            "https://hackerone.com/reports/726364"
+          ]
+        },
+        {
+          "VulnerabilityID": "CVE-2020-7788",
+          "PkgID": "ini@1.0.0",
+          "PkgName": "ini",
+          "PkgPath": "app/code-server/lib/vscode/extensions/ini/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "1.3.6",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2020-7788",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "nodejs-ini: Prototype pollution via malicious INI file",
+          "Description": "This affects the package ini before 1.3.6. If an attacker submits a malicious INI file to an application that parses it with ini.parse, they will pollute the prototype on the application. This can be exploited further depending on the context.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-1321"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L",
+              "V3Score": 7.3
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:N/C:P/I:P/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V2Score": 7.5,
+              "V3Score": 9.8
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L",
+              "V3Score": 7.3
+            }
+          },
+          "References": [
+            "https://access.redhat.com/errata/RHSA-2022:6595",
+            "https://access.redhat.com/security/cve/CVE-2020-7788",
+            "https://bugzilla.redhat.com/1907444",
+            "https://bugzilla.redhat.com/1945459",
+            "https://bugzilla.redhat.com/1964461",
+            "https://bugzilla.redhat.com/2007557",
+            "https://bugzilla.redhat.com/2098556",
+            "https://bugzilla.redhat.com/2102001",
+            "https://bugzilla.redhat.com/2105422",
+            "https://bugzilla.redhat.com/2105426",
+            "https://bugzilla.redhat.com/2105428",
+            "https://bugzilla.redhat.com/2105430",
+            "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-7788",
+            "https://errata.almalinux.org/9/ALSA-2022-6595.html",
+            "https://github.com/advisories/GHSA-qqgx-2p2h-9c37",
+            "https://github.com/npm/ini/commit/56d2805e07ccd94e2ba0984ac9240ff02d44b6f1",
+            "https://github.com/npm/ini/commit/56d2805e07ccd94e2ba0984ac9240ff02d44b6f1 (v1.3.6)",
+            "https://linux.oracle.com/cve/CVE-2020-7788.html",
+            "https://linux.oracle.com/errata/ELSA-2022-6595.html",
+            "https://lists.debian.org/debian-lts-announce/2020/12/msg00032.html",
+            "https://nvd.nist.gov/vuln/detail/CVE-2020-7788",
+            "https://snyk.io/vuln/SNYK-JS-INI-1048974",
+            "https://www.cve.org/CVERecord?id=CVE-2020-7788",
+            "https://www.npmjs.com/advisories/1589"
+          ],
+          "PublishedDate": "2020-12-11T11:15:00Z",
+          "LastModifiedDate": "2022-12-02T19:40:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2020-7712",
+          "PkgID": "json@1.0.0",
+          "PkgName": "json",
+          "PkgPath": "app/code-server/lib/vscode/extensions/json/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "10.0.0",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2020-7712",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Command injection in json",
+          "Description": "This affects the package json before 10.0.0. It is possible to inject arbritary commands using the parseLookup function.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-78"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 7.2
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:S/C:P/I:P/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H",
+              "V2Score": 6.5,
+              "V3Score": 7.2
+            }
+          },
+          "References": [
+            "https://github.com/advisories/GHSA-3c6g-pvg8-gqw2",
+            "https://github.com/trentm/json/commit/cc4798169f9e0f181f8aa61905b88479badcd483",
+            "https://github.com/trentm/json/issues/144",
+            "https://github.com/trentm/json/pull/145",
+            "https://lists.apache.org/thread.html/r37c0e1807da7ff2bdd028bbe296465a6bbb99e2320dbe661d5d8b33b@%3Cissues.zookeeper.apache.org%3E",
+            "https://lists.apache.org/thread.html/r3b04f4e99a19613f88ae088aa18cd271231a3c79dfff8f5efa8cda61@%3Cissues.zookeeper.apache.org%3E",
+            "https://lists.apache.org/thread.html/r5f17bfca1d6e7f4b33ae978725b2fd62a9f1b3111696eafa9add802d@%3Cissues.zookeeper.apache.org%3E",
+            "https://lists.apache.org/thread.html/r8d2e174230f6d26e16c007546e804c343f1f68956f526daaafa4aaae@%3Cdev.zookeeper.apache.org%3E",
+            "https://lists.apache.org/thread.html/r977a907ecbedf87ae5ba47d4c77639efb120f74d4d1b3de14a4ef4da@%3Cissues.flink.apache.org%3E",
+            "https://lists.apache.org/thread.html/r9c6d28e5b9a9b3481b7d1f90f1c2f75cd1a5ade91038426e0fb095da@%3Cdev.flink.apache.org%3E",
+            "https://lists.apache.org/thread.html/ra890c24b3d90be36daf48ae76b263acb297003db24c1122f8e4aaef2@%3Cissues.flink.apache.org%3E",
+            "https://lists.apache.org/thread.html/rb023d54a46da1ac0d8969097f5fecc79636b07d3b80db7b818a5c55c@%3Cissues.zookeeper.apache.org%3E",
+            "https://lists.apache.org/thread.html/rb2b981912446a74e14fe6076c4b7c7d8502727ea0718e6a65a9b1be5@%3Cissues.zookeeper.apache.org%3E",
+            "https://lists.apache.org/thread.html/rb89bd82dffec49f83b49e9ad625b1b63a408b3c7d1a60d6f049142a0@%3Cissues.flink.apache.org%3E",
+            "https://lists.apache.org/thread.html/rba7ea4d75d6a8e5b935991d960d9b893fd30e576c4d3b531084ebd7d@%3Cissues.flink.apache.org%3E",
+            "https://lists.apache.org/thread.html/rd9b9cc843f5cf5b532bdad9e87a817967efcf52b917e8c43b6df4cc7@%3Cissues.zookeeper.apache.org%3E",
+            "https://lists.apache.org/thread.html/rec8bb4d637b04575da41cfae49118e108e95d43bfac39b7b698ee4db@%3Cissues.zookeeper.apache.org%3E",
+            "https://lists.apache.org/thread.html/ree3abcd33c06ee95ab59faa1751198a1186d8941ddc2c2562c12966c@%3Cissues.zookeeper.apache.org%3E",
+            "https://nvd.nist.gov/vuln/detail/CVE-2020-7712",
+            "https://snyk.io/vuln/SNYK-JAVA-ORGWEBJARS-608932",
+            "https://snyk.io/vuln/SNYK-JAVA-ORGWEBJARSNPM-608931",
+            "https://snyk.io/vuln/SNYK-JS-JSON-597481",
+            "https://www.oracle.com//security-alerts/cpujul2021.html",
+            "https://www.oracle.com/security-alerts/cpujan2022.html",
+            "https://www.oracle.com/security-alerts/cpujul2022.html"
+          ],
+          "PublishedDate": "2020-08-30T08:15:00Z",
+          "LastModifiedDate": "2022-12-03T14:56:00Z"
+        },
+        {
+          "VulnerabilityID": "GHSA-wx77-rp39-c6vg",
+          "PkgID": "markdown@1.0.0",
+          "PkgName": "markdown",
+          "PkgPath": "app/code-server/lib/vscode/extensions/markdown-basics/package.json",
+          "InstalledVersion": "1.0.0",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://github.com/advisories/GHSA-wx77-rp39-c6vg",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Regular Expression Denial of Service in markdown",
+          "Description": "All versions of `markdown` are vulnerable to Regular Expression Denial of Service (ReDoS). The `markdown.toHTML()` function has significantly degraded performance when parsing long strings containing underscores. This may lead to Denial of Service if the parser accepts user input.\n\n\n## Recommendation\n\nNo fix is currently available. Consider using an alternative package until a fix is made available.",
+          "Severity": "LOW",
+          "References": [
+            "https://github.com/advisories/GHSA-wx77-rp39-c6vg",
+            "https://www.npmjs.com/advisories/1330"
+          ]
+        },
+        {
+          "VulnerabilityID": "CVE-2018-7408",
+          "PkgID": "npm@1.0.1",
+          "PkgName": "npm",
+          "PkgPath": "app/code-server/lib/vscode/extensions/npm/package.json",
+          "InstalledVersion": "1.0.1",
+          "FixedVersion": "5.7.1",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2018-7408",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Incorrect Permission Assignment for Critical Resource in NPM",
+          "Description": "An issue was discovered in an npm 5.7.0 2018-02-21 pre-release (marked as \"next: 5.7.0\" and therefore automatically installed by an \"npm upgrade -g npm\" command, and also announced in the vendor's blog without mention of pre-release status). It might allow local users to bypass intended filesystem access restrictions because ownerships of /etc and /usr directories are being changed unexpectedly, related to a \"correctMkdir\" issue.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-732"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.0/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 7.8
+            },
+            "nvd": {
+              "V2Vector": "AV:L/AC:L/Au:N/C:P/I:P/A:P",
+              "V3Vector": "CVSS:3.0/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+              "V2Score": 4.6,
+              "V3Score": 7.8
+            }
+          },
+          "References": [
+            "http://blog.npmjs.org/post/171169301000/v571",
+            "https://github.com/advisories/GHSA-ph34-pc88-72gc",
+            "https://github.com/npm/npm/commit/74e149da6efe6ed89477faa81fef08eee7999ad0",
+            "https://github.com/npm/npm/issues/19883",
+            "https://nvd.nist.gov/vuln/detail/CVE-2018-7408"
+          ],
+          "PublishedDate": "2018-02-22T18:29:00Z",
+          "LastModifiedDate": "2019-10-03T00:03:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2019-16775",
+          "PkgID": "npm@1.0.1",
+          "PkgName": "npm",
+          "PkgPath": "app/code-server/lib/vscode/extensions/npm/package.json",
+          "InstalledVersion": "1.0.1",
+          "FixedVersion": "6.13.3",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2019-16775",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "npm: Symlink reference outside of node_modules folder through the bin field upon installation",
+          "Description": "Versions of the npm CLI prior to 6.13.3 are vulnerable to an Arbitrary File Write. It is possible for packages to create symlinks to files outside of thenode_modules folder through the bin field upon installation. A properly constructed entry in the package.json bin field would allow a package publisher to create a symlink pointing to arbitrary files on a user's system when the package is installed. This behavior is still possible through install scripts. This vulnerability bypasses a user using the --ignore-scripts install option.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-61"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:R/S:C/C:H/I:H/A:N",
+              "V3Score": 7.7
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:S/C:N/I:P/A:N",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N",
+              "V2Score": 4,
+              "V3Score": 6.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:R/S:U/C:N/I:H/A:N",
+              "V3Score": 4.8
+            }
+          },
+          "References": [
+            "http://lists.opensuse.org/opensuse-security-announce/2020-01/msg00027.html",
+            "https://access.redhat.com/errata/RHEA-2020:0330",
+            "https://access.redhat.com/errata/RHSA-2020:0573",
+            "https://access.redhat.com/errata/RHSA-2020:0579",
+            "https://access.redhat.com/errata/RHSA-2020:0597",
+            "https://access.redhat.com/errata/RHSA-2020:0602",
+            "https://access.redhat.com/security/cve/CVE-2019-16775",
+            "https://blog.npmjs.org/post/189618601100/binary-planting-with-the-npm-cli",
+            "https://errata.almalinux.org/8/ALSA-2020-0579.html",
+            "https://github.com/advisories/GHSA-m6cx-g6qm-p2cx",
+            "https://github.com/npm/cli/security/advisories/GHSA-m6cx-g6qm-p2cx",
+            "https://linux.oracle.com/cve/CVE-2019-16775.html",
+            "https://linux.oracle.com/errata/ELSA-2020-0579.html",
+            "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/Z36UKPO5F3PQ3Q2POMF5LEKXWAH5RUFP/",
+            "https://nvd.nist.gov/vuln/detail/CVE-2019-16775",
+            "https://www.cve.org/CVERecord?id=CVE-2019-16775",
+            "https://www.npmjs.com/advisories/1434",
+            "https://www.oracle.com/security-alerts/cpujan2020.html",
+            "https://www.oracle.com/security-alerts/cpuoct2021.html"
+          ],
+          "PublishedDate": "2019-12-13T01:15:00Z",
+          "LastModifiedDate": "2023-01-24T16:10:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2019-16776",
+          "PkgID": "npm@1.0.1",
+          "PkgName": "npm",
+          "PkgPath": "app/code-server/lib/vscode/extensions/npm/package.json",
+          "InstalledVersion": "1.0.1",
+          "FixedVersion": "6.13.3",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2019-16776",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "npm: Arbitrary file write via constructed entry in the package.json bin field",
+          "Description": "Versions of the npm CLI prior to 6.13.3 are vulnerable to an Arbitrary File Write. It fails to prevent access to folders outside of the intended node_modules folder through the bin field. A properly constructed entry in the package.json bin field would allow a package publisher to modify and/or gain access to arbitrary files on a user's system when the package is installed. This behavior is still possible through install scripts. This vulnerability bypasses a user using the --ignore-scripts install option.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-22"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:R/S:C/C:H/I:H/A:N",
+              "V3Score": 7.7
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:S/C:P/I:P/A:N",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N",
+              "V2Score": 5.5,
+              "V3Score": 8.1
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:R/S:U/C:N/I:H/A:N",
+              "V3Score": 4.8
+            }
+          },
+          "References": [
+            "http://lists.opensuse.org/opensuse-security-announce/2020-01/msg00027.html",
+            "https://access.redhat.com/errata/RHEA-2020:0330",
+            "https://access.redhat.com/errata/RHSA-2020:0573",
+            "https://access.redhat.com/errata/RHSA-2020:0579",
+            "https://access.redhat.com/errata/RHSA-2020:0597",
+            "https://access.redhat.com/errata/RHSA-2020:0602",
+            "https://access.redhat.com/security/cve/CVE-2019-16776",
+            "https://blog.npmjs.org/post/189618601100/binary-planting-with-the-npm-cli",
+            "https://errata.almalinux.org/8/ALSA-2020-0579.html",
+            "https://github.com/advisories/GHSA-x8qc-rrcw-4r46",
+            "https://github.com/npm/cli/security/advisories/GHSA-x8qc-rrcw-4r46",
+            "https://linux.oracle.com/cve/CVE-2019-16776.html",
+            "https://linux.oracle.com/errata/ELSA-2020-0579.html",
+            "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/Z36UKPO5F3PQ3Q2POMF5LEKXWAH5RUFP/",
+            "https://nvd.nist.gov/vuln/detail/CVE-2019-16776",
+            "https://www.cve.org/CVERecord?id=CVE-2019-16776",
+            "https://www.npmjs.com/advisories/1436",
+            "https://www.oracle.com/security-alerts/cpujan2020.html"
+          ],
+          "PublishedDate": "2019-12-13T01:15:00Z",
+          "LastModifiedDate": "2022-08-02T20:45:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2019-16777",
+          "PkgID": "npm@1.0.1",
+          "PkgName": "npm",
+          "PkgPath": "app/code-server/lib/vscode/extensions/npm/package.json",
+          "InstalledVersion": "1.0.1",
+          "FixedVersion": "6.13.4",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2019-16777",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "npm: Global node_modules Binary Overwrite",
+          "Description": "Versions of the npm CLI prior to 6.13.4 are vulnerable to an Arbitrary File Overwrite. It fails to prevent existing globally-installed binaries to be overwritten by other package installations. For example, if a package was installed globally and created a serve binary, any subsequent installs of packages that also create a serve binary would overwrite the previous serve binary. This behavior is still allowed in local installations and also through install scripts. This vulnerability bypasses a user using the --ignore-scripts install option.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-269"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:R/S:C/C:H/I:H/A:N",
+              "V3Score": 7.7
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:S/C:N/I:P/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N",
+              "V2Score": 5.5,
+              "V3Score": 6.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:R/S:U/C:N/I:H/A:N",
+              "V3Score": 4.8
+            }
+          },
+          "References": [
+            "http://lists.opensuse.org/opensuse-security-announce/2020-01/msg00027.html",
+            "https://access.redhat.com/errata/RHEA-2020:0330",
+            "https://access.redhat.com/errata/RHSA-2020:0573",
+            "https://access.redhat.com/errata/RHSA-2020:0579",
+            "https://access.redhat.com/errata/RHSA-2020:0597",
+            "https://access.redhat.com/errata/RHSA-2020:0602",
+            "https://access.redhat.com/security/cve/CVE-2019-16777",
+            "https://blog.npmjs.org/post/189618601100/binary-planting-with-the-npm-cli",
+            "https://errata.almalinux.org/8/ALSA-2020-0579.html",
+            "https://github.com/advisories/GHSA-4328-8hgf-7wjr",
+            "https://github.com/npm/cli/security/advisories/GHSA-4328-8hgf-7wjr",
+            "https://linux.oracle.com/cve/CVE-2019-16777.html",
+            "https://linux.oracle.com/errata/ELSA-2020-0579.html",
+            "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/Z36UKPO5F3PQ3Q2POMF5LEKXWAH5RUFP/",
+            "https://nvd.nist.gov/vuln/detail/CVE-2019-16777",
+            "https://security.gentoo.org/glsa/202003-48",
+            "https://www.cve.org/CVERecord?id=CVE-2019-16777",
+            "https://www.npmjs.com/advisories/1437",
+            "https://www.oracle.com/security-alerts/cpujan2020.html"
+          ],
+          "PublishedDate": "2019-12-13T01:15:00Z",
+          "LastModifiedDate": "2022-08-02T20:45:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2016-3956",
+          "PkgID": "npm@1.0.1",
+          "PkgName": "npm",
+          "PkgPath": "app/code-server/lib/vscode/extensions/npm/package.json",
+          "InstalledVersion": "1.0.1",
+          "FixedVersion": "\u003e= 2.15.1 \u003c= 3.0.0, \u003e= 3.8.3",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "nodejs-security-wg",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2016-3956",
+          "DataSource": {
+            "ID": "nodejs-security-wg",
+            "Name": "Node.js Ecosystem Security Working Group",
+            "URL": "https://github.com/nodejs/security-wg"
+          },
+          "Title": "npm: bearer token leak to non-registry hosts",
+          "Description": "The CLI in npm before 2.15.1 and 3.x before 3.8.3, as used in Node.js 0.10 before 0.10.44, 0.12 before 0.12.13, 4 before 4.4.2, and 5 before 5.10.0, includes bearer tokens with arbitrary requests, which allows remote HTTP servers to obtain sensitive information by reading Authorization headers.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-200"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:N/AC:L/Au:N/C:P/I:N/A:N",
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+              "V2Score": 5,
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V2Vector": "AV:N/AC:M/Au:N/C:P/I:N/A:N",
+              "V2Score": 4.3
+            }
+          },
+          "References": [
+            "http://blog.npmjs.org/post/142036323955/fixing-a-bearer-token-vulnerability",
+            "http://www-01.ibm.com/support/docview.wss?uid=swg21980827",
+            "https://access.redhat.com/security/cve/CVE-2016-3956",
+            "https://github.com/advisories/GHSA-m5h6-hr3q-22h5",
+            "https://github.com/npm/npm/commit/f67ecad59e99a03e5aad8e93cd1a086ae087cb29",
+            "https://github.com/npm/npm/commit/fea8cc92cee02c720b58f95f14d315507ccad401",
+            "https://github.com/npm/npm/issues/8380",
+            "https://nodejs.org/en/blog/vulnerability/npm-tokens-leak-march-2016/",
+            "https://nodesecurity.io/advisories/98",
+            "https://nvd.nist.gov/vuln/detail/CVE-2016-3956",
+            "https://www.cve.org/CVERecord?id=CVE-2016-3956",
+            "https://www.npmjs.com/advisories/98"
+          ],
+          "PublishedDate": "2016-07-02T14:59:00Z",
+          "LastModifiedDate": "2021-06-15T16:30:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2020-15095",
+          "PkgID": "npm@1.0.1",
+          "PkgName": "npm",
+          "PkgPath": "app/code-server/lib/vscode/extensions/npm/package.json",
+          "InstalledVersion": "1.0.1",
+          "FixedVersion": "6.14.6",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2020-15095",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "npm: sensitive information exposure through logs",
+          "Description": "Versions of the npm CLI prior to 6.14.6 are vulnerable to an information exposure vulnerability through log files. The CLI supports URLs like \"\u003cprotocol\u003e://[\u003cuser\u003e[:\u003cpassword\u003e]@]\u003chostname\u003e[:\u003cport\u003e][:][/]\u003cpath\u003e\". The password value is not redacted and is printed to stdout and also to any generated log files.",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-532"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:R/S:U/C:H/I:N/A:N",
+              "V3Score": 4.4
+            },
+            "nvd": {
+              "V2Vector": "AV:L/AC:M/Au:N/C:P/I:N/A:N",
+              "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:R/S:U/C:H/I:N/A:N",
+              "V2Score": 1.9,
+              "V3Score": 4.4
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:R/S:U/C:H/I:N/A:N",
+              "V3Score": 4.4
+            }
+          },
+          "References": [
+            "http://lists.opensuse.org/opensuse-security-announce/2020-10/msg00011.html",
+            "http://lists.opensuse.org/opensuse-security-announce/2020-10/msg00015.html",
+            "http://lists.opensuse.org/opensuse-security-announce/2020-10/msg00023.html",
+            "https://access.redhat.com/security/cve/CVE-2020-15095",
+            "https://errata.almalinux.org/8/ALSA-2021-0548.html",
+            "https://github.com/advisories/GHSA-93f3-23rq-pjfp",
+            "https://github.com/npm/cli/blob/66aab417f836a901f8afb265251f761bb0422463/CHANGELOG.md#6146-2020-07-07",
+            "https://github.com/npm/cli/commit/a9857b8f6869451ff058789c4631fadfde5bbcbc",
+            "https://github.com/npm/cli/security/advisories/GHSA-93f3-23rq-pjfp",
+            "https://linux.oracle.com/cve/CVE-2020-15095.html",
+            "https://linux.oracle.com/errata/ELSA-2021-0548.html",
+            "https://lists.fedoraproject.org/archives/list/package-announce@lists.fedoraproject.org/message/4OOYAMJVLLCLXDTHW3V5UXNULZBBK4O6/",
+            "https://nvd.nist.gov/vuln/detail/CVE-2020-15095",
+            "https://security.gentoo.org/glsa/202101-07",
+            "https://www.cve.org/CVERecord?id=CVE-2020-15095"
+          ],
+          "PublishedDate": "2020-07-07T19:15:00Z",
+          "LastModifiedDate": "2022-08-02T20:44:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2013-4116",
+          "PkgID": "npm@1.0.1",
+          "PkgName": "npm",
+          "PkgPath": "app/code-server/lib/vscode/extensions/npm/package.json",
+          "InstalledVersion": "1.0.1",
+          "FixedVersion": "\u003e=1.3.3",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "nodejs-security-wg",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2013-4116",
+          "DataSource": {
+            "ID": "nodejs-security-wg",
+            "Name": "Node.js Ecosystem Security Working Group",
+            "URL": "https://github.com/nodejs/security-wg"
+          },
+          "Title": "npm: Insecure temporary directory generation",
+          "Description": "lib/npm.js in Node Packaged Modules (npm) before 1.3.3 allows local users to overwrite arbitrary files via a symlink attack on temporary files with predictable names that are created when unpacking archives.",
+          "Severity": "LOW",
+          "CweIDs": [
+            "CWE-59"
+          ],
+          "CVSS": {
+            "nvd": {
+              "V2Vector": "AV:L/AC:M/Au:N/C:N/I:P/A:P",
+              "V2Score": 3.3
+            },
+            "redhat": {
+              "V2Vector": "AV:L/AC:M/Au:N/C:N/I:P/A:N",
+              "V2Score": 1.9
+            }
+          },
+          "References": [
+            "http://www.openwall.com/lists/oss-security/2013/07/10/17",
+            "http://www.openwall.com/lists/oss-security/2013/07/11/9",
+            "http://www.securityfocus.com/bid/61083",
+            "https://access.redhat.com/security/cve/CVE-2013-4116",
+            "https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=715325",
+            "https://bugzilla.redhat.com/show_bug.cgi?id=983917",
+            "https://exchange.xforce.ibmcloud.com/vulnerabilities/87141",
+            "https://github.com/advisories/GHSA-v3jv-wrf4-5845",
+            "https://github.com/npm/npm/commit/f4d31693",
+            "https://github.com/npm/npm/issues/3635",
+            "https://nvd.nist.gov/vuln/detail/CVE-2013-4116",
+            "https://www.cve.org/CVERecord?id=CVE-2013-4116",
+            "https://www.npmjs.com/advisories/152"
+          ],
+          "PublishedDate": "2014-04-22T14:23:00Z",
+          "LastModifiedDate": "2020-10-14T13:21:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-36665",
+          "PkgID": "protobufjs@6.11.3",
+          "PkgName": "protobufjs",
+          "PkgPath": "app/code-server/node_modules/protobufjs/package.json",
+          "InstalledVersion": "6.11.3",
+          "FixedVersion": "6.11.4, 7.2.4",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-36665",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "prototype pollution using user-controlled protobuf message",
+          "Description": "protobuf.js (aka protobufjs) 6.10.0 through 7.x before 7.2.4 allows Prototype Pollution, a different vulnerability than CVE-2022-25878. A user-controlled protobuf message can be used by an attacker to pollute the prototype of Object.prototype by adding and overwriting its data and functions. Exploitation can involve: (1) using the function parse to parse protobuf messages on the fly, (2) loading .proto files by using load/loadSync functions, or (3) providing untrusted input to the functions ReflectionObject.setParsedOption and util.setProperty. NOTE: this CVE Record is about \"Object.constructor.prototype.\u003cnew-property\u003e = ...;\" whereas CVE-2022-25878 was about \"Object.__proto__.\u003cnew-property\u003e = ...;\" instead.",
+          "Severity": "CRITICAL",
+          "CweIDs": [
+            "CWE-1321"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:H",
+              "V3Score": 8.6
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-36665",
+            "https://github.com/advisories/GHSA-h755-8qp9-cq85",
+            "https://github.com/protobufjs/protobuf.js/commit/e66379f451b0393c27d87b37fa7d271619e16b0d",
+            "https://github.com/protobufjs/protobuf.js/commits/release-6.11.4",
+            "https://github.com/protobufjs/protobuf.js/compare/protobufjs-v7.2.3...protobufjs-v7.2.4",
+            "https://github.com/protobufjs/protobuf.js/pull/1899",
+            "https://github.com/protobufjs/protobuf.js/releases/tag/protobufjs-v7.2.4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-36665",
+            "https://www.code-intelligence.com/blog/cve-protobufjs-prototype-pollution-cve-2023-36665",
+            "https://www.cve.org/CVERecord?id=CVE-2023-36665"
+          ],
+          "PublishedDate": "2023-07-05T14:15:00Z",
+          "LastModifiedDate": "2023-07-12T15:50:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2021-21353",
+          "PkgID": "pug@1.0.0",
+          "PkgName": "pug",
+          "PkgPath": "app/code-server/lib/vscode/extensions/pug/package.json",
+          "InstalledVersion": "1.0.0",
+          "FixedVersion": "3.0.1",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2021-21353",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "user provided objects as input to pug templates can achieve remote code execution",
+          "Description": "Pug is an npm package which is a high-performance template engine. In pug before version 3.0.1, if a remote attacker was able to control the `pretty` option of the pug compiler, e.g. if you spread a user provided object such as the query parameters of a request into the pug template inputs, it was possible for them to achieve remote code execution on the node.js backend. This is fixed in version 3.0.1. This advisory applies to multiple pug packages including \"pug\", \"pug-code-gen\". pug-code-gen has a backported fix at version 2.0.3. This advisory is not exploitable if there is no way for un-trusted input to be passed to pug as the `pretty` option, e.g. if you compile templates in advance before applying user input to them, you do not need to upgrade.",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-74"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:C/C:N/I:H/A:N",
+              "V3Score": 6.8
+            },
+            "nvd": {
+              "V2Vector": "AV:N/AC:M/Au:N/C:P/I:P/A:P",
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:C/C:H/I:H/A:H",
+              "V2Score": 6.8,
+              "V3Score": 9
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:C/C:H/I:H/A:H",
+              "V3Score": 9
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2021-21353",
+            "https://github.com/advisories/GHSA-p493-635q-r6gr",
+            "https://github.com/pugjs/pug/commit/991e78f7c4220b2f8da042877c6f0ef5a4683be0",
+            "https://github.com/pugjs/pug/issues/3312",
+            "https://github.com/pugjs/pug/pull/3314",
+            "https://github.com/pugjs/pug/releases/tag/pug%403.0.1",
+            "https://github.com/pugjs/pug/security/advisories/GHSA-p493-635q-r6gr",
+            "https://nvd.nist.gov/vuln/detail/CVE-2021-21353",
+            "https://www.cve.org/CVERecord?id=CVE-2021-21353",
+            "https://www.npmjs.com/package/pug",
+            "https://www.npmjs.com/package/pug-code-gen"
+          ],
+          "PublishedDate": "2021-03-03T02:15:00Z",
+          "LastModifiedDate": "2021-03-09T15:35:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-24999",
+          "PkgID": "qs@6.7.0",
+          "PkgName": "qs",
+          "PkgPath": "app/code-server/node_modules/body-parser/node_modules/qs/package.json",
+          "InstalledVersion": "6.7.0",
+          "FixedVersion": "6.2.4, 6.3.3, 6.4.1, 6.5.3, 6.6.1, 6.7.3, 6.8.3, 6.9.7, 6.10.3",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-24999",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "\"qs\" prototype poisoning causes the hang of the node process",
+          "Description": "qs before 6.10.3, as used in Express before 4.17.3 and other products, allows attackers to cause a Node process hang for an Express application because an __ proto__ key can be used. In many typical Express use cases, an unauthenticated remote attacker can place the attack payload in the query string of the URL that is used to visit the application, such as a[__proto__]=b\u0026a[__proto__]\u0026a[length]=100000000. The fix was backported to qs 6.9.7, 6.8.3, 6.7.3, 6.6.1, 6.5.3, 6.4.1, 6.3.3, and 6.2.4 (and therefore Express 4.17.3, which has \"deps: qs@6.9.7\" in its release description, is not vulnerable).",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-1321"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            }
+          },
+          "References": [
+            "https://access.redhat.com/errata/RHSA-2023:0050",
+            "https://access.redhat.com/security/cve/CVE-2022-24999",
+            "https://bugzilla.redhat.com/2044591",
+            "https://bugzilla.redhat.com/2066009",
+            "https://bugzilla.redhat.com/2134609",
+            "https://bugzilla.redhat.com/2140911",
+            "https://bugzilla.redhat.com/2150323",
+            "https://errata.almalinux.org/8/ALSA-2023-0050.html",
+            "https://github.com/advisories/GHSA-hrpp-h998-j3pp",
+            "https://github.com/expressjs/express/releases/tag/4.17.3",
+            "https://github.com/ljharb/qs/commit/4310742efbd8c03f6495f07906b45213da0a32ec",
+            "https://github.com/ljharb/qs/commit/727ef5d34605108acb3513f72d5435972ed15b68",
+            "https://github.com/ljharb/qs/commit/73205259936317b40f447c5cdb71c5b341848e1b",
+            "https://github.com/ljharb/qs/commit/8b4cc14cda94a5c89341b77e5fe435ec6c41be2d",
+            "https://github.com/ljharb/qs/commit/ba24e74dd17931f825adb52f5633e48293b584e1",
+            "https://github.com/ljharb/qs/commit/e799ba57e573a30c14b67c1889c7c04d508b9105",
+            "https://github.com/ljharb/qs/commit/ed0f5dcbef4b168a8ae299d78b1e4a2e9b1baf1f",
+            "https://github.com/ljharb/qs/commit/f945393cfe442fe8c6e62b4156fd35452c0686ee",
+            "https://github.com/ljharb/qs/commit/fc3682776670524a42e19709ec4a8138d0d7afda",
+            "https://github.com/ljharb/qs/pull/428",
+            "https://github.com/n8tz/CVE-2022-24999",
+            "https://linux.oracle.com/cve/CVE-2022-24999.html",
+            "https://linux.oracle.com/errata/ELSA-2023-0050.html",
+            "https://lists.debian.org/debian-lts-announce/2023/01/msg00039.html",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-24999",
+            "https://www.cve.org/CVERecord?id=CVE-2022-24999"
+          ],
+          "PublishedDate": "2022-11-26T22:15:00Z",
+          "LastModifiedDate": "2023-02-16T19:19:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-24999",
+          "PkgID": "qs@6.7.0",
+          "PkgName": "qs",
+          "PkgPath": "app/code-server/node_modules/express/node_modules/qs/package.json",
+          "InstalledVersion": "6.7.0",
+          "FixedVersion": "6.2.4, 6.3.3, 6.4.1, 6.5.3, 6.6.1, 6.7.3, 6.8.3, 6.9.7, 6.10.3",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-24999",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "\"qs\" prototype poisoning causes the hang of the node process",
+          "Description": "qs before 6.10.3, as used in Express before 4.17.3 and other products, allows attackers to cause a Node process hang for an Express application because an __ proto__ key can be used. In many typical Express use cases, an unauthenticated remote attacker can place the attack payload in the query string of the URL that is used to visit the application, such as a[__proto__]=b\u0026a[__proto__]\u0026a[length]=100000000. The fix was backported to qs 6.9.7, 6.8.3, 6.7.3, 6.6.1, 6.5.3, 6.4.1, 6.3.3, and 6.2.4 (and therefore Express 4.17.3, which has \"deps: qs@6.9.7\" in its release description, is not vulnerable).",
+          "Severity": "HIGH",
+          "CweIDs": [
+            "CWE-1321"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            }
+          },
+          "References": [
+            "https://access.redhat.com/errata/RHSA-2023:0050",
+            "https://access.redhat.com/security/cve/CVE-2022-24999",
+            "https://bugzilla.redhat.com/2044591",
+            "https://bugzilla.redhat.com/2066009",
+            "https://bugzilla.redhat.com/2134609",
+            "https://bugzilla.redhat.com/2140911",
+            "https://bugzilla.redhat.com/2150323",
+            "https://errata.almalinux.org/8/ALSA-2023-0050.html",
+            "https://github.com/advisories/GHSA-hrpp-h998-j3pp",
+            "https://github.com/expressjs/express/releases/tag/4.17.3",
+            "https://github.com/ljharb/qs/commit/4310742efbd8c03f6495f07906b45213da0a32ec",
+            "https://github.com/ljharb/qs/commit/727ef5d34605108acb3513f72d5435972ed15b68",
+            "https://github.com/ljharb/qs/commit/73205259936317b40f447c5cdb71c5b341848e1b",
+            "https://github.com/ljharb/qs/commit/8b4cc14cda94a5c89341b77e5fe435ec6c41be2d",
+            "https://github.com/ljharb/qs/commit/ba24e74dd17931f825adb52f5633e48293b584e1",
+            "https://github.com/ljharb/qs/commit/e799ba57e573a30c14b67c1889c7c04d508b9105",
+            "https://github.com/ljharb/qs/commit/ed0f5dcbef4b168a8ae299d78b1e4a2e9b1baf1f",
+            "https://github.com/ljharb/qs/commit/f945393cfe442fe8c6e62b4156fd35452c0686ee",
+            "https://github.com/ljharb/qs/commit/fc3682776670524a42e19709ec4a8138d0d7afda",
+            "https://github.com/ljharb/qs/pull/428",
+            "https://github.com/n8tz/CVE-2022-24999",
+            "https://linux.oracle.com/cve/CVE-2022-24999.html",
+            "https://linux.oracle.com/errata/ELSA-2023-0050.html",
+            "https://lists.debian.org/debian-lts-announce/2023/01/msg00039.html",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-24999",
+            "https://www.cve.org/CVERecord?id=CVE-2022-24999"
+          ],
+          "PublishedDate": "2022-11-26T22:15:00Z",
+          "LastModifiedDate": "2023-02-16T19:19:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-25883",
+          "PkgID": "semver@6.3.0",
+          "PkgName": "semver",
+          "PkgPath": "app/code-server/node_modules/make-dir/node_modules/semver/package.json",
+          "InstalledVersion": "6.3.0",
+          "FixedVersion": "5.7.2, 6.3.1, 7.5.2",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-25883",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Regular expression denial of service",
+          "Description": "Versions of the package semver before 7.5.2 are vulnerable to Regular Expression Denial of Service (ReDoS) via the function new Range, when untrusted user data is provided as a range.\r\r\r",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-1333"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 5.3
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-25883",
+            "https://github.com/advisories/GHSA-c2qf-rxjj-qqgw",
+            "https://github.com/npm/node-semver/blob/main/classes/range.js#L97-L104",
+            "https://github.com/npm/node-semver/blob/main/classes/range.js%23L97-L104",
+            "https://github.com/npm/node-semver/blob/main/internal/re.js#L138",
+            "https://github.com/npm/node-semver/blob/main/internal/re.js#L160",
+            "https://github.com/npm/node-semver/blob/main/internal/re.js%23L138",
+            "https://github.com/npm/node-semver/blob/main/internal/re.js%23L160",
+            "https://github.com/npm/node-semver/commit/2f8fd41487acf380194579ecb6f8b1bbfe116be0",
+            "https://github.com/npm/node-semver/commit/717534ee353682f3bcf33e60a8af4292626d4441",
+            "https://github.com/npm/node-semver/commit/928e56d21150da0413a3333a3148b20e741a920c",
+            "https://github.com/npm/node-semver/pull/564",
+            "https://github.com/npm/node-semver/pull/585",
+            "https://github.com/npm/node-semver/pull/593",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-25883",
+            "https://security.snyk.io/vuln/SNYK-JS-SEMVER-3247795",
+            "https://www.cve.org/CVERecord?id=CVE-2022-25883"
+          ],
+          "PublishedDate": "2023-06-21T05:15:00Z",
+          "LastModifiedDate": "2023-07-12T00:53:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2022-25883",
+          "PkgID": "semver@7.3.5",
+          "PkgName": "semver",
+          "PkgPath": "app/code-server/lib/vscode/node_modules/semver/package.json",
+          "InstalledVersion": "7.3.5",
+          "FixedVersion": "5.7.2, 6.3.1, 7.5.2",
+          "Status": "fixed",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2022-25883",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Regular expression denial of service",
+          "Description": "Versions of the package semver before 7.5.2 are vulnerable to Regular Expression Denial of Service (ReDoS) via the function new Range, when untrusted user data is provided as a range.\r\r\r",
+          "Severity": "MEDIUM",
+          "CweIDs": [
+            "CWE-1333"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L",
+              "V3Score": 5.3
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+              "V3Score": 7.5
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2022-25883",
+            "https://github.com/advisories/GHSA-c2qf-rxjj-qqgw",
+            "https://github.com/npm/node-semver/blob/main/classes/range.js#L97-L104",
+            "https://github.com/npm/node-semver/blob/main/classes/range.js%23L97-L104",
+            "https://github.com/npm/node-semver/blob/main/internal/re.js#L138",
+            "https://github.com/npm/node-semver/blob/main/internal/re.js#L160",
+            "https://github.com/npm/node-semver/blob/main/internal/re.js%23L138",
+            "https://github.com/npm/node-semver/blob/main/internal/re.js%23L160",
+            "https://github.com/npm/node-semver/commit/2f8fd41487acf380194579ecb6f8b1bbfe116be0",
+            "https://github.com/npm/node-semver/commit/717534ee353682f3bcf33e60a8af4292626d4441",
+            "https://github.com/npm/node-semver/commit/928e56d21150da0413a3333a3148b20e741a920c",
+            "https://github.com/npm/node-semver/pull/564",
+            "https://github.com/npm/node-semver/pull/585",
+            "https://github.com/npm/node-semver/pull/593",
+            "https://nvd.nist.gov/vuln/detail/CVE-2022-25883",
+            "https://security.snyk.io/vuln/SNYK-JS-SEMVER-3247795",
+            "https://www.cve.org/CVERecord?id=CVE-2022-25883"
+          ],
+          "PublishedDate": "2023-06-21T05:15:00Z",
+          "LastModifiedDate": "2023-07-12T00:53:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-37466",
+          "PkgID": "vm2@3.9.19",
+          "PkgName": "vm2",
+          "PkgPath": "app/code-server/node_modules/vm2/package.json",
+          "InstalledVersion": "3.9.19",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-37466",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "Promise handler sanitization can be bypassed allowing attackers to escape the sandbox and run arbitrary code",
+          "Description": "vm2 is an advanced vm/sandbox for Node.js. The library contains critical security issues and should not be used for production. The maintenance of the project has been discontinued.  In vm2 for versions up to 3.9.19, `Promise` handler sanitization can be bypassed with `@@species` accessor property allowing attackers to escape the sandbox and run arbitrary code. Remote Code Execution, assuming the attacker has arbitrary code execution primitive inside the context of vm2 sandbox.",
+          "Severity": "CRITICAL",
+          "CweIDs": [
+            "CWE-94"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-37466",
+            "https://github.com/advisories/GHSA-cchq-frgv-rjh5",
+            "https://github.com/patriksimek/vm2/security/advisories/GHSA-cchq-frgv-rjh5",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-37466",
+            "https://www.cve.org/CVERecord?id=CVE-2023-37466"
+          ],
+          "PublishedDate": "2023-07-14T00:15:00Z",
+          "LastModifiedDate": "2023-07-27T12:15:00Z"
+        },
+        {
+          "VulnerabilityID": "CVE-2023-37903",
+          "PkgID": "vm2@3.9.19",
+          "PkgName": "vm2",
+          "PkgPath": "app/code-server/node_modules/vm2/package.json",
+          "InstalledVersion": "3.9.19",
+          "Status": "affected",
+          "Layer": {
+            "Digest": "sha256:76000b692abd282a5bf66a6ca416cc3dbf38d47ab4d222a77581a0d92da6dcbe",
+            "DiffID": "sha256:7a4b0ed921a2b5e697c4adfa4ab19e90cb17aa3880448ff5e626795e9247682f"
+          },
+          "SeveritySource": "ghsa",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-37903",
+          "DataSource": {
+            "ID": "ghsa",
+            "Name": "GitHub Security Advisory Npm",
+            "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Anpm"
+          },
+          "Title": "custom inspect function allows attackers to escape the sandbox and run arbitrary code",
+          "Description": "vm2 is an open source vm/sandbox for Node.js. In vm2 for versions up to and including 3.9.19, Node.js custom inspect function allows attackers to escape the sandbox and run arbitrary code. This may result in Remote Code Execution, assuming the attacker has arbitrary code execution primitive inside the context of vm2 sandbox. There are no patches and no known workarounds. Users are advised to find an alternative software.",
+          "Severity": "CRITICAL",
+          "CweIDs": [
+            "CWE-78"
+          ],
+          "CVSS": {
+            "ghsa": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            },
+            "nvd": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+              "V3Score": 10
+            },
+            "redhat": {
+              "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "V3Score": 9.8
+            }
+          },
+          "References": [
+            "https://access.redhat.com/security/cve/CVE-2023-37903",
+            "https://github.com/advisories/GHSA-g644-9gfx-q4q4",
+            "https://github.com/patriksimek/vm2/security/advisories/GHSA-g644-9gfx-q4q4",
+            "https://nvd.nist.gov/vuln/detail/CVE-2023-37903",
+            "https://www.cve.org/CVERecord?id=CVE-2023-37903"
+          ],
+          "PublishedDate": "2023-07-21T20:15:00Z",
+          "LastModifiedDate": "2023-08-01T12:55:00Z"
+        }
+      ]
+    }
+  ]
+}
