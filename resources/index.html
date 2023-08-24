@@ -6,9 +6,16 @@
     <script src="/js/htmx/1.9.4/htmx.min.js.gz"></script>
   </head>
   <body>
-    <form id="form" hx-swap="outerHTML" hx-post="/clicked">
+    <form
+      id="form"
+      hx-swap="outerHTML"
+      hx-post="/clicked"
+      hx-indicator="#spinner"
+    >
       <input type="text" name="imagename" />
       <button>Submit</button>
+
+      <img id="spinner" class="htmx-indicator" src="/img/bars.svg" />
     </form>
   </body>
 </html>

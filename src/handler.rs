@@ -46,6 +46,17 @@ pub(super) async fn js_htmx_1_9_4() -> impl IntoResponse {
 }
 
 #[tracing::instrument]
+pub(super) async fn img_bars() -> impl IntoResponse {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "image/svg+xml")
+        .body(Full::from(
+            include_bytes!("../resources/img/bars.svg").to_vec(),
+        ))
+        .unwrap()
+}
+
+#[tracing::instrument]
 pub(super) async fn clicked(Form(submit): Form<SubmitForm>) -> impl IntoResponse {
     // run following command trivy image --format json
     // linuxserver/code-server:latest

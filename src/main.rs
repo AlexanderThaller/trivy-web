@@ -74,6 +74,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     let app = Router::new()
         .route("/", get(handler::root))
         .route("/js/htmx/1.9.4/htmx.min.js.gz", get(handler::js_htmx_1_9_4))
+        .route("/img/bars.svg", get(handler::img_bars))
         .route("/clicked", post(handler::clicked));
 
     Server::bind(&addr).serve(app.into_make_service()).await?;
