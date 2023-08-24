@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>title</title>
+    <title>Trivy Web Scanner</title>
     <script src="/js/htmx/1.9.4/htmx.min.js.gz"></script>
   </head>
   <body>
@@ -12,7 +12,7 @@
       hx-post="/clicked"
       hx-indicator="#spinner"
     >
-      <input type="text" name="imagename" />
+      <input style="width: 300px" input="text" name="imagename" />
       <button>Submit</button>
 
       <img id="spinner" class="htmx-indicator" src="/img/bars.svg" />
