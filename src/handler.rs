@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use axum::{
     self,
     body::Full,
@@ -15,7 +17,11 @@ use maud::html;
 use serde::Deserialize;
 use tokio::process::Command;
 
+mod trivy;
+
 use trivy::Output as TrivyJsonOutput;
+
+use self::trivy::Vulnerability;
 
 #[derive(Debug, Deserialize)]
 pub(super) struct SubmitForm {
@@ -44,7 +50,7 @@ pub(super) async fn clicked(Form(submit): Form<SubmitForm>) -> impl IntoResponse
     // run following command trivy image --format json
     // linuxserver/code-server:latest
 
-    let stdout = Command::new("trivy")
+    let output = Command::new("trivy")
         .arg("image")
         .arg("--format")
         .arg("json")
@@ -53,60 +59,79 @@ pub(super) async fn clicked(Form(submit): Form<SubmitForm>) -> impl IntoResponse
         .await
         .expect("failed to execute process");
 
-    let output: Result<TrivyJsonOutput, _> = serde_json::from_slice(&stdout.stdout);
+    if !output.status.success() {
+        let mut buffer = String::new();
+        buffer.push_str("<button onclick=\"window.location.href = '/';\">Scan Again</button>");
+        buffer.push_str("<br />");
+        buffer.push_str("<br />");
+
+        let lines = String::from_utf8_lossy(&output.stderr);
+        let lines = lines.lines();
+
+        let mut failed = false;
+
+        for line in lines {
+            let html = ansi_to_html::convert_escaped(line).unwrap_or_else(|_| {
+                failed = true;
+                "failed to convert trivy output to html".to_string()
+            });
+
+            buffer.push_str(&html);
+            buffer.push_str("<br />");
+        }
+
+        return Html(buffer);
+    }
+
+    let output: Result<TrivyJsonOutput, _> = serde_json::from_slice(&output.stdout);
 
     match output {
-        Ok(output) => Html(
-            html! {
-                @for result in output.results {
-                    @for vulnerability in result.vulnerabilities {
-                        p { (vulnerability.vulnerability_id) }
+        Ok(output) => {
+            let vulnerabilities = output
+                .results
+                .into_iter()
+                .flat_map(|result| result.vulnerabilities)
+                .collect::<BTreeSet<Vulnerability>>();
+
+            Html(
+                html! {
+                    button onclick="window.location.href = '/';" { "Scan Again" }
+
+                    table {
+                        thead {
+                            tr {
+                                th { "vulnerability_id" }
+                                th { "severity" }
+                            }
+                        }
+
+                        tbody {
+                            @for vulnerability in vulnerabilities {
+                                tr {
+                                    @match vulnerability.references {
+                                        Some(references) => {
+                                            td { a href=(references.first().expect("should always have a reference")) { (vulnerability.vulnerability_id) }}
+                                        }
+                                        None => {
+                                            td { (vulnerability.vulnerability_id) }
+                                        }
+                                    }
+                                    td { (vulnerability.severity) }
+                                }
+                            }
+                        }
                     }
                 }
-            }
-            .into_string(),
-        ),
+                .into_string(),
+            )
+        }
 
         Err(err) => Html(
             html! {
+                button onclick="window.location.href = '/';" { "Scan Again" }
                 p { (format!("error: {err}")) }
             }
             .into_string(),
         ),
-    }
-}
-
-mod trivy {
-    use serde::Deserialize;
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "PascalCase")]
-    pub(super) struct Output {
-        pub(super) artifact_name: String,
-        pub(super) results: Vec<Results>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "PascalCase")]
-    pub(super) struct Results {
-        pub(super) vulnerabilities: Vec<Vulnerability>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "PascalCase")]
-    pub(super) struct Vulnerability {
-        #[serde(rename = "VulnerabilityID")]
-        pub(super) vulnerability_id: String,
-    }
-
-    #[cfg(test)]
-    mod test {
-        use super::Output;
-
-        #[test]
-        fn deserialize() {
-            let _out: Output =
-                serde_json::from_str(include_str!("resources/tests/trivy_output.json")).unwrap();
-        }
     }
 }

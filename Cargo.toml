@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ansi-to-html = "0.1"
 axum-macros = "0.3"
 axum = { version = "0.6", features = ["json", "macros"] }
 clap = { version = "4", features = ["derive", "env", "cargo"] }
@@ -17,4 +18,5 @@ tower-http = { version = "0.4", features = ["fs", "trace"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-tree = "0.2"
 tracing = "0.1"
+url = { version = "2", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
