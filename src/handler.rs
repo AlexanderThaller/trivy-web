@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use axum::{
     self,
     body::Full,
@@ -15,22 +13,63 @@ use axum::{
 };
 use maud::html;
 use serde::Deserialize;
-use tokio::process::Command;
+use tokio::{
+    fs::read_to_string,
+    process::Command,
+};
 
 mod trivy;
 
 use trivy::Output as TrivyJsonOutput;
 
-use self::trivy::Vulnerability;
-
 #[derive(Debug, Deserialize)]
 pub(super) struct SubmitForm {
     imagename: String,
+    username: String,
+    password: Password,
 }
 
+#[derive(Deserialize)]
+struct Password(String);
+
+#[cfg(not(debug_assertions))]
 #[tracing::instrument]
 pub(super) async fn root() -> impl IntoResponse {
     Html(include_str!("../resources/index.html"))
+}
+
+#[cfg(debug_assertions)]
+#[tracing::instrument]
+pub(super) async fn root() -> impl IntoResponse {
+    Html(
+        read_to_string("resources/index.html")
+            .await
+            .expect("failed to read index.html file"),
+    )
+}
+
+#[cfg(not(debug_assertions))]
+#[tracing::instrument]
+pub(super) async fn css_main() -> impl IntoResponse {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "text/css")
+        .body(Full::from(include_str!("../resources/css/main.css")))
+        .unwrap()
+}
+
+#[cfg(debug_assertions)]
+#[tracing::instrument]
+pub(super) async fn css_main() -> impl IntoResponse {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "text/css")
+        .body(Full::from(
+            read_to_string("resources/css/main.css")
+                .await
+                .expect("failed to read main.css file"),
+        ))
+        .unwrap()
 }
 
 #[tracing::instrument]
@@ -61,20 +100,25 @@ pub(super) async fn clicked(Form(submit): Form<SubmitForm>) -> impl IntoResponse
     // run following command trivy image --format json
     // linuxserver/code-server:latest
 
-    let output = Command::new("trivy")
+    let mut command = Command::new("trivy");
+
+    let mut command = command
         .arg("image")
         .arg("--format")
         .arg("json")
-        .arg(&submit.imagename)
-        .output()
-        .await
-        .expect("failed to execute process");
+        .arg("--quiet")
+        .arg(&submit.imagename);
+
+    if !submit.username.is_empty() && !submit.password.0.is_empty() {
+        command = command
+            .env("TRIVY_USERNAME", submit.username)
+            .env("TRIVY_PASSWORD", submit.password.0)
+    }
+
+    let output = command.output().await.expect("failed to execute process");
 
     if !output.status.success() {
         let mut buffer = String::new();
-        buffer.push_str("<button onclick=\"window.location.href = '/';\">Scan Again</button>");
-        buffer.push_str("<br />");
-        buffer.push_str("<br />");
 
         let lines = String::from_utf8_lossy(&output.stderr);
         let lines = lines.lines();
@@ -97,52 +141,19 @@ pub(super) async fn clicked(Form(submit): Form<SubmitForm>) -> impl IntoResponse
     let output: Result<TrivyJsonOutput, _> = serde_json::from_slice(&output.stdout);
 
     match output {
-        Ok(output) => {
-            let vulnerabilities = output
-                .results
-                .into_iter()
-                .flat_map(|result| result.vulnerabilities)
-                .collect::<BTreeSet<Vulnerability>>();
-
-            Html(
-                html! {
-                    button onclick="window.location.href = '/';" { "Scan Again" }
-
-                    table {
-                        thead {
-                            tr {
-                                th { "vulnerability_id" }
-                                th { "severity" }
-                            }
-                        }
-
-                        tbody {
-                            @for vulnerability in vulnerabilities {
-                                tr {
-                                    @match vulnerability.references {
-                                        Some(references) => {
-                                            td { a href=(references.first().expect("should always have a reference")) { (vulnerability.vulnerability_id) }}
-                                        }
-                                        None => {
-                                            td { (vulnerability.vulnerability_id) }
-                                        }
-                                    }
-                                    td { (vulnerability.severity) }
-                                }
-                            }
-                        }
-                    }
-                }
-                .into_string(),
-            )
-        }
+        Ok(output) => Html(output.to_html()),
 
         Err(err) => Html(
             html! {
-                button onclick="window.location.href = '/';" { "Scan Again" }
                 p { (format!("error: {err}")) }
             }
             .into_string(),
         ),
+    }
+}
+
+impl std::fmt::Debug for Password {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("REDACTED")
     }
 }

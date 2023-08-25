@@ -1,0 +1,50 @@
+<h2>Scan Results</h2>
+
+<p>Artifact Name: {{ artifact_name }}</p>
+
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th>severity</th>
+      <th>id</th>
+      <th>
+        affected packages [<span class="fixed_version">fixed version</span>]
+      </th>
+      <th>CVE Information</th>
+    </tr>
+  </thead>
+
+  <colgroup>
+    <col span="1" style="width: 5px" />
+    <col span="1" style="width: auto" />
+    <col span="1" style="width: auto" />
+    <col span="1" style="width: auto" />
+    <col span="1" style="width: auto" />
+  </colgroup>
+
+  <tbody>
+    {% for vulerability in vulnerabilities %}
+    <tr class="{{ vulerability.severity }}">
+      <td></td>
+      <td>{{ vulerability.severity }}</td>
+
+      {% match vulerability.references %} {% when Some with (references) %}
+      <td>
+        <a href="{{ references.first().unwrap() }}"> {{ vulerability.id }} </a>
+      </td>
+      {% when None %}
+      <td>{{ vulerability.id }}</td>
+      {% endmatch %}
+
+      <td>
+        {{ vulerability.pkg_name }} {{ vulerability.installed_version }} {%
+        match vulerability.fixed_version %}{% when Some with (fixed_version)
+        %}[<span class="fixed_version">{{ fixed_version}}</span>]{% when None
+        %}{% endmatch %}
+      </td>
+      <td></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

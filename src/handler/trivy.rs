@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use askama::Template;
 use serde::Deserialize;
 use url::Url;
 
@@ -13,7 +14,7 @@ pub(super) struct Output {
 #[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "PascalCase")]
 pub(super) struct Results {
-    pub(super) vulnerabilities: Vec<Vulnerability>,
+    pub(super) vulnerabilities: Option<Vec<Vulnerability>>,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -22,9 +23,13 @@ pub(super) struct Vulnerability {
     pub(super) severity: Severity,
 
     #[serde(rename = "VulnerabilityID")]
-    pub(super) vulnerability_id: String,
+    pub(super) id: String,
 
     pub(super) references: Option<BTreeSet<Url>>,
+    pub(super) pkg_name: String,
+    pub(super) installed_version: String,
+    pub(super) primary_url: Option<String>,
+    pub(super) fixed_version: Option<String>,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -37,6 +42,13 @@ pub(super) enum Severity {
     Unknown,
 }
 
+#[derive(Template)]
+#[template(path = "response.html")]
+struct ResponseTemplate<'a> {
+    artifact_name: &'a str,
+    vulnerabilities: BTreeSet<&'a Vulnerability>,
+}
+
 impl std::fmt::Display for Severity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -46,6 +58,24 @@ impl std::fmt::Display for Severity {
             Severity::Low => write!(f, "LOW"),
             Severity::Unknown => write!(f, "UNKNOWN"),
         }
+    }
+}
+
+impl Output {
+    pub(super) fn to_html(&self) -> String {
+        let vulnerabilities = self
+            .results
+            .iter()
+            .filter_map(|result| result.vulnerabilities.as_ref())
+            .flatten()
+            .collect::<BTreeSet<&Vulnerability>>();
+
+        let template = ResponseTemplate {
+            artifact_name: &self.artifact_name,
+            vulnerabilities,
+        };
+
+        template.to_string()
     }
 }
 

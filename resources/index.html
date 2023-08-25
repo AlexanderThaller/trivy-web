@@ -3,19 +3,47 @@
   <head>
     <meta charset="utf-8" />
     <title>Trivy Web Scanner</title>
+
+    <link rel="stylesheet" type="text/css" href="/css/main.css" />
     <script src="/js/htmx/1.9.4/htmx.min.js.gz"></script>
   </head>
   <body>
+    <h1>Trivy Image Scanner</h1>
+
     <form
       id="form"
-      hx-swap="outerHTML"
+      hx-target="#result"
       hx-post="/clicked"
       hx-indicator="#spinner"
     >
-      <input style="width: 300px" input="text" name="imagename" />
-      <button>Submit</button>
+      <fieldset>
+        <h2>Image</h2>
+        <p>
+          <input id="image" input="text" name="imagename" />
+        </p>
 
-      <img id="spinner" class="htmx-indicator" src="/img/bars.svg" />
+        <br />
+
+        <h2>Credentials</h2>
+        <p>
+          <label for="username">Username</label>
+          <input input="text" name="username" />
+        </p>
+
+        <p>
+          <label for="password">Password</label>
+          <input input="text" type="password" name="password" />
+        </p>
+      </fieldset>
+
+      <p>
+        <button>Submit</button>
+        <img id="spinner" class="htmx-indicator" src="/img/bars.svg" />
+      </p>
     </form>
+
+    <br />
+
+    <div id="result"></div>
   </body>
 </html>

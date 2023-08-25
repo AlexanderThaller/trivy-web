@@ -1,3 +1,5 @@
+#![feature(let_chains)]
+
 use std::{
     error,
     net::SocketAddr,
@@ -72,9 +74,12 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     info!("Listening on http://{addr}");
 
     let app = Router::new()
-        .route("/", get(handler::root))
-        .route("/js/htmx/1.9.4/htmx.min.js.gz", get(handler::js_htmx_1_9_4))
+    // assets
+        .route("/css/main.css", get(handler::css_main))
         .route("/img/bars.svg", get(handler::img_bars))
+        .route("/js/htmx/1.9.4/htmx.min.js.gz", get(handler::js_htmx_1_9_4))
+    // handlers
+        .route("/", get(handler::root))
         .route("/clicked", post(handler::clicked));
 
     Server::bind(&addr).serve(app.into_make_service()).await?;
