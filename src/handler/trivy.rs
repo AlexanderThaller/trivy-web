@@ -1,4 +1,7 @@
-use std::collections::BTreeSet;
+use std::collections::{
+    BTreeMap,
+    BTreeSet,
+};
 
 use askama::Template;
 use serde::Deserialize;
@@ -28,8 +31,49 @@ pub(super) struct Vulnerability {
     pub(super) references: Option<BTreeSet<Url>>,
     pub(super) pkg_name: String,
     pub(super) installed_version: String,
-    pub(super) primary_url: Option<String>,
+    pub(super) primary_url: Option<Url>,
     pub(super) fixed_version: Option<String>,
+    pub(super) title: Option<String>,
+
+    #[serde(rename = "CVSS")]
+    pub(super) cvss: Option<BTreeMap<String, Cvss>>,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Cvss {
+    #[serde(rename = "V2Vector")]
+    v2vector: Option<String>,
+    #[serde(rename = "V3Vector")]
+    v3vector: Option<String>,
+    #[serde(rename = "V2Score")]
+    v2score: Option<Score>,
+    #[serde(rename = "V3Score")]
+    v3score: Option<Score>,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Score(String);
+
+impl<'de> Deserialize<'de> for Score {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = f64::deserialize(deserializer)?;
+        Ok(Score(value.to_string()))
+    }
+}
+
+impl std::fmt::Display for Score {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Cvss {
+    pub(super) fn score(&self) -> Option<&Score> {
+        self.v2score.as_ref().or(self.v3score.as_ref())
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -76,6 +120,16 @@ impl Output {
         };
 
         template.to_string()
+    }
+}
+
+impl Vulnerability {
+    pub(super) fn primary_url(&self) -> Option<&Url> {
+        self.primary_url.as_ref().or_else(|| {
+            self.references
+                .as_ref()
+                .and_then(|references| references.iter().next())
+        })
     }
 }
 

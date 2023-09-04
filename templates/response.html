@@ -29,9 +29,9 @@
       <td></td>
       <td>{{ vulerability.severity }}</td>
 
-      {% match vulerability.references %} {% when Some with (references) %}
+      {% match vulerability.primary_url() %} {% when Some with (url) %}
       <td>
-        <a href="{{ references.first().unwrap() }}"> {{ vulerability.id }} </a>
+        <a href="{{ url }}"> {{ vulerability.id }} </a>
       </td>
       {% when None %}
       <td>{{ vulerability.id }}</td>
@@ -43,7 +43,7 @@
         %}[<span class="fixed_version">{{ fixed_version}}</span>]{% when None
         %}{% endmatch %}
       </td>
-      <td></td>
+      <td>{% include "cve_information.html" %}</td>
     </tr>
     {% endfor %}
   </tbody>

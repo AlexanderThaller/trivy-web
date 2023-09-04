@@ -1,0 +1,14 @@
+<p>
+  {% match vulerability.title %}{% when Some with (title)%}Title: {{ title }}{%
+  when None %}{% endmatch %}
+</p>
+
+<p>
+  {% match vulerability.cvss %} {% when Some with (cvss) %} {% for value in cvss
+  %}{% match value.1.score() %}{% when Some with (score) %}{{ value.0 }}: {{
+  score }} {% when None %} {% endmatch %}{% endfor %} {% when None %} {%
+  endmatch %}
+</p>
+
+<p>Data Source:</p>
+<p>References:</p>

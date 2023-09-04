@@ -1,6 +1,20 @@
+:root {
+  /* General colors */
+  --body-bg-color: rgb(19, 21, 22);
+  --body-text-color: rgb(234, 234, 234);
+
+  /* Severity colors */
+  --critical-color: #cc0000;
+  --high-color: #cc2f00;
+  --medium-color: #cc5700;
+  --low-color: #009fbf;
+  --unknown-color: #bf29bf;
+  --fixed-version-color: #37bd37;
+}
+
 body {
-  background-color: rgb(19, 21, 22);
-  color: rgb(186, 184, 182);
+  background-color: var(--body-bg-color);
+  color: var(--body-text-color);
 }
 
 h1 {
@@ -42,45 +56,45 @@ table tr {
 }
 
 tr.CRITICAL > td:first-child {
-  background-color: #ff0000;
+  background-color: var(--critical-color);
 }
 
 tr.CRITICAL > td:nth-child(2) {
-  color: #ff0000;
+  color: var(--critical-color);
 }
 
 tr.HIGH > td:first-child {
-  background-color: #ff3700;
+  background-color: var(--high-color);
 }
 
 tr.HIGH > td:nth-child(2) {
-  color: #ff3700;
+  color: var(--high-color);
 }
 
 tr.MEDIUM > td:first-child {
-  background-color: #ff6a00;
+  background-color: var(--medium-color);
 }
 
 tr.MEDIUM > td:nth-child(2) {
-  color: #ff6a00;
+  color: var(--medium-color);
 }
 
 tr.LOW > td:first-child {
-  background-color: #00bfff;
+  background-color: var(--low-color);
 }
 
 tr.LOW > td:nth-child(2) {
-  color: #00bfff;
+  color: var(--low-color);
 }
 
 tr.UNKNOWN > td:first-child {
-  background-color: #ff00ff;
+  background-color: var(--unknown-color);
 }
 
 tr.UNKNOWN > td:nth-child(2) {
-  color: #ff00ff;
+  color: var(--unknown-color);
 }
 
 .fixed_version {
-  color: #00ff00;
+  color: var(--fixed-version-color);
 }
