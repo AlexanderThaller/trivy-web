@@ -13,10 +13,10 @@ use axum::{
 };
 use maud::html;
 use serde::Deserialize;
-use tokio::{
-    fs::read_to_string,
-    process::Command,
-};
+use tokio::process::Command;
+
+#[cfg(debug_assertions)]
+use tokio::fs::read_to_string;
 
 mod trivy;
 
@@ -115,7 +115,18 @@ pub(super) async fn clicked(Form(submit): Form<SubmitForm>) -> impl IntoResponse
             .env("TRIVY_PASSWORD", submit.password.0)
     }
 
-    let output = command.output().await.expect("failed to execute process");
+    let output = match command.output().await {
+        Ok(output) => output,
+
+        Err(err) => {
+            return Html(
+                html! {
+                    p { (format!("failed to run trivy command: {err}")) }
+                }
+                .into_string(),
+            )
+        }
+    };
 
     if !output.status.success() {
         let mut buffer = String::new();
