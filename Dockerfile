@@ -27,4 +27,4 @@ COPY --from=builder /usr/src/trivy-web/target/release/trivy-web /usr/local/bin/t
 
 EXPOSE 16223
 
-CMD ["/usr/local/bin/trivy-web"]
+ENTRYPOINT ["/usr/local/bin/trivy-web"]

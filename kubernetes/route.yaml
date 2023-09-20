@@ -1,0 +1,16 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: trivy-web
+  namespace: trivy-web
+spec:
+  host: trivy-web-trivy-web.apps.k8s.thaller.rocks
+  to:
+    kind: Service
+    name: trivy-web
+    weight: 100
+  port:
+    targetPort: 16223
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
