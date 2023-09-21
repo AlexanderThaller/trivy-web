@@ -1,34 +1,38 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: trivy-web
+  name: trivy-server
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: trivy-web
+      app: trivy-server
   template:
     metadata:
       labels:
-        app: trivy-web
+        app: trivy-server
     spec:
       containers:
-        - name: trivy-web
-          image: athallerde/trivy-web:2023-09-10-2
+        - name: trivy-server
+          image: ghcr.io/aquasecurity/trivy:0.45.1
           args:
-            - "--binding=0.0.0.0:16223"
+            - "server"
+            - "--listen"
+            - "0.0.0.0:4954"
+            - "--cache-backend"
+            - "redis://redis.trivy-web.svc.cluster.local:6379"
           ports:
-            - containerPort: 16223
+            - containerPort: 4954
           resources:
             requests:
               cpu: 100m
               memory: 128Mi
             limits:
               cpu: "1000m"
-              memory: 512Mi
+              memory: 2Gi
           volumeMounts:
-            - name: trivy-storage
+            - name: cache
               mountPath: /.cache
       volumes:
-        - name: trivy-storage
+        - name: cache
           emptyDir: {}

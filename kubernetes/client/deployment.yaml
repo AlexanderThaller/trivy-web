@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trivy-web-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trivy-web-client
+  template:
+    metadata:
+      labels:
+        app: trivy-web-client
+    spec:
+      containers:
+        - name: trivy-web
+          image: athallerde/trivy-web:2023-09-21-0
+          args:
+            - "--binding=0.0.0.0:16223"
+            - "--server=http://trivy-server.trivy-web.svc.cluster.local:4954"
+          ports:
+            - containerPort: 16223
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1000m"
+              memory: 2Gi

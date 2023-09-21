@@ -27,6 +27,8 @@ use tracing_subscriber::{
 };
 use tracing_tree::HierarchicalLayer;
 
+use crate::handler::AppState;
+
 mod handler;
 
 /// Simple uploading service
@@ -51,6 +53,10 @@ struct Opt {
         env = "TRIVY_WEB_BINDING"
     )]
     pub binding: SocketAddr,
+
+    /// Optionally use an trivy server for scanning
+    #[clap(long, value_name = "address:port", env = "TRIVY_SERVER")]
+    pub server: Option<String>,
 }
 
 #[tokio::main]
@@ -69,6 +75,12 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
         )
         .init();
 
+    if let Some(server) = &opt.server {
+        info!("Using trivy server at {}", server)
+    }
+
+    let state = AppState { server: opt.server };
+
     let addr = opt.binding;
     info!("Listening on http://{addr}");
 
@@ -79,7 +91,9 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
         .route("/js/htmx/1.9.4/htmx.min.js.gz", get(handler::js_htmx_1_9_4))
     // handlers
         .route("/", get(handler::root))
-        .route("/clicked", post(handler::clicked));
+        .route("/clicked", post(handler::clicked))
+    // state
+        .with_state(state);
 
     Server::bind(&addr)
         .serve(app.into_make_service())
@@ -108,5 +122,5 @@ async fn shutdown_signal() {
         _ = terminate => {},
     }
 
-    println!("signal received, starting graceful shutdown");
+    info!("signal received, starting graceful shutdown");
 }

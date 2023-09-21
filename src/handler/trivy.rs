@@ -28,7 +28,7 @@ pub(super) struct Vulnerability {
     #[serde(rename = "VulnerabilityID")]
     pub(super) id: String,
 
-    pub(super) references: Option<BTreeSet<Url>>,
+    pub(super) references: Option<BTreeSet<String>>,
     pub(super) pkg_name: String,
     pub(super) installed_version: String,
     pub(super) primary_url: Option<Url>,
@@ -124,11 +124,12 @@ impl Output {
 }
 
 impl Vulnerability {
-    pub(super) fn primary_url(&self) -> Option<&Url> {
-        self.primary_url.as_ref().or_else(|| {
+    pub(super) fn primary_url(&self) -> Option<&str> {
+        self.primary_url.as_ref().map(|u| u.as_str()).or_else(|| {
             self.references
                 .as_ref()
                 .and_then(|references| references.iter().next())
+                .map(|u| u.as_str())
         })
     }
 }
@@ -141,5 +142,7 @@ mod test {
     fn deserialize() {
         let _out: Output =
             serde_json::from_str(include_str!("resources/tests/trivy_output.json")).unwrap();
+        let _out: Output =
+            serde_json::from_str(include_str!("resources/tests/trivy_output2.json")).unwrap();
     }
 }

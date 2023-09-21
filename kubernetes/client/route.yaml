@@ -1,13 +1,13 @@
 kind: Route
 apiVersion: route.openshift.io/v1
 metadata:
-  name: trivy-web
+  name: trivy-web-client
   namespace: trivy-web
 spec:
-  host: trivy-web-trivy-web.apps.k8s.thaller.rocks
+  host: trivy-web.apps.k8s.thaller.rocks
   to:
     kind: Service
-    name: trivy-web
+    name: trivy-web-client
     weight: 100
   port:
     targetPort: 16223

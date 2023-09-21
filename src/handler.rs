@@ -1,6 +1,7 @@
 use axum::{
     self,
     body::Full,
+    extract::State,
     http::{
         Response,
         StatusCode,
@@ -21,6 +22,11 @@ use tokio::fs::read_to_string;
 mod trivy;
 
 use trivy::Output as TrivyJsonOutput;
+
+#[derive(Debug, Clone)]
+pub(super) struct AppState {
+    pub(super) server: Option<String>,
+}
 
 #[derive(Debug, Deserialize)]
 pub(super) struct SubmitForm {
@@ -96,7 +102,10 @@ pub(super) async fn img_bars() -> impl IntoResponse {
 }
 
 #[tracing::instrument]
-pub(super) async fn clicked(Form(submit): Form<SubmitForm>) -> impl IntoResponse {
+pub(super) async fn clicked(
+    State(state): State<AppState>,
+    Form(submit): Form<SubmitForm>,
+) -> impl IntoResponse {
     // run following command trivy image --format json
     // linuxserver/code-server:latest
 
@@ -106,8 +115,13 @@ pub(super) async fn clicked(Form(submit): Form<SubmitForm>) -> impl IntoResponse
         .arg("image")
         .arg("--format")
         .arg("json")
-        .arg("--quiet")
-        .arg(&submit.imagename);
+        .arg("--quiet");
+
+    if let Some(server) = state.server {
+        command = command.arg("--server").arg(server.as_str())
+    }
+
+    command = command.arg(&submit.imagename);
 
     if !submit.username.is_empty() && !submit.password.0.is_empty() {
         command = command
