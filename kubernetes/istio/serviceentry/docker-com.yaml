@@ -1,10 +1,13 @@
 apiVersion: networking.istio.io/v1beta1
 kind: ServiceEntry
 metadata:
-  name: search.maven.org
+  name: docker.com
 spec:
   hosts:
-    - search.maven.org
+    - auth.docker.io
+    - index.docker.io
+    - production.cloudflare.docker.com
+    - registry.hub.docker.com
   ports:
     - number: 443
       name: https
