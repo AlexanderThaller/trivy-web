@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: trivy-server
 spec:
-  replicas: 1
+  replicas: 5
   selector:
     matchLabels:
       app: trivy-server
@@ -11,6 +11,9 @@ spec:
     metadata:
       labels:
         app: trivy-server
+        version: 1.0.0
+      annotations:
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
         - name: trivy-server

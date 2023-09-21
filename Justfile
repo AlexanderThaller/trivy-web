@@ -11,19 +11,7 @@ push:
   docker push "{{ image_name }}:{{ image_tag }}" athallerde/{{ image_name }}:{{ image_tag }}
 
 deploy:
-  oc apply -f kubernetes/client/deployment.yaml
-  oc apply -f kubernetes/client/route.yaml
-  oc apply -f kubernetes/client/service.yaml
-  oc apply -f kubernetes/server/deployment.yaml
-  oc apply -f kubernetes/server/service.yaml
-  oc apply -f kubernetes/redis/statefulset.yaml
-  oc apply -f kubernetes/redis/service.yaml
+  find kubernetes -type f -exec oc apply -f {} \;
 
 undeploy:
-  oc delete -f kubernetes/client/deployment.yaml
-  oc delete -f kubernetes/client/route.yaml
-  oc delete -f kubernetes/client/service.yaml
-  oc delete -f kubernetes/server/deployment.yaml
-  oc delete -f kubernetes/server/service.yaml
-  oc delete -f kubernetes/redis/statefulset.yaml
-  oc delete -f kubernetes/redis/service.yaml
+  find kubernetes -type f -exec oc delete -f {} \;

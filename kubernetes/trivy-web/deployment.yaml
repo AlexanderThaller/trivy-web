@@ -1,20 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: trivy-web-client
+  name: trivy-web
 spec:
-  replicas: 1
+  replicas: 5
   selector:
     matchLabels:
-      app: trivy-web-client
+      app: trivy-web
   template:
     metadata:
       labels:
-        app: trivy-web-client
+        app: trivy-web
+        version: 1.0.0
+      annotations:
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
         - name: trivy-web
-          image: athallerde/trivy-web:2023-09-21-0
+          image: athallerde/trivy-web:2023-09-21-1
           args:
             - "--binding=0.0.0.0:16223"
             - "--server=http://trivy-server.trivy-web.svc.cluster.local:4954"
@@ -25,5 +28,5 @@ spec:
               cpu: 100m
               memory: 128Mi
             limits:
-              cpu: "1000m"
+              cpu: "5000m"
               memory: 2Gi

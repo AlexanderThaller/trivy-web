@@ -12,6 +12,9 @@ spec:
     metadata:
       labels:
         app: redis
+        version: 1.0.0
+      annotations:
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
         - name: redis

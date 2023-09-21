@@ -1,10 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: trivy-web-client
+  name: trivy-web
+  labels:
+    app: trivy-web
 spec:
   ports:
     - port: 16223
       targetPort: 16223
+      name: http
   selector:
-    app: trivy-web-client
+    app: trivy-web
