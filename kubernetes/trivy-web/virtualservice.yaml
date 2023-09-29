@@ -6,7 +6,7 @@ spec:
   gateways:
     - trivy-web
   hosts:
-    - trivy-web.apps.k8s.thaller.rocks
+    - trivy-web.thaller.rocks
   http:
     - route:
         - destination:
