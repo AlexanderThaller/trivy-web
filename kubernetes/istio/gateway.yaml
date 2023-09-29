@@ -12,6 +12,6 @@ spec:
         protocol: HTTPS
       tls:
         mode: SIMPLE
-        credentialName: cert-thaller-rocks
+        credentialName: cert-apps-k8s-thaller-rocks
       hosts:
         - trivy-web.apps.k8s.thaller.rocks
