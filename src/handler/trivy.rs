@@ -11,6 +11,7 @@ use url::Url;
 #[serde(rename_all = "PascalCase")]
 pub(super) struct Output {
     pub(super) artifact_name: String,
+    #[serde(default)]
     pub(super) results: Vec<Results>,
 }
 
@@ -144,5 +145,7 @@ mod test {
             serde_json::from_str(include_str!("resources/tests/trivy_output.json")).unwrap();
         let _out: Output =
             serde_json::from_str(include_str!("resources/tests/trivy_output2.json")).unwrap();
+        let _out: Output =
+            serde_json::from_str(include_str!("resources/tests/trivy_output3.json")).unwrap();
     }
 }

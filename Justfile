@@ -1,5 +1,5 @@
 image_name := "trivy-web"
-image_tag := "2023-09-21-1"
+image_tag := "2023-10-02-0"
 
 build:
   docker build -t "{{ image_name }}:{{ image_tag }}" .
