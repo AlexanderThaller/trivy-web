@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: trivy-web
-          image: athallerde/trivy-web:2023-09-21-1
+          image: athallerde/trivy-web:2023-10-02-0
           args:
             - "--binding=0.0.0.0:16223"
             - "--server=http://trivy-server.trivy-web.svc.cluster.local:4954"
