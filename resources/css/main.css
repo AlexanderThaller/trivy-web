@@ -98,3 +98,36 @@ tr.UNKNOWN > td:nth-child(2) {
 .fixed_version {
   color: var(--fixed-version-color);
 }
+
+.severity_count {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: inline-block;
+}
+
+.severity_count li {
+  float: left;
+  margin-right: 10px; /* Adjust value to your preference */
+}
+
+.severity_count li.critical {
+  background-color: var(--critical-color);
+}
+
+.severity_count li.high {
+  background-color: var(--high-color);
+}
+
+.severity_count li.medium {
+  background-color: var(--medium-color);
+}
+
+.severity_count li.low {
+  background-color: var(--low-color);
+}
+
+.severity_count li.unknown {
+  background-color: var(--unknown-color);
+}
