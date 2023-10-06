@@ -1,7 +1,7 @@
 <h2>Scan Results</h2>
 
 <p>Artifact Name: {{ artifact_name }}</p>
-<p>Vulnerabilities: {{ vulnerabilities.len() }}</p>
+<p>Vulnerabilities: {% include "vulnerabilities.html" %}</p>
 
 <table>
   <thead>

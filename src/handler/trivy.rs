@@ -77,7 +77,7 @@ impl Cvss {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 #[serde(rename_all = "UPPERCASE")]
 pub(super) enum Severity {
     Critical,
@@ -87,11 +87,21 @@ pub(super) enum Severity {
     Unknown,
 }
 
+#[derive(Debug, Default)]
+pub(super) struct SeverityCount {
+    critical: usize,
+    high: usize,
+    medium: usize,
+    low: usize,
+    unknown: usize,
+}
+
 #[derive(Template)]
 #[template(path = "response.html")]
 struct ResponseTemplate<'a> {
     artifact_name: &'a str,
     vulnerabilities: BTreeSet<&'a Vulnerability>,
+    severity_count: SeverityCount,
 }
 
 impl std::fmt::Display for Severity {
@@ -117,11 +127,28 @@ impl Output {
 
         let template = ResponseTemplate {
             artifact_name: &self.artifact_name,
+            severity_count: get_vulnerabilities_count(&vulnerabilities),
             vulnerabilities,
         };
 
         template.to_string()
     }
+}
+
+fn get_vulnerabilities_count(vulnerabilities: &BTreeSet<&Vulnerability>) -> SeverityCount {
+    let mut vulnerabilities_count = SeverityCount::default();
+
+    for vulnerability in vulnerabilities {
+        match vulnerability.severity {
+            Severity::Critical => vulnerabilities_count.critical += 1,
+            Severity::High => vulnerabilities_count.high += 1,
+            Severity::Medium => vulnerabilities_count.medium += 1,
+            Severity::Low => vulnerabilities_count.low += 1,
+            Severity::Unknown => vulnerabilities_count.unknown += 1,
+        }
+    }
+
+    vulnerabilities_count
 }
 
 impl Vulnerability {
