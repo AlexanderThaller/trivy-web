@@ -64,7 +64,7 @@ pub(super) async fn css_main() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "text/css")
-        .body(Full::from(include_str!("../resources/css/main.css")))
+        .body(Body::from(include_str!("../resources/css/main.css")))
         .unwrap()
 }
 
