@@ -9,7 +9,6 @@ use axum::{
         post,
     },
     Router,
-    Server,
 };
 use clap::{
     value_parser,
@@ -84,7 +83,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     let addr = opt.binding;
     info!("Listening on http://{addr}");
 
-    let app = Router::new()
+    let router = Router::new()
     // assets
         .route("/css/main.css", get(handler::css_main))
         .route("/img/bars.svg", get(handler::img_bars))
@@ -95,8 +94,9 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     // state
         .with_state(state);
 
-    Server::bind(&addr)
-        .serve(app.into_make_service())
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+
+    axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 
