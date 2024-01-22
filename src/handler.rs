@@ -1,6 +1,6 @@
 use axum::{
     self,
-    body::Full,
+    body::Body,
     extract::State,
     http::{
         Response,
@@ -70,7 +70,7 @@ pub(super) async fn css_main() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "text/css")
-        .body(Full::from(
+        .body(Body::from(
             read_to_string("resources/css/main.css")
                 .await
                 .expect("failed to read main.css file"),
@@ -84,7 +84,7 @@ pub(super) async fn js_htmx_1_9_4() -> impl IntoResponse {
         .status(StatusCode::OK)
         .header("Content-Type", "application/javascript")
         .header("Content-Encoding", "gzip")
-        .body(Full::from(
+        .body(Body::from(
             include_bytes!("../resources/js/htmx/1.9.4/htmx.min.js.gz").to_vec(),
         ))
         .unwrap()
@@ -95,7 +95,7 @@ pub(super) async fn img_bars() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "image/svg+xml")
-        .body(Full::from(
+        .body(Body::from(
             include_bytes!("../resources/img/bars.svg").to_vec(),
         ))
         .unwrap()
@@ -151,7 +151,7 @@ pub(super) async fn clicked(
         let mut failed = false;
 
         for line in lines {
-            let html = ansi_to_html::convert_escaped(line).unwrap_or_else(|_| {
+            let html = ansi_to_html::convert(line).unwrap_or_else(|_| {
                 failed = true;
                 "failed to convert trivy output to html".to_string()
             });
