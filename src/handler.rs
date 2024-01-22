@@ -54,6 +54,10 @@ pub(super) async fn root() -> impl IntoResponse {
     )
 }
 
+pub(super) async fn healthz() -> impl IntoResponse {
+    "OK"
+}
+
 #[cfg(not(debug_assertions))]
 #[tracing::instrument]
 pub(super) async fn css_main() -> impl IntoResponse {

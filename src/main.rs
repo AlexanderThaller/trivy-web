@@ -91,6 +91,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     // handlers
         .route("/", get(handler::root))
         .route("/clicked", post(handler::clicked))
+        .route("/healthz", get(handler::healthz))
     // state
         .with_state(state);
 
