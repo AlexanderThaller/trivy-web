@@ -48,7 +48,7 @@ struct Opt {
     #[clap(
         long,
         value_name = "address:port",
-        default_value = "127.0.0.1:16223",
+        default_value = "0.0.0.0:16223",
         env = "TRIVY_WEB_BINDING"
     )]
     pub binding: SocketAddr,
