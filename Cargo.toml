@@ -21,3 +21,8 @@ tracing-tree = "0.3"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
