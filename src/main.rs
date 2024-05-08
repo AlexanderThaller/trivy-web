@@ -1,13 +1,29 @@
-use std::{error, net::SocketAddr};
+use std::{
+    error,
+    net::SocketAddr,
+};
 
 use axum::{
-    routing::{get, post},
+    routing::{
+        get,
+        post,
+    },
     Router,
 };
-use clap::{value_parser, Parser};
+use clap::{
+    value_parser,
+    Parser,
+};
 use tokio::signal;
-use tracing::{info, Level};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry};
+use tracing::{
+    info,
+    Level,
+};
+use tracing_subscriber::{
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+    Registry,
+};
 use tracing_tree::HierarchicalLayer;
 
 use crate::handler::AppState;
