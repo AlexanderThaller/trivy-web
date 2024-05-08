@@ -2,8 +2,14 @@ use axum::{
     self,
     body::Body,
     extract::State,
-    http::{Response, StatusCode},
-    response::{Html, IntoResponse},
+    http::{
+        Response,
+        StatusCode,
+    },
+    response::{
+        Html,
+        IntoResponse,
+    },
     Form,
 };
 use maud::html;
