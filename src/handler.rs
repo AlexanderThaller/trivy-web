@@ -2,19 +2,14 @@ use axum::{
     self,
     body::Body,
     extract::State,
-    http::{
-        Response,
-        StatusCode,
-    },
-    response::{
-        Html,
-        IntoResponse,
-    },
+    http::{Response, StatusCode},
+    response::{Html, IntoResponse},
     Form,
 };
 use maud::html;
 use serde::Deserialize;
 use tokio::process::Command;
+use tracing::warn;
 
 #[cfg(debug_assertions)]
 use tokio::fs::read_to_string;
@@ -137,12 +132,14 @@ pub(super) async fn clicked(
         Ok(output) => output,
 
         Err(err) => {
+            warn!("failed to run trivy: {err}");
+
             return Html(
                 html! {
                     p { (format!("failed to run trivy command: {err}")) }
                 }
                 .into_string(),
-            )
+            );
         }
     };
 

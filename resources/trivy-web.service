@@ -1,29 +1,38 @@
 [Unit]
-Description=Blackbox Exporter Rust Service
+Description=Trivy Web
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/trivy-web
+ExecStart=/usr/local/bin/trivy-web --log-level=debug
 
-# https://gist.github.com/ageis/f5595e59b1cddb1513d1b425a323db04
+CapabilityBoundingSet=
 DevicePolicy=closed
-LockPersonality=yes
-MemoryDenyWriteExecute=yes
-NoNewPrivileges=yes
-PrivateDevices=yes
-PrivateTmp=yes
-ProtectControlGroups=yes
-ProtectHome=read-only
-ProtectKernelModules=yes
-ProtectKernelTunables=yes
-ProtectSystem=strict
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
-RestrictNamespaces=yes
-RestrictRealtime=yes
-RestrictSUIDSGID=yes
-
-# https://0pointer.net/blog/dynamic-users-with-systemd.html
-DynamicUser=yes
+DynamicUser=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+PrivateUsers=true
+ProcSubset=pid
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=full
+RemoveIPC=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+TemporaryFileSystem=/:ro
 
 [Install]
 WantedBy=multi-user.target
