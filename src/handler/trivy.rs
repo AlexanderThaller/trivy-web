@@ -1,7 +1,4 @@
-use std::collections::{
-    BTreeMap,
-    BTreeSet,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use askama::Template;
 use serde::Deserialize;
