@@ -6,21 +6,24 @@ Type=simple
 ExecStart=/usr/local/bin/trivy-web
 
 # https://gist.github.com/ageis/f5595e59b1cddb1513d1b425a323db04
-NoNewPrivileges=yes
-PrivateTmp=yes
-PrivateDevices=yes
 DevicePolicy=closed
-ProtectSystem=strict
-ProtectHome=read-only
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
 ProtectControlGroups=yes
+ProtectHome=read-only
 ProtectKernelModules=yes
 ProtectKernelTunables=yes
+ProtectSystem=strict
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 RestrictNamespaces=yes
 RestrictRealtime=yes
 RestrictSUIDSGID=yes
-MemoryDenyWriteExecute=yes
-LockPersonality=yes
+
+# https://0pointer.net/blog/dynamic-users-with-systemd.html
+DynamicUser=yes
 
 [Install]
 WantedBy=multi-user.target
