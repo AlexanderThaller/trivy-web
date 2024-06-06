@@ -56,17 +56,17 @@ impl TryFrom<DockerManifest> for Vec<Signature> {
         let certificates = value
             .layers
             .into_iter()
-            .map(|mut layer| {
+            .filter_map(|mut layer| {
                 layer
                     .annotations
                     .remove("dev.sigstore.cosign/certificate")
-                    .unwrap()
-            })
-            .map(|certificate| {
-                let (_, certificate) = parse_x509_pem(certificate.as_bytes()).unwrap();
-                let (_, certificate) = parse_x509_certificate(&certificate.contents).unwrap();
+                    .map(|certificate| {
+                        let (_, certificate) = parse_x509_pem(certificate.as_bytes()).unwrap();
+                        let (_, certificate) =
+                            parse_x509_certificate(&certificate.contents).unwrap();
 
-                Certificate::try_from(certificate)
+                        Certificate::try_from(certificate)
+                    })
             })
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
