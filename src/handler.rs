@@ -140,7 +140,7 @@ pub(super) async fn clicked(
     if let Err(err) = docker_manifest {
         return Html(
             html! {
-                p { (format!("error: {err:?}")) }
+                p { (format!("docker error: {err:?}")) }
             }
             .into_string(),
         );
@@ -168,7 +168,7 @@ pub(super) async fn clicked(
     if let Err(err) = trivy_result {
         return Html(
             html! {
-                p { (format!("error: {err:?}")) }
+                p { (format!("trivy error: {err:?}")) }
             }
             .into_string(),
         );
