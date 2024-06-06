@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{
     Deserialize,
     Serialize,
@@ -18,7 +20,11 @@ pub(super) struct DockerManifest {
     #[serde(rename = "mediaType")]
     media_type: String,
 
+    #[serde(default)]
     pub(super) manifests: Vec<Manifest>,
+
+    #[serde(default)]
+    pub(super) layers: Vec<Layer>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -39,6 +45,18 @@ pub(super) struct Platform {
     pub(super) os: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub(super) struct Layer {
+    #[serde(rename = "mediaType")]
+    media_type: String,
+
+    size: usize,
+
+    pub(super) digest: String,
+
+    pub(super) annotations: HashMap<String, String>,
+}
+
 pub(super) async fn docker_manifest(image: &str) -> Result<DockerManifest, Error> {
     let mut command = Command::new("docker");
 
@@ -48,8 +66,6 @@ pub(super) async fn docker_manifest(image: &str) -> Result<DockerManifest, Error
 
     if !output.status.success() {
         let stderr = String::from_utf8(output.stderr).unwrap();
-
-        dbg!(&stderr);
 
         match stderr.as_str() {
             "manifest unknown\n" => return Err(Error::ManifestUnknown),
@@ -62,6 +78,15 @@ pub(super) async fn docker_manifest(image: &str) -> Result<DockerManifest, Error
     let manifest = serde_json::from_str::<DockerManifest>(&stdout).unwrap();
 
     Ok(manifest)
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::ManifestUnknown => write!(f, "manifest unknown"),
+            Error::Unknown(err) => write!(f, "unknown error: {}", err),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -139,13 +164,15 @@ mod tests {
                     },
                 },
             ],
+
+            layers: vec![],
         };
 
         assert_eq!(expected, got);
     }
 
     #[test]
-    fn deserialize() {
+    fn deserialize_manifests() {
         const INPUT: &str = include_str!("resources/tests/trivy-manifest-response.json");
 
         let expected = DockerManifest {
@@ -198,6 +225,26 @@ mod tests {
                     },
                 },
             ],
+
+            layers: vec![],
+        };
+
+        let got: DockerManifest = serde_json::from_str(INPUT).unwrap();
+
+        assert_eq!(expected, got);
+    }
+
+    #[test]
+    #[ignore]
+    fn deserialize_layers() {
+        const INPUT: &str = include_str!("resources/tests/cosign_manifest.json");
+
+        let expected = DockerManifest {
+            schema_version: 2,
+            media_type: "application/vnd.oci.image.manifest.v1+json".to_string(),
+
+            manifests: vec![],
+            layers: vec![],
         };
 
         let got: DockerManifest = serde_json::from_str(INPUT).unwrap();

@@ -10,6 +10,7 @@ ansi-to-html = "0.2"
 askama = "0.12"
 axum-macros = "0.4"
 axum = { version = "0.7", features = ["json", "macros"] }
+chrono = "0.4"
 clap = { version = "4", features = ["derive", "env", "cargo"] }
 maud = "0.26"
 serde = { version = "1", features = ["derive"] }
@@ -21,6 +22,7 @@ tracing-tree = "0.3"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
+x509-parser = "0.16"
 
 [dev-dependencies]
 pretty_assertions = "1"

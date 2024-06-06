@@ -22,16 +22,16 @@ use serde::Deserialize;
 use tokio::fs::read_to_string;
 
 use self::{
+    cosign::cosign_manifest,
     docker::DockerManifest,
     trivy::{
         get_vulnerabilities_count,
-        Severity,
         SeverityCount,
-        TrivyResult,
         Vulnerability,
     },
 };
 
+mod cosign;
 mod docker;
 mod trivy;
 
@@ -55,6 +55,7 @@ struct Password(String);
 struct ImageResponse {
     artifact_name: String,
     docker_manifest: DockerManifest,
+    cosign_manifest: Option<cosign::Cosign>,
     vulnerabilities: BTreeSet<Vulnerability>,
     severity_count: SeverityCount,
 }
@@ -146,6 +147,7 @@ pub(super) async fn clicked(
     }
 
     let docker_manifest = docker_manifest.unwrap();
+    let cosign_manifest = cosign_manifest(&submit.imagename).await.ok();
 
     let server = state.server.as_deref();
 
@@ -187,6 +189,7 @@ pub(super) async fn clicked(
 
     let response = ImageResponse {
         artifact_name,
+        cosign_manifest,
         docker_manifest,
         vulnerabilities,
         severity_count,

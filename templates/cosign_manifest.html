@@ -1,0 +1,21 @@
+{% if let Some(manifest) = cosign_manifest %}
+<p>Location: {{ manifest.manifest_location }}</p>
+<table>
+  <thead>
+    <tr>
+      <th>Issuer</th>
+      <th>Identity</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for signature in manifest.signatures %}
+    <tr>
+      <td>{{ signature.issuer }}</td>
+      <td>{{ signature.identity }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No Signature Found</p>
+{% endif %}
