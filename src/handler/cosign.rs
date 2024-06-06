@@ -78,12 +78,17 @@ impl TryFrom<DockerManifest> for Vec<Signature> {
                     .extensions
                     .remove("1.3.6.1.4.1.57264.1.1")
                     .unwrap();
+
                 let identity = certificate
                     .extensions
                     .remove("1.3.6.1.4.1.57264.1.9")
                     .unwrap();
 
-                let identity = identity.trim_start_matches('_').to_string();
+                let identity = identity
+                    .find("https://")
+                    .map(|index| &identity[index..])
+                    .unwrap()
+                    .to_string();
 
                 Signature { issuer, identity }
             })
