@@ -3,13 +3,18 @@ use std::collections::{
     BTreeSet,
 };
 
-use askama::Template;
 use serde::Deserialize;
+use tokio::process::Command;
 use url::Url;
+
+#[derive(Debug)]
+pub(super) enum Error {
+    Unkown(String),
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub(super) struct Output {
+pub(super) struct TrivyResult {
     pub(super) artifact_name: String,
     #[serde(default)]
     pub(super) results: Vec<Results>,
@@ -21,7 +26,7 @@ pub(super) struct Results {
     pub(super) vulnerabilities: Option<Vec<Vulnerability>>,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub(super) struct Vulnerability {
     pub(super) severity: Severity,
@@ -40,7 +45,7 @@ pub(super) struct Vulnerability {
     pub(super) cvss: Option<BTreeMap<String, Cvss>>,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub(super) struct Cvss {
     #[serde(rename = "V2Vector")]
     v2vector: Option<String>,
@@ -52,7 +57,7 @@ pub(super) struct Cvss {
     v3score: Option<Score>,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub(super) struct Score(String);
 
 impl<'de> Deserialize<'de> for Score {
@@ -89,19 +94,11 @@ pub(super) enum Severity {
 
 #[derive(Debug, Default)]
 pub(super) struct SeverityCount {
-    critical: usize,
-    high: usize,
-    medium: usize,
-    low: usize,
-    unknown: usize,
-}
-
-#[derive(Template)]
-#[template(path = "response.html")]
-struct ResponseTemplate<'a> {
-    artifact_name: &'a str,
-    vulnerabilities: BTreeSet<&'a Vulnerability>,
-    severity_count: SeverityCount,
+    pub(super) critical: usize,
+    pub(super) high: usize,
+    pub(super) medium: usize,
+    pub(super) low: usize,
+    pub(super) unknown: usize,
 }
 
 impl std::fmt::Display for Severity {
@@ -116,26 +113,7 @@ impl std::fmt::Display for Severity {
     }
 }
 
-impl Output {
-    pub(super) fn to_html(&self) -> String {
-        let vulnerabilities = self
-            .results
-            .iter()
-            .filter_map(|result| result.vulnerabilities.as_ref())
-            .flatten()
-            .collect::<BTreeSet<&Vulnerability>>();
-
-        let template = ResponseTemplate {
-            artifact_name: &self.artifact_name,
-            severity_count: get_vulnerabilities_count(&vulnerabilities),
-            vulnerabilities,
-        };
-
-        template.to_string()
-    }
-}
-
-fn get_vulnerabilities_count(vulnerabilities: &BTreeSet<&Vulnerability>) -> SeverityCount {
+pub(super) fn get_vulnerabilities_count(vulnerabilities: BTreeSet<Vulnerability>) -> SeverityCount {
     let mut vulnerabilities_count = SeverityCount::default();
 
     for vulnerability in vulnerabilities {
@@ -162,17 +140,76 @@ impl Vulnerability {
     }
 }
 
+pub(super) async fn scan_image(
+    image: &str,
+    server: Option<&str>,
+    username: Option<&str>,
+    password: Option<&str>,
+) -> Result<TrivyResult, Error> {
+    // run following command trivy image --format json
+    // linuxserver/code-server:latest
+
+    let mut command = Command::new("trivy");
+
+    let mut command = command.arg("image").arg("--format").arg("json");
+
+    if let Some(server) = server {
+        command = command.arg("--server").arg(server)
+    }
+
+    command = command.arg(image);
+
+    if let Some(username) = username {
+        if let Some(password) = password {
+            command = command
+                .env("TRIVY_USERNAME", username)
+                .env("TRIVY_PASSWORD", password)
+        }
+    }
+
+    let output = command.output().await.unwrap();
+
+    if !output.status.success() {
+        let stderr = String::from_utf8(output.stderr).unwrap();
+
+        match stderr.as_str() {
+            _ => return Err(Error::Unkown(stderr)),
+        }
+    }
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let output = serde_json::from_str::<TrivyResult>(&stdout).unwrap();
+
+    Ok(output)
+}
+
 #[cfg(test)]
 mod test {
-    use super::Output;
+    use super::TrivyResult;
 
     #[test]
     fn deserialize() {
-        let _out: Output =
+        let _out: TrivyResult =
             serde_json::from_str(include_str!("resources/tests/trivy_output.json")).unwrap();
-        let _out: Output =
+        let _out: TrivyResult =
             serde_json::from_str(include_str!("resources/tests/trivy_output2.json")).unwrap();
-        let _out: Output =
+        let _out: TrivyResult =
             serde_json::from_str(include_str!("resources/tests/trivy_output3.json")).unwrap();
+    }
+
+    #[tokio::test]
+    async fn missing() {
+        let got = super::scan_image("ghcr.io/aquasecurity/trivy:0.0.0", None, None, None).await;
+
+        dbg!(got);
+
+        todo!()
+    }
+
+    #[tokio::test]
+    async fn exists() {
+        let _got = super::scan_image("ghcr.io/aquasecurity/trivy:0.52.0", None, None, None)
+            .await
+            .unwrap();
     }
 }
