@@ -13,7 +13,8 @@
     <tr>
       <td>{{ manifest.platform.os }}</td>
       <td>{{ manifest.platform.architecture }}</td>
-      <td>{{ manifest.digest }} {% endfor %}</td>
+      <td>{{ manifest.digest }}</td>
     </tr>
+    {% endfor %}
   </tbody>
 </table>

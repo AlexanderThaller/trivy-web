@@ -8,6 +8,7 @@ use tokio::process::Command;
 use url::Url;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(super) enum Error {
     Unkown(String),
 }
@@ -171,10 +172,7 @@ pub(super) async fn scan_image(
 
     if !output.status.success() {
         let stderr = String::from_utf8(output.stderr).unwrap();
-
-        match stderr.as_str() {
-            _ => return Err(Error::Unkown(stderr)),
-        }
+        return Err(Error::Unkown(stderr));
     }
 
     let stdout = String::from_utf8(output.stdout).unwrap();
