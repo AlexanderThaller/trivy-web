@@ -1,3 +1,6 @@
+use std::collections::BTreeSet;
+
+use askama::Template;
 use axum::{
     self,
     body::Body,
@@ -14,15 +17,23 @@ use axum::{
 };
 use maud::html;
 use serde::Deserialize;
-use tokio::process::Command;
-use tracing::warn;
 
 #[cfg(debug_assertions)]
 use tokio::fs::read_to_string;
 
-mod trivy;
+use self::{
+    docker::DockerManifest,
+    trivy::{
+        get_vulnerabilities_count,
+        Severity,
+        SeverityCount,
+        TrivyResult,
+        Vulnerability,
+    },
+};
 
-use trivy::Output as TrivyJsonOutput;
+mod docker;
+mod trivy;
 
 #[derive(Debug, Clone)]
 pub(super) struct AppState {
@@ -38,6 +49,15 @@ pub(super) struct SubmitForm {
 
 #[derive(Deserialize)]
 struct Password(String);
+
+#[derive(Debug, Template)]
+#[template(path = "response.html")]
+struct ImageResponse {
+    artifact_name: String,
+    docker_manifest: DockerManifest,
+    vulnerabilities: BTreeSet<Vulnerability>,
+    severity_count: SeverityCount,
+}
 
 #[cfg(not(debug_assertions))]
 #[tracing::instrument]
@@ -114,74 +134,65 @@ pub(super) async fn clicked(
     // run following command trivy image --format json
     // linuxserver/code-server:latest
 
-    let mut command = Command::new("trivy");
+    let docker_manifest = docker::docker_manifest(&submit.imagename).await;
 
-    let mut command = command
-        .arg("image")
-        .arg("--format")
-        .arg("json")
-        .arg("--quiet");
-
-    if let Some(server) = state.server {
-        command = command.arg("--server").arg(server.as_str())
-    }
-
-    command = command.arg(&submit.imagename);
-
-    if !submit.username.is_empty() && !submit.password.0.is_empty() {
-        command = command
-            .env("TRIVY_USERNAME", submit.username)
-            .env("TRIVY_PASSWORD", submit.password.0)
-    }
-
-    let output = match command.output().await {
-        Ok(output) => output,
-
-        Err(err) => {
-            warn!("failed to run trivy: {err}");
-
-            return Html(
-                html! {
-                    p { (format!("failed to run trivy command: {err}")) }
-                }
-                .into_string(),
-            );
-        }
-    };
-
-    if !output.status.success() {
-        let mut buffer = String::new();
-
-        let lines = String::from_utf8_lossy(&output.stderr);
-        let lines = lines.lines();
-
-        let mut failed = false;
-
-        for line in lines {
-            let html = ansi_to_html::convert(line).unwrap_or_else(|_| {
-                failed = true;
-                "failed to convert trivy output to html".to_string()
-            });
-
-            buffer.push_str(&html);
-            buffer.push_str("<br />");
-        }
-
-        return Html(buffer);
-    }
-
-    let output: Result<TrivyJsonOutput, _> = serde_json::from_slice(&output.stdout);
-
-    match output {
-        Ok(output) => Html(output.to_html()),
-
-        Err(err) => Html(
+    if let Err(err) = docker_manifest {
+        return Html(
             html! {
-                p { (format!("error: {err}")) }
+                p { (format!("error: {err:?}")) }
             }
             .into_string(),
-        ),
+        );
     }
+
+    let docker_manifest = docker_manifest.unwrap();
+
+    let server = state.server.as_deref();
+
+    let username = if submit.username.is_empty() {
+        None
+    } else {
+        Some(submit.username.as_str())
+    };
+
+    let password = if submit.password.0.is_empty() {
+        None
+    } else {
+        Some(submit.password.0.as_str())
+    };
+
+    let trivy_result = trivy::scan_image(&submit.imagename, server, username, password).await;
+
+    if let Err(err) = trivy_result {
+        return Html(
+            html! {
+                p { (format!("error: {err:?}")) }
+            }
+            .into_string(),
+        );
+    }
+
+    let trivy_result = trivy_result.unwrap();
+
+    let artifact_name = trivy_result.artifact_name.clone();
+
+    let vulnerabilities = trivy_result
+        .results
+        .into_iter()
+        .filter_map(|result| result.vulnerabilities)
+        .flatten()
+        .collect::<BTreeSet<Vulnerability>>();
+
+    let severity_count = get_vulnerabilities_count(vulnerabilities.clone());
+
+    let response = ImageResponse {
+        artifact_name,
+        docker_manifest,
+        vulnerabilities,
+        severity_count,
+    };
+
+    Html(response.render().unwrap())
 }
 
 impl std::fmt::Debug for Password {

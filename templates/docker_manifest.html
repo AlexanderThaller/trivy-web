@@ -1,0 +1,21 @@
+<h2>Manifest</h2>
+
+<p>Artifact Name: {{ artifact_name }}</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Platform</th>
+      <th>Architecture</th>
+      <th>Digest</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for manifest in docker_manifest.manifests %}
+    <tr>
+      <td>{{ manifest.platform.os }}</td>
+      <td>{{ manifest.platform.architecture }}</td>
+      <td>{{ manifest.digest }} {% endfor %}</td>
+    </tr>
+  </tbody>
+</table>
