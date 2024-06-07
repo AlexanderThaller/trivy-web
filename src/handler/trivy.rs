@@ -132,11 +132,11 @@ pub(super) fn get_vulnerabilities_count(vulnerabilities: BTreeSet<Vulnerability>
 
 impl Vulnerability {
     pub(super) fn primary_url(&self) -> Option<&str> {
-        self.primary_url.as_ref().map(|u| u.as_str()).or_else(|| {
+        self.primary_url.as_ref().map(url::Url::as_str).or_else(|| {
             self.references
                 .as_ref()
                 .and_then(|references| references.iter().next())
-                .map(|u| u.as_str())
+                .map(String::as_str)
         })
     }
 }
@@ -155,7 +155,7 @@ pub(super) async fn scan_image(
     let mut command = command.arg("image").arg("--format").arg("json");
 
     if let Some(server) = server {
-        command = command.arg("--server").arg(server)
+        command = command.arg("--server").arg(server);
     }
 
     command = command.arg(image);
@@ -164,7 +164,7 @@ pub(super) async fn scan_image(
         if let Some(password) = password {
             command = command
                 .env("TRIVY_USERNAME", username)
-                .env("TRIVY_PASSWORD", password)
+                .env("TRIVY_PASSWORD", password);
         }
     }
 
@@ -197,9 +197,7 @@ mod test {
 
     #[tokio::test]
     async fn missing() {
-        let got = super::scan_image("ghcr.io/aquasecurity/trivy:0.0.0", None, None, None).await;
-
-        dbg!(got);
+        let _got = super::scan_image("ghcr.io/aquasecurity/trivy:0.0.0", None, None, None).await;
 
         todo!()
     }
