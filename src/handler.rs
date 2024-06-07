@@ -15,6 +15,10 @@ use axum::{
     },
     Form,
 };
+use docker_registry_client::{
+    Client as DockerRegistryClient,
+    Manifest as DockerManifest,
+};
 use maud::html;
 use serde::Deserialize;
 
@@ -23,7 +27,6 @@ use tokio::fs::read_to_string;
 
 use self::{
     cosign::cosign_manifest,
-    docker::DockerManifest,
     trivy::{
         get_vulnerabilities_count,
         SeverityCount,
@@ -38,6 +41,7 @@ mod trivy;
 #[derive(Debug, Clone)]
 pub(super) struct AppState {
     pub(super) server: Option<String>,
+    pub(super) docker_registry_client: DockerRegistryClient,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,7 +58,7 @@ struct Password(String);
 #[template(path = "response.html")]
 struct ImageResponse {
     artifact_name: String,
-    docker_manifest: DockerManifest,
+    docker_manifest: Option<DockerManifest>,
     cosign_manifest: Option<cosign::Cosign>,
     vulnerabilities: BTreeSet<Vulnerability>,
     severity_count: SeverityCount,
@@ -135,18 +139,13 @@ pub(super) async fn clicked(
     // run following command trivy image --format json
     // linuxserver/code-server:latest
 
-    let docker_manifest = docker::docker_manifest(&submit.imagename).await;
+    let image_name = submit.imagename.parse().unwrap();
+    let docker_manifest = state
+        .docker_registry_client
+        .get_manifest(&image_name)
+        .await
+        .ok();
 
-    if let Err(err) = docker_manifest {
-        return Html(
-            html! {
-                p { (format!("docker error: {err:?}")) }
-            }
-            .into_string(),
-        );
-    }
-
-    let docker_manifest = docker_manifest.unwrap();
     let cosign_manifest = cosign_manifest(&submit.imagename).await.ok();
 
     let server = state.server.as_deref();
