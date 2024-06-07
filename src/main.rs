@@ -20,6 +20,7 @@ use clap::{
     value_parser,
     Parser,
 };
+use docker_registry_client::Client as DockerRegistryClient;
 use tokio::signal;
 use tracing::{
     info,
@@ -84,7 +85,10 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
         info!("Using trivy server at {server}");
     }
 
-    let state = AppState { server: opt.server };
+    let state = AppState {
+        server: opt.server,
+        docker_registry_client: DockerRegistryClient::default(),
+    };
 
     let addr = opt.binding;
     info!("Listening on http://{addr}");

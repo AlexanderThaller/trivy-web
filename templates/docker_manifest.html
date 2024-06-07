@@ -1,20 +1,31 @@
 <p>Artifact Name: {{ artifact_name }}</p>
 
+<!-- prettier-ignore -->
+{% if let Some(manifest) = docker_manifest %}
+
+{% match manifest %}
+{% when DockerManifest::Image with (image) %}
+Image
+{% when DockerManifest::List with (list) %}
 <table>
   <thead>
     <tr>
-      <th>Platform</th>
       <th>Architecture</th>
+      <th>Os</th>
+      <th>Size</th>
       <th>Digest</th>
     </tr>
   </thead>
   <tbody>
-    {% for manifest in docker_manifest.manifests %}
+    {% for entry in list.manifests %}
     <tr>
-      <td>{{ manifest.platform.os }}</td>
-      <td>{{ manifest.platform.architecture }}</td>
-      <td>{{ manifest.digest }}</td>
+      <td>{{ entry.platform.architecture }}</td>
+      <td>{{ entry.platform.os }}</td>
+      <td>{{ entry.size }}</td>
+      <td>{{ entry.digest }}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+{% when DockerManifest::Single with (single) %} Single {% endmatch %} {% endif
+%}
