@@ -54,6 +54,7 @@ pub(super) struct Layer {
 
     pub(super) digest: String,
 
+    #[serde(default)]
     pub(super) annotations: HashMap<String, String>,
 }
 
