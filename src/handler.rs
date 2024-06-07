@@ -189,8 +189,8 @@ pub(super) async fn clicked(
 
     let response = ImageResponse {
         artifact_name,
-        cosign_manifest,
         docker_manifest,
+        cosign_manifest,
         vulnerabilities,
         severity_count,
     };

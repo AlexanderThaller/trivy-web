@@ -1,3 +1,9 @@
+//#![deny(missing_docs)]
+#![forbid(unsafe_code)]
+#![warn(clippy::pedantic)]
+//#![warn(clippy::unwrap_used)]
+#![warn(rust_2018_idioms, unused_lifetimes, missing_debug_implementations)]
+
 use std::{
     error,
     net::SocketAddr,
@@ -75,7 +81,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
         .init();
 
     if let Some(server) = &opt.server {
-        info!("Using trivy server at {}", server)
+        info!("Using trivy server at {server}");
     }
 
     let state = AppState { server: opt.server };
@@ -119,8 +125,8 @@ async fn shutdown_signal() {
     };
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        () = ctrl_c => {},
+        () = terminate => {},
     }
 
     info!("signal received, starting graceful shutdown");
