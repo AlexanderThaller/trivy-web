@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 ansi-to-html = "0.2"
-askama = "0.12"
+askama = { version = "0.12", features = ["serde-json"] }
 axum-macros = "0.4"
 axum = { version = "0.7", features = ["json", "macros"] }
 chrono = "0.4"
