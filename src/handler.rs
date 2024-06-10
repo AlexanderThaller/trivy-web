@@ -146,7 +146,9 @@ pub(super) async fn clicked(
         .await
         .ok();
 
-    let cosign_manifest = cosign_manifest(&submit.imagename).await.ok();
+    let cosign_manifest = cosign_manifest(&state.docker_registry_client, &image_name)
+        .await
+        .ok();
 
     let server = state.server.as_deref();
 

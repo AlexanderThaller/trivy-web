@@ -4,6 +4,12 @@ use chrono::{
     DateTime,
     Utc,
 };
+use docker_registry_client::{
+    image_name::ImageName,
+    manifest,
+    Client as DockerRegistryClient,
+    Manifest as DockerManifest,
+};
 use tokio::process::Command;
 use x509_parser::{
     self,
@@ -13,8 +19,6 @@ use x509_parser::{
 };
 
 use crate::handler::docker::docker_manifest;
-
-use super::docker::DockerManifest;
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -26,7 +30,7 @@ pub(super) enum Error {
 
 #[derive(Debug, PartialEq)]
 pub(super) struct Cosign {
-    pub(super) manifest_location: String,
+    pub(super) manifest_location: ImageName,
     pub(super) signatures: Vec<Signature>,
 }
 
@@ -49,56 +53,60 @@ pub(super) struct Signature {
     pub(super) identity: String,
 }
 
-impl TryFrom<DockerManifest> for Vec<Signature> {
-    type Error = Error;
+fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, Error> {
+    let manifest = if let DockerManifest::Image(manifest) = manifest {
+        manifest
+    } else {
+        return Err(Error::Unkown(
+            "Manifest is not a single manifest".to_string(),
+        ));
+    };
 
-    fn try_from(value: DockerManifest) -> Result<Self, Self::Error> {
-        let certificates = value
-            .layers
-            .into_iter()
-            .filter_map(|mut layer| {
-                layer
-                    .annotations
-                    .remove("dev.sigstore.cosign/certificate")
-                    .map(|certificate| {
-                        let (_, certificate) = parse_x509_pem(certificate.as_bytes()).unwrap();
-                        let (_, certificate) =
-                            parse_x509_certificate(&certificate.contents).unwrap();
+    let certificates = manifest
+        .layers
+        .into_iter()
+        .filter_map(|mut layer| {
+            layer
+                .annotations
+                .remove("dev.sigstore.cosign/certificate")
+                .map(|certificate| {
+                    let (_, certificate) = parse_x509_pem(certificate.as_bytes()).unwrap();
+                    let (_, certificate) = parse_x509_certificate(&certificate.contents).unwrap();
 
-                        Certificate::try_from(certificate)
-                    })
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+                    Certificate::try_from(certificate)
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
 
-        let mut signatures = certificates
-            .into_iter()
-            .map(|mut certificate| {
-                let issuer = certificate
-                    .extensions
-                    .remove("1.3.6.1.4.1.57264.1.1")
-                    .unwrap();
+    let mut signatures = certificates
+        .into_iter()
+        .map(|mut certificate| {
+            dbg!(&certificate);
 
-                let identity = certificate
-                    .extensions
-                    .remove("1.3.6.1.4.1.57264.1.9")
-                    .unwrap();
+            let issuer = certificate
+                .extensions
+                .remove("1.3.6.1.4.1.57264.1.1")
+                .unwrap_or_default();
 
-                let identity = identity
-                    .find("https://")
-                    .map(|index| &identity[index..])
-                    .unwrap()
-                    .to_string();
+            let identity = certificate
+                .extensions
+                .remove("1.3.6.1.4.1.57264.1.9")
+                .unwrap_or_else(|| {
+                    certificate
+                        .extensions
+                        .remove("2.5.29.17")
+                        .unwrap_or_default()
+                });
 
-                Signature { issuer, identity }
-            })
-            .collect::<Vec<_>>();
+            Signature { issuer, identity }
+        })
+        .collect::<Vec<_>>();
 
-        signatures.sort();
-        signatures.dedup();
+    signatures.sort();
+    signatures.dedup();
 
-        Ok(signatures)
-    }
+    Ok(signatures)
 }
 
 impl TryFrom<X509Certificate<'_>> for Certificate {
@@ -148,11 +156,15 @@ impl TryFrom<X509Certificate<'_>> for Certificate {
     }
 }
 
-pub(super) async fn cosign_manifest(image: &str) -> Result<Cosign, Error> {
-    let manifest_location = triangulate(image).await?;
-    let manifest = docker_manifest(&manifest_location)
+pub(super) async fn cosign_manifest(
+    client: &DockerRegistryClient,
+    image: &ImageName,
+) -> Result<Cosign, Error> {
+    let manifest_location = triangulate(&image.to_string()).await?.parse().unwrap();
+    let manifest = client
+        .get_manifest(&manifest_location)
         .await
-        .map(|result| Vec::<Signature>::try_from(result).unwrap())
+        .map(|manifest| signature_from_manifest(manifest).unwrap())
         .map_err(|err| Error::Unkown(err.to_string()))?;
 
     Ok(Cosign {
