@@ -1,11 +1,24 @@
 <p>Artifact Name: {{ artifact_name }}</p>
 
-<!-- prettier-ignore -->
 {% if let Some(manifest) = docker_manifest %}
 
 {% match manifest %}
 {% when DockerManifest::Image with (image) %}
-Image
+<table>
+  <thead>
+    <tr>
+      <th>Size</th>
+      <th>Digest</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>{{ image.config.size }}</td>
+      <td>{{ image.config.digest }}</td>
+    </tr>
+  </tbody>
+</table>
+
 {% when DockerManifest::List with (list) %}
 <table>
   <thead>
@@ -27,5 +40,22 @@ Image
     {% endfor %}
   </tbody>
 </table>
-{% when DockerManifest::Single with (single) %} Single {% endmatch %} {% endif
-%}
+
+{% when DockerManifest::Single with (single) %}
+<table>
+  <thead>
+    <tr>
+      <th>Architecture</th>
+      <th>Size</th>
+      <th>Digest</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>{{ single.architecture }}</td>
+    </tr>
+  </tbody>
+</table>
+
+{% endmatch %}
+{% endif %}
