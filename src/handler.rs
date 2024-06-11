@@ -35,7 +35,6 @@ use self::{
 };
 
 mod cosign;
-mod docker;
 mod trivy;
 
 #[derive(Debug, Clone)]

@@ -6,7 +6,6 @@ use chrono::{
 };
 use docker_registry_client::{
     image_name::ImageName,
-    manifest,
     Client as DockerRegistryClient,
     Manifest as DockerManifest,
 };
@@ -18,14 +17,13 @@ use x509_parser::{
     pem::parse_x509_pem,
 };
 
-use crate::handler::docker::docker_manifest;
-
 #[derive(Debug)]
-#[allow(dead_code)]
 pub(super) enum Error {
-    Unkown(String),
     InvalidNotBefore,
     InvalidNotAfter,
+
+    #[allow(dead_code)]
+    Unkown(String),
 }
 
 #[derive(Debug, PartialEq)]
@@ -54,9 +52,7 @@ pub(super) struct Signature {
 }
 
 fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, Error> {
-    let manifest = if let DockerManifest::Image(manifest) = manifest {
-        manifest
-    } else {
+    let DockerManifest::Image(manifest) = manifest else {
         return Err(Error::Unkown(
             "Manifest is not a single manifest".to_string(),
         ));
@@ -192,31 +188,39 @@ async fn triangulate(image: &str) -> Result<String, Error> {
 
 #[cfg(test)]
 mod test {
+    use docker_registry_client::Manifest as DockerManifest;
     use pretty_assertions::assert_eq;
 
-    use crate::handler::{
-        cosign::Signature,
-        docker::DockerManifest,
+    use crate::handler::cosign::{
+        cosign_manifest,
+        signature_from_manifest,
+        Signature,
     };
 
     #[tokio::test]
     async fn missing() {
-        let got = super::cosign_manifest("ghcr.io/aquasecurity/trivy:0.0.0").await;
+        let client = docker_registry_client::Client::new();
+        let image_name = "ghcr.io/aquasecurity/trivy:0.0.0".parse().unwrap();
+        let got = cosign_manifest(&client, &image_name).await;
 
         assert!(got.is_err());
     }
 
     #[tokio::test]
     async fn exists() {
-        let got = super::cosign_manifest("ghcr.io/aquasecurity/trivy:0.52.0")
-            .await
-            .unwrap();
+        let client = docker_registry_client::Client::new();
+        let image_name = "ghcr.io/aquasecurity/trivy:0.52.0".parse().unwrap();
+        let got = cosign_manifest(&client, &image_name).await.unwrap();
 
         let expected = super::Cosign {
-            manifest_location: "ghcr.io/aquasecurity/trivy:0.52.0".to_string(),
+            manifest_location:
+                "ghcr.io/aquasecurity/trivy:\
+                 sha256-89fb17b267ef490a4c62d32c949b324a4f3d3b326c2b57d99cffe94547568ef8.sig"
+                    .parse()
+                    .unwrap(),
             signatures: vec![super::Signature {
-                issuer: "ghcr.io/aquasecurity/trivy:0.52.0".to_string(),
-                identity: "ghcr.io/aquasecurity/trivy:0.52.0".to_string(),
+                issuer: "https://token.actions.githubusercontent.com".to_string(),
+                identity: "_https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v0.52.0".to_string(),
             }],
         };
 
@@ -227,12 +231,12 @@ mod test {
     fn parse_manifest() {
         const INPUT: &str = include_str!("resources/tests/cosign_manifest.json");
         let docker_manifest: DockerManifest = serde_json::from_str(INPUT).unwrap();
-        let got: Vec<Signature> = docker_manifest.try_into().unwrap();
+        let got = signature_from_manifest(docker_manifest).unwrap();
 
         let expected = vec![
             Signature{
                     issuer: "https://token.actions.githubusercontent.com".to_string(),
-                    identity: "https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v0.52.0".to_string(),
+                    identity: "_https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v0.52.0".to_string(),
             }
         ];
 
