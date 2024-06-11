@@ -8,8 +8,8 @@ use tokio::process::Command;
 use url::Url;
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub(super) enum Error {
+    #[allow(dead_code)]
     Unkown(String),
 }
 
@@ -196,10 +196,11 @@ mod test {
     }
 
     #[tokio::test]
+    #[should_panic(expected = "should fail")]
     async fn missing() {
-        let _got = super::scan_image("ghcr.io/aquasecurity/trivy:0.0.0", None, None, None).await;
-
-        todo!()
+        let _got = super::scan_image("ghcr.io/aquasecurity/trivy:0.0.0", None, None, None)
+            .await
+            .expect("should fail");
     }
 
     #[tokio::test]
