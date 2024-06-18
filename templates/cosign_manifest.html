@@ -2,6 +2,7 @@
 
 {% match cosign_manifest %}
 {% when Ok(manifest) %}
+{% if let Some(manifest) = manifest %}
 <p>Location: {{ manifest.manifest_location }}</p>
 <table>
   <thead>
@@ -19,6 +20,9 @@
     {% endfor %}
   </tbody>
 </table>
+{% else %}
+<p>No manifest found</p>
+{% endif %}
 {% when Err(err) %}
 <h4>Error</h4>
 <code>

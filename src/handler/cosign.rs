@@ -209,19 +209,28 @@ fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, e
 pub(crate) async fn cosign_manifest(
     client: &DockerRegistryClient,
     image: &ImageName,
-) -> Result<Cosign, eyre::Error> {
+) -> Result<Option<Cosign>, eyre::Error> {
     let manifest_location = triangulate(&image.to_string()).await?.parse().unwrap();
 
     let manifest = client
         .get_manifest(&manifest_location)
         .await
-        .map(signature_from_manifest)
-        .context("Failed to get cosign manifest")?;
+        .map(signature_from_manifest);
 
-    Ok(Cosign {
+    let manifest = match manifest {
+        Ok(manifest) => Ok(manifest),
+
+        Err(err) => match err {
+            docker_registry_client::DockerError::ManifestNotFound(_) => return Ok(None),
+            _ => Err(err),
+        },
+    }
+    .context("Failed to get manifest")?;
+
+    Ok(Some(Cosign {
         manifest_location,
         signatures: manifest.context("Failed to parse cosign signature from manifest")?,
-    })
+    }))
 }
 
 pub(crate) async fn cosign_verify(
@@ -310,7 +319,7 @@ mod test {
         let image_name = "ghcr.io/aquasecurity/trivy:0.52.0".parse().unwrap();
         let got = cosign_manifest(&client, &image_name).await.unwrap();
 
-        let expected = super::Cosign {
+        let expected = Some(super::Cosign {
             manifest_location:
                 "ghcr.io/aquasecurity/trivy:\
                  sha256-89fb17b267ef490a4c62d32c949b324a4f3d3b326c2b57d99cffe94547568ef8.sig"
@@ -320,7 +329,7 @@ mod test {
                 issuer: "https://token.actions.githubusercontent.com".to_string(),
                 identity: "_https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v0.52.0".to_string(),
             }],
-        };
+        });
 
         assert_eq!(expected, got);
     }
