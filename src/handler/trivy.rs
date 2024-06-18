@@ -4,15 +4,10 @@ use std::collections::{
 };
 
 use docker_registry_client::image_name::ImageName;
+use eyre::WrapErr;
 use serde::Deserialize;
 use tokio::process::Command;
 use url::Url;
-
-#[derive(Debug)]
-pub(super) enum Error {
-    #[allow(dead_code)]
-    Unkown(String),
-}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -60,16 +55,6 @@ pub(super) struct Cvss {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub(super) struct Score(String);
-
-impl std::error::Error for Error {}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Unkown(s) => f.write_str(s),
-        }
-    }
-}
 
 impl<'de> Deserialize<'de> for Score {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -156,7 +141,7 @@ pub(super) async fn scan_image(
     server: Option<&str>,
     username: Option<&str>,
     password: Option<&str>,
-) -> Result<TrivyResult, Error> {
+) -> Result<TrivyResult, eyre::Error> {
     // run following command trivy image --format json
     // linuxserver/code-server:latest
 
@@ -178,20 +163,25 @@ pub(super) async fn scan_image(
         }
     }
 
-    let output = command.output().await.unwrap();
+    let output = command.output().await.context("Failed to run trivy")?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8(output.stderr).unwrap();
-        return Err(Error::Unkown(stderr));
+        let stderr =
+            String::from_utf8(output.stderr).context("Failed to convert trivy stderr to utf8")?;
+        return Err(eyre::Report::msg(stderr));
     }
 
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    let output = serde_json::from_str::<TrivyResult>(&stdout).unwrap();
+    let stdout =
+        String::from_utf8(output.stdout).context("Failed to convert trivy stdout to utf8")?;
+
+    let output = serde_json::from_str::<TrivyResult>(&stdout)
+        .context("Failed to parse trivy output json")?;
 
     Ok(output)
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
     use super::TrivyResult;
 

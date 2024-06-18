@@ -82,7 +82,7 @@ pub(super) async fn css_main() -> impl IntoResponse {
                 .await
                 .expect("failed to read main.css file"),
         ))
-        .unwrap()
+        .expect("should never fail")
 }
 
 #[tracing::instrument]
@@ -94,7 +94,7 @@ pub(super) async fn js_htmx_2_0_0() -> impl IntoResponse {
         .body(Body::from(
             include_bytes!("../resources/js/htmx/2.0.0/htmx.min.js.gz").to_vec(),
         ))
-        .unwrap()
+        .expect("should never fail")
 }
 
 #[tracing::instrument]
@@ -105,7 +105,7 @@ pub(super) async fn img_bars() -> impl IntoResponse {
         .body(Body::from(
             include_bytes!("../resources/img/bars.svg").to_vec(),
         ))
-        .unwrap()
+        .expect("should never fail")
 }
 
 #[tracing::instrument]

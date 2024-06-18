@@ -1,13 +1,10 @@
 //#![deny(missing_docs)]
 #![forbid(unsafe_code)]
 #![warn(clippy::pedantic)]
-//#![warn(clippy::unwrap_used)]
+#![warn(clippy::unwrap_used)]
 #![warn(rust_2018_idioms, unused_lifetimes, missing_debug_implementations)]
 
-use std::{
-    error,
-    net::SocketAddr,
-};
+use std::net::SocketAddr;
 
 use axum::{
     routing::{
@@ -21,6 +18,7 @@ use clap::{
     Parser,
 };
 use docker_registry_client::Client as DockerRegistryClient;
+use eyre::Context;
 use tokio::signal;
 use tracing::{
     info,
@@ -67,7 +65,7 @@ struct Opt {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn error::Error>> {
+async fn main() -> Result<(), eyre::Error> {
     let opt = Opt::parse();
 
     Registry::default()
@@ -106,7 +104,9 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     // state
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .context("Failed to bind to address")?;
 
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
