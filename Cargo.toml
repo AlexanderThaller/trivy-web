@@ -24,6 +24,7 @@ url = { version = "2", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 x509-parser = "0.16"
 docker-registry-client = { path = "../docker-registry-client" }
+eyre = "0.6.12"
 
 [dev-dependencies]
 pretty_assertions = "1"
