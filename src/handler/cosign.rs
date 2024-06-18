@@ -272,7 +272,6 @@ mod test {
     use crate::handler::cosign::{
         cosign_manifest,
         signature_from_manifest,
-        Signature,
     };
 
     #[tokio::test]

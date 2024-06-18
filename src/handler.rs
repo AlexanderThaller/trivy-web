@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use askama::Template;
 use axum::{
     self,
@@ -15,35 +13,15 @@ use axum::{
     },
     Form,
 };
-use docker_registry_client::{
-    image_name::ImageName,
-    Client as DockerRegistryClient,
-    Manifest as DockerManifest,
-};
+use docker_registry_client::Client as DockerRegistryClient;
 use maud::html;
 use serde::Deserialize;
-
-use crate::filters::{
-    self,
-    ansi_to_html,
-};
 
 #[cfg(debug_assertions)]
 use tokio::fs::read_to_string;
 
-use self::{
-    cosign::{
-        cosign_manifest,
-        cosign_verify,
-    },
-    trivy::{
-        get_vulnerabilities_count,
-        SeverityCount,
-        Vulnerability,
-    },
-};
-
 mod cosign;
+mod response;
 mod trivy;
 
 #[derive(Debug, Clone)]
@@ -62,17 +40,6 @@ pub(super) struct SubmitForm {
 
 #[derive(Deserialize)]
 struct Password(String);
-
-#[derive(Debug, Template)]
-#[template(path = "response.html")]
-struct ImageResponse {
-    artifact_name: String,
-    docker_manifest: Option<DockerManifest>,
-    cosign_manifest: Option<cosign::Cosign>,
-    cosign_verify: Option<Result<cosign::CosignVerify, cosign::Error>>,
-    vulnerabilities: BTreeSet<Vulnerability>,
-    severity_count: SeverityCount,
-}
 
 #[cfg(not(debug_assertions))]
 #[tracing::instrument]
@@ -144,9 +111,9 @@ pub(super) async fn img_bars() -> impl IntoResponse {
 #[tracing::instrument]
 pub(super) async fn clicked(
     State(state): State<AppState>,
-    Form(submit): Form<SubmitForm>,
+    Form(form): Form<SubmitForm>,
 ) -> impl IntoResponse {
-    if submit.imagename.is_empty() {
+    if form.imagename.is_empty() {
         return Html(
             html! {
                 p { "Please provide an image name" }
@@ -155,88 +122,35 @@ pub(super) async fn clicked(
         );
     }
 
-    let image_name = match submit.imagename.parse::<ImageName>() {
-        Ok(image_name) => image_name,
+    let response = match response::fetch(state, form).await {
+        Ok(response) => response,
 
         Err(err) => {
+            tracing::error!("error while fetching: {err}");
+
             return Html(
                 html! {
-                    p { (format!("Invalid image name: {err}")) }
+                    p { "Internal server error" }
                 }
                 .into_string(),
             );
         }
     };
 
-    // run following command trivy image --format json
-    // linuxserver/code-server:latest
+    match response.render() {
+        Ok(rendered) => Html(rendered),
 
-    let docker_manifest = state
-        .docker_registry_client
-        .get_manifest(&image_name)
-        .await
-        .ok();
+        Err(err) => {
+            tracing::error!("failed to render response: {err}");
 
-    let cosign_manifest = cosign_manifest(&state.docker_registry_client, &image_name)
-        .await
-        .ok();
-
-    let cosign_verify = if submit.cosign_key.is_empty() {
-        None
-    } else {
-        Some(cosign_verify(&submit.cosign_key, &image_name).await)
-    };
-
-    let server = state.server.as_deref();
-
-    let username = if submit.username.is_empty() {
-        None
-    } else {
-        Some(submit.username.as_str())
-    };
-
-    let password = if submit.password.0.is_empty() {
-        None
-    } else {
-        Some(submit.password.0.as_str())
-    };
-
-    let trivy_result = trivy::scan_image(&submit.imagename, server, username, password).await;
-
-    if let Err(err) = trivy_result {
-        match err {
-            trivy::Error::Unkown(stderr) => {
-                return Html(
-                    ansi_to_html(stderr)
-                        .unwrap_or_else(|err| format!("failed to convert error to html: {err}")),
-                );
-            }
+            Html(
+                html! {
+                    p { "Internal server error" }
+                }
+                .into_string(),
+            )
         }
-    };
-
-    let trivy_result = trivy_result.unwrap();
-
-    let artifact_name = trivy_result.artifact_name.clone();
-
-    let vulnerabilities = trivy_result
-        .results
-        .into_iter()
-        .filter_map(|result| result.vulnerabilities)
-        .flatten()
-        .collect::<BTreeSet<Vulnerability>>();
-
-    let severity_count = get_vulnerabilities_count(vulnerabilities.clone());
-
-    let response = ImageResponse {
-        artifact_name,
-        docker_manifest,
-        cosign_manifest,
-        cosign_verify,
-        vulnerabilities,
-        severity_count,
-    };
-
-    Html(response.render().unwrap())
+    }
 }
 
 impl std::fmt::Debug for Password {
