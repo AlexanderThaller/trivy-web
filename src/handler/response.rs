@@ -35,7 +35,7 @@ use super::{
 pub(crate) struct ImageResponse {
     pub(crate) image_name: ImageName,
     pub(crate) docker_manifest: Option<DockerManifest>,
-    pub(crate) cosign_manifest: Option<cosign::Cosign>,
+    pub(crate) cosign_manifest: Result<cosign::Cosign, eyre::Error>,
     pub(crate) cosign_verify: Option<Result<cosign::CosignVerify, eyre::Error>>,
     pub(crate) trivy_information: Result<TrivyInformation, eyre::Error>,
 }
@@ -55,9 +55,7 @@ pub(crate) async fn fetch(state: AppState, form: SubmitForm) -> Result<ImageResp
         .await
         .ok();
 
-    let cosign_manifest = cosign_manifest(&state.docker_registry_client, &image_name)
-        .await
-        .ok();
+    let cosign_manifest = cosign_manifest(&state.docker_registry_client, &image_name).await;
 
     let cosign_verify = if form.cosign_key.is_empty() {
         None
