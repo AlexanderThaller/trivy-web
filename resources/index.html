@@ -5,7 +5,7 @@
     <title>Trivy Web Scanner</title>
 
     <link rel="stylesheet" type="text/css" href="/css/main.css" />
-    <script src="/js/htmx/1.9.4/htmx.min.js.gz"></script>
+    <script src="/js/htmx/2.0.0/htmx.min.js.gz"></script>
   </head>
   <body>
     <h1>Trivy Image Scanner</h1>
@@ -15,14 +15,14 @@
       hx-target="#result"
       hx-post="/clicked"
       hx-indicator="#spinner"
+      hx-disabled-elt="input[type='text'], button"
     >
       <fieldset>
         <h2>Image</h2>
         <p>
+          <label for="imagename">Image Name</label>
           <input id="image" input="text" name="imagename" />
         </p>
-
-        <br />
 
         <h2>Credentials</h2>
         <p>
@@ -47,8 +47,6 @@
         <img id="spinner" class="htmx-indicator" src="/img/bars.svg" />
       </p>
     </form>
-
-    <br />
 
     <div id="result"></div>
   </body>
