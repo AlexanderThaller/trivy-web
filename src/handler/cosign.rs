@@ -162,15 +162,20 @@ fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, e
             layer
                 .annotations
                 .remove("dev.sigstore.cosign/certificate")
-                .map(|certificate| {
-                    let (_, certificate) = parse_x509_pem(certificate.as_bytes()).expect("TODO");
-                    let (_, certificate) =
-                        parse_x509_certificate(&certificate.contents).expect("TODO");
+                .map(|certificate| -> Result<Certificate, eyre::Error> {
+                    let (_, certificate) = parse_x509_pem(certificate.as_bytes())
+                        .context("Failed to parse x509 pem")?;
 
-                    Certificate::try_from(certificate)
+                    let (_, certificate) = parse_x509_certificate(&certificate.contents)
+                        .context("Failed to parse x509")?;
+
+                    let certificate = Certificate::try_from(certificate)
+                        .context("Failed to convert x509 certificate")?;
+
+                    Ok(certificate)
                 })
         })
-        .collect::<Result<Vec<Certificate>, CertificateError>>()
+        .collect::<Result<Vec<Certificate>, eyre::Error>>()
         .context("Failed to parse certificates")?;
 
     let mut signatures = certificates
@@ -211,12 +216,12 @@ pub(crate) async fn cosign_manifest(
     let manifest = client
         .get_manifest(&manifest_location)
         .await
-        .map(|manifest| signature_from_manifest(manifest).expect("TODO"))
+        .map(signature_from_manifest)
         .map_err(|err| eyre::Report::msg(err.to_string()))?;
 
     Ok(Cosign {
         manifest_location,
-        signatures: manifest,
+        signatures: manifest.context("Failed to get manifest")?,
     })
 }
 
