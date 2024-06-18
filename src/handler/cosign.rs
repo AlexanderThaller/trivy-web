@@ -56,7 +56,7 @@ pub(crate) struct Signature {
 pub(crate) struct CosignVerify {
     pub(crate) message: String,
 
-    pub(crate) signature: Vec<VerifySignature>,
+    pub(crate) signatures: Vec<VerifySignature>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -83,12 +83,12 @@ pub(crate) struct Identity {
 #[derive(Debug, Deserialize)]
 pub(crate) struct Image {
     #[serde(rename = "docker-manifest-digest")]
-    digest: String,
+    pub(crate) digest: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Optional {
-    sig: String,
+    pub(crate) sig: String,
 }
 
 impl TryFrom<X509Certificate<'_>> for Certificate {
@@ -241,7 +241,10 @@ pub(crate) async fn cosign_verify(
     let message = String::from_utf8(output.stderr).unwrap();
     let signature: Vec<VerifySignature> = serde_json::from_slice(output.stdout.as_slice()).unwrap();
 
-    Ok(CosignVerify { message, signature })
+    Ok(CosignVerify {
+        message,
+        signatures: signature,
+    })
 }
 
 async fn triangulate(image: &str) -> Result<String, Error> {

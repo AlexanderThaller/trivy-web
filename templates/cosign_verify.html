@@ -2,11 +2,33 @@
   <h3>Verification</h3>
   {% match result %}
     {% when Ok with (manifest) %}
+    <h4>Message</h4>
     <code>
         {{ manifest.message|ansi_to_html|safe }}
     </code>
 
+    <h4>Signatures</h4>
+    <table>
+      <thead>
+        <tr>
+          <th>Identity</th>
+          <th>Digest</th>
+          <th>Type</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for signature in manifest.signatures %}
+        <tr>
+          <td>{{ signature.critical.identity.docker_reference }}</td>
+          <td>{{ signature.critical.image.digest }}</td>
+          <td>{{ signature.critical.cosign_type }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
     {% when Err with (err) %}
+    <h4>Error</h4>
     <code>
         {{ err|ansi_to_html|safe }}
     </code>
