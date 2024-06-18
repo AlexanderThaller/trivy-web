@@ -9,6 +9,7 @@ use docker_registry_client::{
     Client as DockerRegistryClient,
     Manifest as DockerManifest,
 };
+use eyre::Context;
 use serde::Deserialize;
 use tokio::process::Command;
 use x509_parser::{
@@ -19,12 +20,9 @@ use x509_parser::{
 };
 
 #[derive(Debug)]
-pub(crate) enum Error {
+pub(crate) enum CertificateError {
     InvalidNotBefore,
     InvalidNotAfter,
-
-    #[allow(dead_code)]
-    Unkown(String),
 }
 
 #[derive(Debug, PartialEq)]
@@ -92,7 +90,7 @@ pub(crate) struct Optional {
 }
 
 impl TryFrom<X509Certificate<'_>> for Certificate {
-    type Error = Error;
+    type Error = CertificateError;
 
     fn try_from(x509: X509Certificate<'_>) -> Result<Self, Self::Error> {
         let subject = x509.subject().to_string();
@@ -124,8 +122,11 @@ impl TryFrom<X509Certificate<'_>> for Certificate {
         let not_before = validity.not_before.timestamp();
         let not_after = validity.not_after.timestamp();
 
-        let not_before = DateTime::from_timestamp(not_before, 0).ok_or(Error::InvalidNotBefore)?;
-        let not_after = DateTime::from_timestamp(not_after, 0).ok_or(Error::InvalidNotAfter)?;
+        let not_before =
+            DateTime::from_timestamp(not_before, 0).ok_or(Self::Error::InvalidNotBefore)?;
+
+        let not_after =
+            DateTime::from_timestamp(not_after, 0).ok_or(Self::Error::InvalidNotAfter)?;
 
         Ok(Self {
             subject,
@@ -138,21 +139,20 @@ impl TryFrom<X509Certificate<'_>> for Certificate {
     }
 }
 
-impl std::fmt::Display for Error {
+impl std::fmt::Display for CertificateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidNotAfter => write!(f, "Invalid not after"),
             Self::InvalidNotBefore => write!(f, "Invalid not before"),
-            Self::Unkown(err) => write!(f, "{err}"),
         }
     }
 }
 
-fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, Error> {
+impl std::error::Error for CertificateError {}
+
+fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, eyre::Error> {
     let DockerManifest::Image(manifest) = manifest else {
-        return Err(Error::Unkown(
-            "Manifest is not a single manifest".to_string(),
-        ));
+        return Err(eyre::Report::msg("Manifest is not a single manifest"));
     };
 
     let certificates = manifest
@@ -163,14 +163,15 @@ fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, E
                 .annotations
                 .remove("dev.sigstore.cosign/certificate")
                 .map(|certificate| {
-                    let (_, certificate) = parse_x509_pem(certificate.as_bytes()).unwrap();
-                    let (_, certificate) = parse_x509_certificate(&certificate.contents).unwrap();
+                    let (_, certificate) = parse_x509_pem(certificate.as_bytes()).expect("TODO");
+                    let (_, certificate) =
+                        parse_x509_certificate(&certificate.contents).expect("TODO");
 
                     Certificate::try_from(certificate)
                 })
         })
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+        .collect::<Result<Vec<Certificate>, CertificateError>>()
+        .context("Failed to parse certificates")?;
 
     let mut signatures = certificates
         .into_iter()
@@ -205,13 +206,13 @@ fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, E
 pub(crate) async fn cosign_manifest(
     client: &DockerRegistryClient,
     image: &ImageName,
-) -> Result<Cosign, Error> {
+) -> Result<Cosign, eyre::Error> {
     let manifest_location = triangulate(&image.to_string()).await?.parse().unwrap();
     let manifest = client
         .get_manifest(&manifest_location)
         .await
-        .map(|manifest| signature_from_manifest(manifest).unwrap())
-        .map_err(|err| Error::Unkown(err.to_string()))?;
+        .map(|manifest| signature_from_manifest(manifest).expect("TODO"))
+        .map_err(|err| eyre::Report::msg(err.to_string()))?;
 
     Ok(Cosign {
         manifest_location,
@@ -222,7 +223,7 @@ pub(crate) async fn cosign_manifest(
 pub(crate) async fn cosign_verify(
     cosign_key: &str,
     image: &ImageName,
-) -> Result<CosignVerify, Error> {
+) -> Result<CosignVerify, eyre::Error> {
     let output = Command::new("cosign")
         .arg("verify")
         .arg("--private-infrastructure=true")
@@ -232,14 +233,20 @@ pub(crate) async fn cosign_verify(
         .arg(image.to_string())
         .output()
         .await
-        .map_err(|err| Error::Unkown(err.to_string()))?;
+        .context("Failed to run cosign verify")?;
 
     if !output.status.success() {
-        return Err(Error::Unkown(String::from_utf8(output.stderr).unwrap()));
+        let message =
+            String::from_utf8(output.stderr).context("Failed to convert cosign stderr to utf8")?;
+
+        return Err(eyre::Report::msg(message));
     }
 
-    let message = String::from_utf8(output.stderr).unwrap();
-    let signature: Vec<VerifySignature> = serde_json::from_slice(output.stdout.as_slice()).unwrap();
+    let message =
+        String::from_utf8(output.stderr).context("Failed to convert cosign stderr utf8")?;
+
+    let signature: Vec<VerifySignature> = serde_json::from_slice(output.stdout.as_slice())
+        .context("Failed to parse cosign output json")?;
 
     Ok(CosignVerify {
         message,
@@ -247,24 +254,33 @@ pub(crate) async fn cosign_verify(
     })
 }
 
-async fn triangulate(image: &str) -> Result<String, Error> {
+async fn triangulate(image: &str) -> Result<String, eyre::Error> {
     let mut command = Command::new("cosign");
 
     let command = command.arg("triangulate").arg(image);
 
-    let output = command.output().await.unwrap();
+    let output = command
+        .output()
+        .await
+        .context("Failed to run cosign triangulate")?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8(output.stderr).unwrap();
-        return Err(Error::Unkown(stderr));
+        let stderr =
+            String::from_utf8(output.stderr).context("Failed to convert cosign stderr to utf8")?;
+
+        return Err(eyre::Report::msg(stderr));
     }
 
-    let stdout = String::from_utf8(output.stdout).unwrap().trim().to_string();
+    let stdout = String::from_utf8(output.stdout)
+        .context("Failed to convert cosign stdout to utf8")?
+        .trim()
+        .to_string();
 
     Ok(stdout)
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
     use docker_registry_client::Manifest as DockerManifest;
     use pretty_assertions::assert_eq;

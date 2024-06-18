@@ -36,7 +36,7 @@ pub(crate) struct ImageResponse {
     pub(crate) image_name: ImageName,
     pub(crate) docker_manifest: Option<DockerManifest>,
     pub(crate) cosign_manifest: Option<cosign::Cosign>,
-    pub(crate) cosign_verify: Option<Result<cosign::CosignVerify, cosign::Error>>,
+    pub(crate) cosign_verify: Option<Result<cosign::CosignVerify, eyre::Error>>,
     pub(crate) trivy_information: Result<TrivyInformation, eyre::Error>,
 }
 
