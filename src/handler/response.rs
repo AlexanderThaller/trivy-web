@@ -1,7 +1,10 @@
 use std::collections::BTreeSet;
 
 use askama::Template;
-use docker_registry_client::Manifest as DockerManifest;
+use docker_registry_client::{
+    image_name::ImageName,
+    Manifest as DockerManifest,
+};
 
 use crate::{
     filters,
@@ -30,12 +33,17 @@ use super::{
 #[derive(Debug, Template)]
 #[template(path = "response.html")]
 pub(crate) struct ImageResponse {
-    pub(crate) artifact_name: String,
+    pub(crate) image_name: ImageName,
     pub(crate) docker_manifest: Option<DockerManifest>,
     pub(crate) cosign_manifest: Option<cosign::Cosign>,
     pub(crate) cosign_verify: Option<Result<cosign::CosignVerify, cosign::Error>>,
-    pub(crate) vulnerabilities: BTreeSet<Vulnerability>,
-    pub(crate) severity_count: SeverityCount,
+    pub(crate) trivy_information: Result<TrivyInformation, eyre::Error>,
+}
+
+#[derive(Debug)]
+pub(crate) struct TrivyInformation {
+    vulnerabilities: BTreeSet<Vulnerability>,
+    severity_count: SeverityCount,
 }
 
 pub(crate) async fn fetch(state: AppState, form: SubmitForm) -> Result<ImageResponse, eyre::Error> {
@@ -71,10 +79,26 @@ pub(crate) async fn fetch(state: AppState, form: SubmitForm) -> Result<ImageResp
         Some(form.password.0.as_str())
     };
 
-    let trivy_result = trivy::scan_image(&form.imagename, server, username, password).await;
-    let trivy_result = trivy_result.unwrap();
+    let trivy_information = fetch_trivy(&image_name, server, username, password).await;
 
-    let artifact_name = trivy_result.artifact_name.clone();
+    let response = ImageResponse {
+        image_name,
+        docker_manifest,
+        cosign_manifest,
+        cosign_verify,
+        trivy_information,
+    };
+
+    Ok(response)
+}
+
+async fn fetch_trivy(
+    image_name: &ImageName,
+    server: Option<&str>,
+    username: Option<&str>,
+    password: Option<&str>,
+) -> Result<TrivyInformation, eyre::Error> {
+    let trivy_result = trivy::scan_image(image_name, server, username, password).await?;
 
     let vulnerabilities = trivy_result
         .results
@@ -85,14 +109,8 @@ pub(crate) async fn fetch(state: AppState, form: SubmitForm) -> Result<ImageResp
 
     let severity_count = get_vulnerabilities_count(vulnerabilities.clone());
 
-    let response = ImageResponse {
-        artifact_name,
-        docker_manifest,
-        cosign_manifest,
-        cosign_verify,
+    Ok(TrivyInformation {
         vulnerabilities,
         severity_count,
-    };
-
-    Ok(response)
+    })
 }
