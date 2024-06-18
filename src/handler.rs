@@ -16,13 +16,17 @@ use axum::{
     Form,
 };
 use docker_registry_client::{
+    image_name::ImageName,
     Client as DockerRegistryClient,
     Manifest as DockerManifest,
 };
 use maud::html;
 use serde::Deserialize;
 
-use crate::filters;
+use crate::filters::{
+    self,
+    ansi_to_html,
+};
 
 #[cfg(debug_assertions)]
 use tokio::fs::read_to_string;
@@ -142,10 +146,31 @@ pub(super) async fn clicked(
     State(state): State<AppState>,
     Form(submit): Form<SubmitForm>,
 ) -> impl IntoResponse {
+    if submit.imagename.is_empty() {
+        return Html(
+            html! {
+                p { "Please provide an image name" }
+            }
+            .into_string(),
+        );
+    }
+
+    let image_name = match submit.imagename.parse::<ImageName>() {
+        Ok(image_name) => image_name,
+
+        Err(err) => {
+            return Html(
+                html! {
+                    p { (format!("Invalid image name: {err}")) }
+                }
+                .into_string(),
+            );
+        }
+    };
+
     // run following command trivy image --format json
     // linuxserver/code-server:latest
 
-    let image_name = submit.imagename.parse().unwrap();
     let docker_manifest = state
         .docker_registry_client
         .get_manifest(&image_name)
@@ -179,13 +204,15 @@ pub(super) async fn clicked(
     let trivy_result = trivy::scan_image(&submit.imagename, server, username, password).await;
 
     if let Err(err) = trivy_result {
-        return Html(
-            html! {
-                p { (format!("trivy error: {err:?}")) }
+        match err {
+            trivy::Error::Unkown(stderr) => {
+                return Html(
+                    ansi_to_html(stderr)
+                        .unwrap_or_else(|err| format!("failed to convert error to html: {err}")),
+                );
             }
-            .into_string(),
-        );
-    }
+        }
+    };
 
     let trivy_result = trivy_result.unwrap();
 
