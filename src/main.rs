@@ -98,7 +98,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     // assets
         .route("/css/main.css", get(handler::css_main))
         .route("/img/bars.svg", get(handler::img_bars))
-        .route("/js/htmx/1.9.4/htmx.min.js.gz", get(handler::js_htmx_1_9_4))
+        .route("/js/htmx/2.0.0/htmx.min.js.gz", get(handler::js_htmx_2_0_0))
     // handlers
         .route("/", get(handler::root))
         .route("/clicked", post(handler::clicked))

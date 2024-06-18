@@ -115,13 +115,13 @@ pub(super) async fn css_main() -> impl IntoResponse {
 }
 
 #[tracing::instrument]
-pub(super) async fn js_htmx_1_9_4() -> impl IntoResponse {
+pub(super) async fn js_htmx_2_0_0() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "application/javascript")
         .header("Content-Encoding", "gzip")
         .body(Body::from(
-            include_bytes!("../resources/js/htmx/1.9.4/htmx.min.js.gz").to_vec(),
+            include_bytes!("../resources/js/htmx/2.0.0/htmx.min.js.gz").to_vec(),
         ))
         .unwrap()
 }
