@@ -3,8 +3,10 @@ use std::collections::BTreeSet;
 use askama::Template;
 use docker_registry_client::{
     image_name::ImageName,
+    Client as DockerRegistryClient,
     Manifest as DockerManifest,
 };
+use tokio::task;
 
 use crate::{
     filters,
@@ -27,6 +29,7 @@ use super::{
         get_vulnerabilities_count,
     },
     AppState,
+    Password,
     SubmitForm,
 };
 
@@ -55,29 +58,23 @@ pub(crate) async fn fetch(state: AppState, form: SubmitForm) -> Result<ImageResp
         .await
         .ok();
 
-    let cosign_manifest = cosign_manifest(&state.docker_registry_client, &image_name).await;
+    let cosign_manifest = task::spawn(fetch_cosign_manifest(
+        state.docker_registry_client.clone(),
+        image_name.clone(),
+    ));
 
-    let cosign_verify = if form.cosign_key.is_empty() {
-        None
-    } else {
-        Some(cosign_verify(&form.cosign_key, &image_name).await)
-    };
+    let cosign_verify = task::spawn(fetch_cosign_verify(form.cosign_key, image_name.clone()));
 
-    let server = state.server.as_deref();
+    let trivy_information = task::spawn(fetch_trivy(
+        image_name.clone(),
+        state.server.clone(),
+        form.username,
+        form.password,
+    ));
 
-    let username = if form.username.is_empty() {
-        None
-    } else {
-        Some(form.username.as_str())
-    };
-
-    let password = if form.password.0.is_empty() {
-        None
-    } else {
-        Some(form.password.0.as_str())
-    };
-
-    let trivy_information = fetch_trivy(&image_name, server, username, password).await;
+    let cosign_manifest = cosign_manifest.await?;
+    let cosign_verify = cosign_verify.await?;
+    let trivy_information = trivy_information.await?;
 
     let response = ImageResponse {
         image_name,
@@ -90,13 +87,44 @@ pub(crate) async fn fetch(state: AppState, form: SubmitForm) -> Result<ImageResp
     Ok(response)
 }
 
+async fn fetch_cosign_manifest(
+    docker_registry_client: DockerRegistryClient,
+    image_name: ImageName,
+) -> Result<Option<cosign::Cosign>, eyre::Error> {
+    cosign_manifest(&docker_registry_client, &image_name).await
+}
+
+async fn fetch_cosign_verify(
+    cosign_key: String,
+    image_name: ImageName,
+) -> Option<Result<cosign::CosignVerify, eyre::Error>> {
+    if cosign_key.is_empty() {
+        None
+    } else {
+        Some(cosign_verify(&cosign_key, &image_name).await)
+    }
+}
+
 async fn fetch_trivy(
-    image_name: &ImageName,
-    server: Option<&str>,
-    username: Option<&str>,
-    password: Option<&str>,
+    image_name: ImageName,
+    server: Option<String>,
+    username: String,
+    password: Password,
 ) -> Result<TrivyInformation, eyre::Error> {
-    let trivy_result = trivy::scan_image(image_name, server, username, password).await?;
+    let username = if username.is_empty() {
+        None
+    } else {
+        Some(username.as_str())
+    };
+
+    let password = if password.0.is_empty() {
+        None
+    } else {
+        Some(password.0.as_str())
+    };
+
+    let trivy_result =
+        trivy::scan_image(&image_name, server.as_deref(), username, password).await?;
 
     let vulnerabilities = trivy_result
         .results
