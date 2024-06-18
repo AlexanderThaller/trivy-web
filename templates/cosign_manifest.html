@@ -1,6 +1,7 @@
 <h3>Manifest</h3>
 
-{% if let Some(manifest) = cosign_manifest %}
+{% match cosign_manifest %}
+{% when Ok(manifest) %}
 <p>Location: {{ manifest.manifest_location }}</p>
 <table>
   <thead>
@@ -18,6 +19,9 @@
     {% endfor %}
   </tbody>
 </table>
-{% else %}
-<p>No Signature Found</p>
-{% endif %}
+{% when Err(err) %}
+<h4>Error</h4>
+<code>
+  {{ err|ansi_to_html|safe }}
+</code>
+{% endmatch %}
