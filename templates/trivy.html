@@ -1,0 +1,64 @@
+{% match trivy_information %}
+{% when Ok(information) %}
+<p>Vulnerabilities:</p>
+<ul class="severity_count">
+    <li class="critical" title="Critical">{{ information.severity_count.critical }}</li>
+    <li class="high" title="High">{{ information.severity_count.high }}</li>
+    <li class="medium" title="Medium">{{ information.severity_count.medium }}</li>
+    <li class="low" title="Low">{{ information.severity_count.low }}</li>
+    <li class="unknown" title="Unknown">{{ information.severity_count.unknown }}</li>
+</ul>
+
+<table>
+    <thead>
+        <tr>
+            <th></th>
+            <th>severity</th>
+            <th>id</th>
+            <th>
+                affected packages [<span class="fixed_version">fixed version</span>]
+            </th>
+            <th>CVE Information</th>
+        </tr>
+    </thead>
+
+    <colgroup>
+        <col span="1" style="width: 5px" />
+        <col span="1" style="width: auto" />
+        <col span="1" style="width: auto" />
+        <col span="1" style="width: auto" />
+        <col span="1" style="width: auto" />
+    </colgroup>
+
+    <tbody>
+        {% for vulnerability in information.vulnerabilities %}
+        <tr class="{{ vulnerability.severity }}">
+            <td></td>
+            <td>{{ vulnerability.severity }}</td>
+
+            {% match vulnerability.primary_url() %} {% when Some with (url) %}
+            <td>
+                <a href="{{ url }}"> {{ vulnerability.id }} </a>
+            </td>
+            {% when None %}
+            <td>{{ vulnerability.id }}</td>
+            {% endmatch %}
+
+            <td>
+                {{ vulnerability.pkg_name }} {{ vulnerability.installed_version }} {%
+                match vulnerability.fixed_version %}{% when Some with (fixed_version)
+                %}[<span class="fixed_version">{{ fixed_version}}</span>]{% when None
+                %}{% endmatch %}
+            </td>
+            <td>{% include "cve_information.html" %}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% when Err(err) %}
+<h3>Error</h3>
+<code>
+  {{ err|ansi_to_html|safe }}
+</code>
+{% endmatch %}

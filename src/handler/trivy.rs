@@ -3,6 +3,7 @@ use std::collections::{
     BTreeSet,
 };
 
+use docker_registry_client::image_name::ImageName;
 use serde::Deserialize;
 use tokio::process::Command;
 use url::Url;
@@ -16,7 +17,6 @@ pub(super) enum Error {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub(super) struct TrivyResult {
-    pub(super) artifact_name: String,
     #[serde(default)]
     pub(super) results: Vec<Results>,
 }
@@ -60,6 +60,16 @@ pub(super) struct Cvss {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub(super) struct Score(String);
+
+impl std::error::Error for Error {}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unkown(s) => f.write_str(s),
+        }
+    }
+}
 
 impl<'de> Deserialize<'de> for Score {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -142,7 +152,7 @@ impl Vulnerability {
 }
 
 pub(super) async fn scan_image(
-    image: &str,
+    image: &ImageName,
     server: Option<&str>,
     username: Option<&str>,
     password: Option<&str>,
@@ -158,7 +168,7 @@ pub(super) async fn scan_image(
         command = command.arg("--server").arg(server);
     }
 
-    command = command.arg(image);
+    command = command.arg(image.to_string());
 
     if let Some(username) = username {
         if let Some(password) = password {
@@ -198,15 +208,25 @@ mod test {
     #[tokio::test]
     #[should_panic(expected = "should fail")]
     async fn missing() {
-        let _got = super::scan_image("ghcr.io/aquasecurity/trivy:0.0.0", None, None, None)
-            .await
-            .expect("should fail");
+        let _got = super::scan_image(
+            &"ghcr.io/aquasecurity/trivy:0.0.0".parse().unwrap(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .expect("should fail");
     }
 
     #[tokio::test]
     async fn exists() {
-        let _got = super::scan_image("ghcr.io/aquasecurity/trivy:0.52.0", None, None, None)
-            .await
-            .unwrap();
+        let _got = super::scan_image(
+            &"ghcr.io/aquasecurity/trivy:0.52.0".parse().unwrap(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
     }
 }
