@@ -3,6 +3,7 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::unwrap_used)]
 #![warn(rust_2018_idioms, unused_lifetimes, missing_debug_implementations)]
+#![warn(clippy::dbg_macro)]
 
 use std::net::SocketAddr;
 

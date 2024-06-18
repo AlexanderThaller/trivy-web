@@ -22,6 +22,6 @@
 {% when Err(err) %}
 <h4>Error</h4>
 <code>
-  {{ err|ansi_to_html|safe }}
+  {{ err|format_error|ansi_to_html|safe }}
 </code>
 {% endmatch %}

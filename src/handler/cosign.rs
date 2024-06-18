@@ -181,8 +181,6 @@ fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, e
     let mut signatures = certificates
         .into_iter()
         .map(|mut certificate| {
-            dbg!(&certificate);
-
             let issuer = certificate
                 .extensions
                 .remove("1.3.6.1.4.1.57264.1.1")
@@ -213,15 +211,16 @@ pub(crate) async fn cosign_manifest(
     image: &ImageName,
 ) -> Result<Cosign, eyre::Error> {
     let manifest_location = triangulate(&image.to_string()).await?.parse().unwrap();
+
     let manifest = client
         .get_manifest(&manifest_location)
         .await
         .map(signature_from_manifest)
-        .map_err(|err| eyre::Report::msg(err.to_string()))?;
+        .context("Failed to get cosign manifest")?;
 
     Ok(Cosign {
         manifest_location,
-        signatures: manifest.context("Failed to get manifest")?,
+        signatures: manifest.context("Failed to parse cosign signature from manifest")?,
     })
 }
 
@@ -286,6 +285,7 @@ async fn triangulate(image: &str) -> Result<String, eyre::Error> {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[allow(clippy::dbg_macro)]
 mod test {
     use docker_registry_client::Manifest as DockerManifest;
     use pretty_assertions::assert_eq;
