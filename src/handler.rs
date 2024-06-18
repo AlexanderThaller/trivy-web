@@ -22,11 +22,16 @@ use docker_registry_client::{
 use maud::html;
 use serde::Deserialize;
 
+use crate::filters;
+
 #[cfg(debug_assertions)]
 use tokio::fs::read_to_string;
 
 use self::{
-    cosign::cosign_manifest,
+    cosign::{
+        cosign_manifest,
+        cosign_verify,
+    },
     trivy::{
         get_vulnerabilities_count,
         SeverityCount,
@@ -48,6 +53,7 @@ pub(super) struct SubmitForm {
     imagename: String,
     username: String,
     password: Password,
+    cosign_key: String,
 }
 
 #[derive(Deserialize)]
@@ -59,6 +65,7 @@ struct ImageResponse {
     artifact_name: String,
     docker_manifest: Option<DockerManifest>,
     cosign_manifest: Option<cosign::Cosign>,
+    cosign_verify: Option<Result<cosign::CosignVerify, cosign::Error>>,
     vulnerabilities: BTreeSet<Vulnerability>,
     severity_count: SeverityCount,
 }
@@ -149,6 +156,12 @@ pub(super) async fn clicked(
         .await
         .ok();
 
+    let cosign_verify = if submit.cosign_key.is_empty() {
+        None
+    } else {
+        Some(cosign_verify(&submit.cosign_key, &image_name).await)
+    };
+
     let server = state.server.as_deref();
 
     let username = if submit.username.is_empty() {
@@ -191,6 +204,7 @@ pub(super) async fn clicked(
         artifact_name,
         docker_manifest,
         cosign_manifest,
+        cosign_verify,
         vulnerabilities,
         severity_count,
     };

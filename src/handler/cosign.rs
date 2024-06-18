@@ -9,6 +9,7 @@ use docker_registry_client::{
     Client as DockerRegistryClient,
     Manifest as DockerManifest,
 };
+use serde::Deserialize;
 use tokio::process::Command;
 use x509_parser::{
     self,
@@ -18,7 +19,7 @@ use x509_parser::{
 };
 
 #[derive(Debug)]
-pub(super) enum Error {
+pub(crate) enum Error {
     InvalidNotBefore,
     InvalidNotAfter,
 
@@ -27,28 +28,124 @@ pub(super) enum Error {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct Cosign {
-    pub(super) manifest_location: ImageName,
-    pub(super) signatures: Vec<Signature>,
+pub(crate) struct Cosign {
+    pub(crate) manifest_location: ImageName,
+    pub(crate) signatures: Vec<Signature>,
 }
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Clone)]
-pub(super) struct Certificate {
-    pub(super) subject: String,
-    pub(super) issuer: String,
+pub(crate) struct Certificate {
+    pub(crate) subject: String,
+    pub(crate) issuer: String,
 
-    pub(super) common_names: Vec<String>,
+    pub(crate) common_names: Vec<String>,
 
-    pub(super) not_before: DateTime<Utc>,
-    pub(super) not_after: DateTime<Utc>,
+    pub(crate) not_before: DateTime<Utc>,
+    pub(crate) not_after: DateTime<Utc>,
 
-    pub(super) extensions: BTreeMap<String, String>,
+    pub(crate) extensions: BTreeMap<String, String>,
 }
 
 #[derive(Debug, PartialEq, Ord, Eq, PartialOrd)]
-pub(super) struct Signature {
-    pub(super) issuer: String,
-    pub(super) identity: String,
+pub(crate) struct Signature {
+    pub(crate) issuer: String,
+    pub(crate) identity: String,
+}
+
+#[derive(Debug)]
+pub(crate) struct CosignVerify {
+    pub(crate) message: String,
+
+    pub(crate) signature: Vec<VerifySignature>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct VerifySignature {
+    pub(crate) critical: Critical,
+    pub(crate) optional: Option<Optional>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Critical {
+    pub(crate) identity: Identity,
+    pub(crate) image: Image,
+
+    #[serde(rename = "type")]
+    pub(crate) cosign_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Identity {
+    #[serde(rename = "docker-reference")]
+    pub(crate) docker_reference: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Image {
+    #[serde(rename = "docker-manifest-digest")]
+    digest: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct Optional {
+    sig: String,
+}
+
+impl TryFrom<X509Certificate<'_>> for Certificate {
+    type Error = Error;
+
+    fn try_from(x509: X509Certificate<'_>) -> Result<Self, Self::Error> {
+        let subject = x509.subject().to_string();
+        let issuer = x509.issuer().to_string();
+
+        let common_names = x509
+            .subject()
+            .iter_common_name()
+            .filter_map(|entry| entry.attr_value().as_str().map(ToString::to_string).ok())
+            .collect::<Vec<_>>();
+
+        let extensions = x509
+            .extensions()
+            .iter()
+            .map(|extension| {
+                let oid = extension.oid.to_id_string();
+
+                let parsed = String::from_utf8_lossy(extension.value)
+                    .chars()
+                    .filter(|c| !c.is_control())
+                    .collect::<String>();
+
+                (oid, parsed)
+            })
+            .collect();
+
+        let validity = x509.validity();
+
+        let not_before = validity.not_before.timestamp();
+        let not_after = validity.not_after.timestamp();
+
+        let not_before = DateTime::from_timestamp(not_before, 0).ok_or(Error::InvalidNotBefore)?;
+        let not_after = DateTime::from_timestamp(not_after, 0).ok_or(Error::InvalidNotAfter)?;
+
+        Ok(Self {
+            subject,
+            issuer,
+            common_names,
+            not_before,
+            not_after,
+            extensions,
+        })
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidNotAfter => write!(f, "Invalid not after"),
+            Self::InvalidNotBefore => write!(f, "Invalid not before"),
+            Self::Unkown(err) => write!(f, "{err}"),
+        }
+    }
 }
 
 fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, Error> {
@@ -105,54 +202,7 @@ fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, E
     Ok(signatures)
 }
 
-impl TryFrom<X509Certificate<'_>> for Certificate {
-    type Error = Error;
-
-    fn try_from(x509: X509Certificate<'_>) -> Result<Self, Self::Error> {
-        let subject = x509.subject().to_string();
-        let issuer = x509.issuer().to_string();
-
-        let common_names = x509
-            .subject()
-            .iter_common_name()
-            .filter_map(|entry| entry.attr_value().as_str().map(ToString::to_string).ok())
-            .collect::<Vec<_>>();
-
-        let extensions = x509
-            .extensions()
-            .iter()
-            .map(|extension| {
-                let oid = extension.oid.to_id_string();
-
-                let parsed = String::from_utf8_lossy(extension.value)
-                    .chars()
-                    .filter(|c| !c.is_control())
-                    .collect::<String>();
-
-                (oid, parsed)
-            })
-            .collect();
-
-        let validity = x509.validity();
-
-        let not_before = validity.not_before.timestamp();
-        let not_after = validity.not_after.timestamp();
-
-        let not_before = DateTime::from_timestamp(not_before, 0).ok_or(Error::InvalidNotBefore)?;
-        let not_after = DateTime::from_timestamp(not_after, 0).ok_or(Error::InvalidNotAfter)?;
-
-        Ok(Self {
-            subject,
-            issuer,
-            common_names,
-            not_before,
-            not_after,
-            extensions,
-        })
-    }
-}
-
-pub(super) async fn cosign_manifest(
+pub(crate) async fn cosign_manifest(
     client: &DockerRegistryClient,
     image: &ImageName,
 ) -> Result<Cosign, Error> {
@@ -167,6 +217,31 @@ pub(super) async fn cosign_manifest(
         manifest_location,
         signatures: manifest,
     })
+}
+
+pub(crate) async fn cosign_verify(
+    cosign_key: &str,
+    image: &ImageName,
+) -> Result<CosignVerify, Error> {
+    let output = Command::new("cosign")
+        .arg("verify")
+        .arg("--private-infrastructure=true")
+        .arg("--output=json")
+        .arg("--key")
+        .arg(cosign_key)
+        .arg(image.to_string())
+        .output()
+        .await
+        .map_err(|err| Error::Unkown(err.to_string()))?;
+
+    if !output.status.success() {
+        return Err(Error::Unkown(String::from_utf8(output.stderr).unwrap()));
+    }
+
+    let message = String::from_utf8(output.stderr).unwrap();
+    let signature: Vec<VerifySignature> = serde_json::from_slice(output.stdout.as_slice()).unwrap();
+
+    Ok(CosignVerify { message, signature })
 }
 
 async fn triangulate(image: &str) -> Result<String, Error> {
@@ -231,15 +306,20 @@ mod test {
     fn parse_manifest() {
         const INPUT: &str = include_str!("resources/tests/cosign_manifest.json");
         let docker_manifest: DockerManifest = serde_json::from_str(INPUT).unwrap();
+        dbg!(&docker_manifest);
+
         let got = signature_from_manifest(docker_manifest).unwrap();
+        dbg!(&got);
 
-        let expected = vec![
-            Signature{
-                    issuer: "https://token.actions.githubusercontent.com".to_string(),
-                    identity: "_https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v0.52.0".to_string(),
-            }
-        ];
+        todo!();
 
-        assert_eq!(expected, got);
+        // let expected = vec![
+        //    Signature{
+        //            issuer: "https://token.actions.githubusercontent.com".to_string(),
+        //            identity: "_https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v0.52.0".to_string(),
+        //    }
+        //];
+
+        // assert_eq!(expected, got);
     }
 }

@@ -1,0 +1,12 @@
+[
+  {
+    "critical": {
+      "identity": { "docker-reference": "quay.io/argoproj/argo-events" },
+      "image": {
+        "docker-manifest-digest": "sha256:33f2261769bc73b375798d730884ea5c574a1b3e1503f75381053a4bafe7731e"
+      },
+      "type": "cosign container image signature"
+    },
+    "optional": null
+  }
+]

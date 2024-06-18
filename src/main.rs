@@ -35,6 +35,7 @@ use tracing_tree::HierarchicalLayer;
 
 use crate::handler::AppState;
 
+mod filters;
 mod handler;
 
 /// Simple uploading service
