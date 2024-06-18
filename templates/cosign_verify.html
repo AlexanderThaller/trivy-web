@@ -1,0 +1,14 @@
+{% if let Some(result) = cosign_verify %}
+  <h3>Verification</h3>
+  {% match result %}
+    {% when Ok with (manifest) %}
+    <code>
+        {{ manifest.message|ansi_to_html|safe }}
+    </code>
+
+    {% when Err with (err) %}
+    <code>
+        {{ err|ansi_to_html|safe }}
+    </code>
+  {% endmatch %}
+{% endif %}

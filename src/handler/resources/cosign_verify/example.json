@@ -1,0 +1,14 @@
+{
+  "critical": {
+    "identity": {
+      "docker-reference": ""
+    },
+    "image": {
+      "Docker-manifest-digest": "97fc222cee7991b5b061d4d4afdb5f3428fcb0c9054e1690313786befa1e4e36"
+    },
+    "type": "cosign container image signature"
+  },
+  "optional": {
+    "sig": "original"
+  }
+}
