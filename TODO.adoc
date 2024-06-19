@@ -1,3 +1,17 @@
 = TODO
 
 * [ ] Allow settings credentials for image information fetching
+* [ ] Cache policy for static content 
+thaller.ws
+1st party
+		16 KiB
+…2.0.0/htmx.min.js.gz(trivy-web.thaller.ws)
+	
+None
+	
+16 KiB
+/css/main.css(trivy-web.thaller.ws)
+	
+None
+	
+1 KiB
