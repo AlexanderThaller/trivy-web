@@ -155,7 +155,6 @@ impl std::fmt::Display for CertificateError {
 
 impl std::error::Error for CertificateError {}
 
-#[tracing::instrument]
 fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, eyre::Error> {
     let DockerManifest::Image(manifest) = manifest else {
         return Err(eyre::Report::msg("Manifest is not a single manifest"));
