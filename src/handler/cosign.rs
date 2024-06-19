@@ -216,14 +216,17 @@ fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, e
 pub(crate) async fn cosign_manifest(
     client: &DockerRegistryClient,
     image: &ImageName,
+    digest: &str,
 ) -> Result<Option<Cosign>, eyre::Error> {
-    let manifest_location = triangulate(&image.to_string()).await?.parse().unwrap();
+    let manifest_location = triangulate(image, digest)
+        .parse()
+        .context("Failed to parse manifest location")?;
 
     let manifest = client
         .get_manifest(&manifest_location)
         .instrument(info_span!("get manifest"))
         .await
-        .map(signature_from_manifest);
+        .map(|response| signature_from_manifest(response.manifest));
 
     let manifest = match manifest {
         Ok(manifest) => Ok(manifest),
@@ -278,30 +281,19 @@ pub(crate) async fn cosign_verify(
 }
 
 #[tracing::instrument]
-async fn triangulate(image: &str) -> Result<String, eyre::Error> {
-    let mut command = Command::new("cosign");
+fn triangulate(image_name: &ImageName, digest: &str) -> String {
+    // quay.io/jetstack/cert-manager-controller:
+    // sha256-9c0527cab629b61bd60c20f0c25615a8593314d3504add968b42bc5b891b253a.sig
 
-    let command = command.arg("triangulate").arg(image);
+    let out = format!(
+        "{}/{}/{}:{}.sig",
+        image_name.registry.registry_domain(),
+        image_name.repository,
+        image_name.image_name,
+        digest.replace(':', "-")
+    );
 
-    let output = command
-        .output()
-        .instrument(info_span!("run cosign triangulate"))
-        .await
-        .context("Failed to run cosign triangulate")?;
-
-    if !output.status.success() {
-        let stderr =
-            String::from_utf8(output.stderr).context("Failed to convert cosign stderr to utf8")?;
-
-        return Err(eyre::Report::msg(stderr));
-    }
-
-    let stdout = String::from_utf8(output.stdout)
-        .context("Failed to convert cosign stdout to utf8")?
-        .trim()
-        .to_string();
-
-    Ok(stdout)
+    out
 }
 
 #[cfg(test)]
@@ -320,7 +312,7 @@ mod test {
     async fn missing() {
         let client = docker_registry_client::Client::new();
         let image_name = "ghcr.io/aquasecurity/trivy:0.0.0".parse().unwrap();
-        let got = cosign_manifest(&client, &image_name).await;
+        let got = cosign_manifest(&client, &image_name, "").await;
 
         assert!(got.is_err());
     }
@@ -329,7 +321,10 @@ mod test {
     async fn exists() {
         let client = docker_registry_client::Client::new();
         let image_name = "ghcr.io/aquasecurity/trivy:0.52.0".parse().unwrap();
-        let got = cosign_manifest(&client, &image_name).await.unwrap();
+        let docker_response = client.get_manifest(&image_name).await.unwrap();
+        let got = cosign_manifest(&client, &image_name, &docker_response.digest.unwrap())
+            .await
+            .unwrap();
 
         let expected = Some(super::Cosign {
             manifest_location:

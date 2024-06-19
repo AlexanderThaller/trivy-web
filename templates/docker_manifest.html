@@ -1,8 +1,14 @@
 <p>Image Name: {{ image_name }}</p>
 
-{% match docker_manifest %}
-{% when Ok(manifest) %}
-{% match manifest %}
+{% match docker_response %}
+{% when Ok(response) %}
+{% if let Some(digest) = response.digest %}
+Digest: {{ digest }}
+{% else %}
+Digest: Not available
+{% endif %}
+
+{% match response.manifest %}
 {% when DockerManifest::Image with (image) %}
 <table>
   <thead>

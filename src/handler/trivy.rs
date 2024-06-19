@@ -7,6 +7,10 @@ use docker_registry_client::image_name::ImageName;
 use eyre::WrapErr;
 use serde::Deserialize;
 use tokio::process::Command;
+use tracing::{
+    info_span,
+    Instrument,
+};
 use url::Url;
 
 #[derive(Debug, Deserialize)]
@@ -109,7 +113,6 @@ impl std::fmt::Display for Severity {
     }
 }
 
-#[tracing::instrument]
 pub(super) fn get_vulnerabilities_count(vulnerabilities: BTreeSet<Vulnerability>) -> SeverityCount {
     let mut vulnerabilities_count = SeverityCount::default();
 
@@ -165,11 +168,16 @@ pub(super) async fn scan_image(
         }
     }
 
-    let output = command.output().await.context("Failed to run trivy")?;
+    let output = command
+        .output()
+        .instrument(info_span!("run trivy command"))
+        .await
+        .context("Failed to run trivy")?;
 
     if !output.status.success() {
         let stderr =
             String::from_utf8(output.stderr).context("Failed to convert trivy stderr to utf8")?;
+
         return Err(eyre::Report::msg(stderr));
     }
 

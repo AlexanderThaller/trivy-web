@@ -6,6 +6,7 @@ use docker_registry_client::{
     Client as DockerRegistryClient,
     ClientError as DockerClientError,
     Manifest as DockerManifest,
+    Response as DockerResponse,
 };
 use tokio::task;
 use tracing::{
@@ -42,7 +43,7 @@ use super::{
 #[template(path = "response.html")]
 pub(crate) struct ImageResponse {
     pub(crate) image_name: ImageName,
-    pub(crate) docker_manifest: Result<DockerManifest, DockerClientError>,
+    pub(crate) docker_response: Result<DockerResponse, DockerClientError>,
     pub(crate) cosign_manifest: Result<Option<cosign::Cosign>, eyre::Error>,
     pub(crate) cosign_verify: Option<Result<cosign::CosignVerify, eyre::Error>>,
     pub(crate) trivy_information: Result<TrivyInformation, eyre::Error>,
@@ -58,14 +59,9 @@ pub(crate) struct TrivyInformation {
 pub(crate) async fn fetch(state: AppState, form: SubmitForm) -> Result<ImageResponse, eyre::Error> {
     let image_name: ImageName = form.imagename.parse()?;
 
-    let docker_manifest = task::spawn(
-        fetch_docker_manifest(state.docker_registry_client.clone(), image_name.clone())
-            .instrument(info_span!("fetch_docker_manifest")),
-    );
-
-    let cosign_manifest = task::spawn(
-        fetch_cosign_manifest(state.docker_registry_client.clone(), image_name.clone())
-            .instrument(info_span!("fetch_cosign_manifest")),
+    let docker_and_cosign_manifest = task::spawn(
+        fetch_docker_and_cosign_manifest(state.docker_registry_client.clone(), image_name.clone())
+            .instrument(info_span!("fetch_docker_and_cosign_manifest")),
     );
 
     let cosign_verify = task::spawn(
@@ -83,14 +79,13 @@ pub(crate) async fn fetch(state: AppState, form: SubmitForm) -> Result<ImageResp
         .instrument(info_span!("fetch_trivy")),
     );
 
-    let docker_manifest = docker_manifest.await?;
-    let cosign_manifest = cosign_manifest.await?;
+    let (docker_response, cosign_manifest) = docker_and_cosign_manifest.await?;
     let cosign_verify = cosign_verify.await?;
     let trivy_information = trivy_information.await?;
 
     let response = ImageResponse {
         image_name,
-        docker_manifest,
+        docker_response,
         cosign_manifest,
         cosign_verify,
         trivy_information,
@@ -100,22 +95,31 @@ pub(crate) async fn fetch(state: AppState, form: SubmitForm) -> Result<ImageResp
 }
 
 #[tracing::instrument]
-async fn fetch_docker_manifest(
+async fn fetch_docker_and_cosign_manifest(
     docker_registry_client: DockerRegistryClient,
     image_name: ImageName,
-) -> Result<DockerManifest, DockerClientError> {
-    docker_registry_client
+) -> (
+    Result<DockerResponse, DockerClientError>,
+    Result<Option<cosign::Cosign>, eyre::Error>,
+) {
+    let docker_response = docker_registry_client
         .get_manifest(&image_name)
-        .instrument(info_span!("get_manifest"))
-        .await
-}
+        .instrument(info_span!("get docker manifest"))
+        .await;
 
-#[tracing::instrument]
-async fn fetch_cosign_manifest(
-    docker_registry_client: DockerRegistryClient,
-    image_name: ImageName,
-) -> Result<Option<cosign::Cosign>, eyre::Error> {
-    cosign_manifest(&docker_registry_client, &image_name).await
+    let cosign_manifest = if let Ok(ref docker_response) = docker_response {
+        if let Some(digest) = &docker_response.digest {
+            cosign_manifest(&docker_registry_client, &image_name, digest)
+                .instrument(info_span!("get cosign manifest"))
+                .await
+        } else {
+            Err(eyre::eyre!("Failed to get docker manifest"))
+        }
+    } else {
+        Err(eyre::eyre!("Failed to get docker manifest"))
+    };
+
+    (docker_response, cosign_manifest)
 }
 
 #[tracing::instrument]
