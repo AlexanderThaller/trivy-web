@@ -109,6 +109,7 @@ impl std::fmt::Display for Severity {
     }
 }
 
+#[tracing::instrument]
 pub(super) fn get_vulnerabilities_count(vulnerabilities: BTreeSet<Vulnerability>) -> SeverityCount {
     let mut vulnerabilities_count = SeverityCount::default();
 
@@ -136,6 +137,7 @@ impl Vulnerability {
     }
 }
 
+#[tracing::instrument]
 pub(super) async fn scan_image(
     image: &ImageName,
     server: Option<&str>,

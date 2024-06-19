@@ -6,25 +6,27 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ansi-to-html = "0.2"
 askama = { version = "0.12", features = ["serde-json"] }
 axum-macros = "0.4"
 axum = { version = "0.7", features = ["json", "macros"] }
 chrono = "0.4"
 clap = { version = "4", features = ["derive", "env", "cargo"] }
+docker-registry-client = { path = "../docker-registry-client" }
+eyre = "0.6"
 maud = "0.26"
+opentelemetry-otlp = "0.16"
+opentelemetry-semantic-conventions = "0.15"
+opentelemetry = "0.23"
+opentelemetry_sdk = { version = "0.23", features = ["rt-tokio"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full", "tracing"] }
-tower-http = { version = "0.5", features = ["fs", "trace"] }
+tracing-opentelemetry = "0.24"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-tree = "0.3"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
-uuid = { version = "1", features = ["v4", "serde"] }
 x509-parser = "0.16"
-docker-registry-client = { path = "../docker-registry-client" }
-eyre = "0.6.12"
 
 [dev-dependencies]
 pretty_assertions = "1"

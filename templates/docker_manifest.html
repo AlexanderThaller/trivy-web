@@ -1,7 +1,7 @@
 <p>Image Name: {{ image_name }}</p>
 
-{% if let Some(manifest) = docker_manifest %}
-
+{% match docker_manifest %}
+{% when Ok(manifest) %}
 {% match manifest %}
 {% when DockerManifest::Image with (image) %}
 <table>
@@ -58,4 +58,9 @@
 </table>
 
 {% endmatch %}
-{% endif %}
+{% when Err(err) %}
+<h4>Error</h4>
+<code>
+  {{ err|ansi_to_html|safe }}
+</code>
+{% endmatch %}
