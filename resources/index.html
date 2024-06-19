@@ -2,15 +2,24 @@
 <html lang="en">
 
   <head>
-    <meta charset="utf-8" />
     <title>Trivy Web Scanner</title>
+
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width"
+    >
 
     <link
       rel="stylesheet"
       type="text/css"
       href="/css/main.css"
     />
-    <script src="/js/htmx/2.0.0/htmx.min.js.gz"></script>
+
+    <script
+      async
+      src="/js/htmx/2.0.0/htmx.min.js.gz"
+    ></script>
   </head>
 
   <body>
@@ -61,11 +70,6 @@
 
       <p>
         <button>Submit</button>
-        <img
-          id="spinner"
-          class="htmx-indicator"
-          src="/img/bars.svg"
-        />
       </p>
     </form>
 
@@ -83,6 +87,9 @@
         var username = formData.get('username');
         var password = formData.get('password');
         var cosign_key = formData.get('cosign_key');
+
+        document.getElementById('image_information').innerHTML = `<img src="/img/bars.svg">`;
+        document.getElementById('scan_information').innerHTML = `<img src="/img/bars.svg">`;
 
         htmx.ajax('POST', '/image', {
           target: '#image_information',
