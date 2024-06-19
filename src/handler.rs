@@ -31,11 +31,16 @@ pub(super) struct AppState {
 }
 
 #[derive(Debug, Deserialize)]
-pub(super) struct SubmitForm {
+pub(super) struct SubmitFormImage {
+    imagename: String,
+    cosign_key: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct SubmitFormTrivy {
     imagename: String,
     username: String,
     password: Password,
-    cosign_key: String,
 }
 
 #[derive(Deserialize)]
@@ -109,20 +114,47 @@ pub(super) async fn img_bars() -> impl IntoResponse {
 }
 
 #[tracing::instrument]
-pub(super) async fn clicked(
+pub(super) async fn image(
     State(state): State<AppState>,
-    Form(form): Form<SubmitForm>,
+    Form(form): Form<SubmitFormImage>,
 ) -> impl IntoResponse {
-    if form.imagename.is_empty() {
-        return Html(
-            html! {
-                p { "Please provide an image name" }
-            }
-            .into_string(),
-        );
-    }
+    let response = match response::image(state, form).await {
+        Ok(response) => response,
 
-    let response = match response::fetch(state, form).await {
+        Err(err) => {
+            tracing::error!("error while fetching: {err}");
+
+            return Html(
+                html! {
+                    p { "Internal server error" }
+                }
+                .into_string(),
+            );
+        }
+    };
+
+    match response.render() {
+        Ok(rendered) => Html(rendered),
+
+        Err(err) => {
+            tracing::error!("failed to render response: {err}");
+
+            Html(
+                html! {
+                    p { "Internal server error" }
+                }
+                .into_string(),
+            )
+        }
+    }
+}
+
+#[tracing::instrument]
+pub(super) async fn trivy(
+    State(state): State<AppState>,
+    Form(form): Form<SubmitFormTrivy>,
+) -> impl IntoResponse {
+    let response = match response::trivy(state, form).await {
         Ok(response) => response,
 
         Err(err) => {

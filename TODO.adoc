@@ -1,0 +1,3 @@
+= TODO
+
+* [ ] Allow settings credentials for image information fetching

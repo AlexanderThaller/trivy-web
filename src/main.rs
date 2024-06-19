@@ -123,7 +123,8 @@ async fn main() -> Result<(), eyre::Error> {
         .route("/js/htmx/2.0.0/htmx.min.js.gz", get(handler::js_htmx_2_0_0))
     // handlers
         .route("/", get(handler::root))
-        .route("/clicked", post(handler::clicked))
+        .route("/image", post(handler::image))
+        .route("/trivy", post(handler::trivy))
         .route("/healthz", get(handler::healthz))
     // state
         .with_state(state);
