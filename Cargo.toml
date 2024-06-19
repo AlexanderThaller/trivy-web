@@ -11,7 +11,7 @@ axum-macros = "0.4"
 axum = { version = "0.7", features = ["json", "macros"] }
 chrono = "0.4"
 clap = { version = "4", features = ["derive", "env", "cargo"] }
-docker-registry-client = { path = "../docker-registry-client" }
+docker-registry-client = { git = "https://github.com/AlexanderThaller/docker-registry-client-rs.git" }
 eyre = "0.6"
 maud = "0.26"
 opentelemetry-otlp = "0.16"
