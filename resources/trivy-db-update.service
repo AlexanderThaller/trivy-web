@@ -1,0 +1,6 @@
+[Unit]
+Description=Update trivy database
+
+[Service]
+Type=oneshot
+ExecStart=trivy server --download-db-only
