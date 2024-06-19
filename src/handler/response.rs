@@ -36,16 +36,22 @@ use super::{
     },
     AppState,
     Password,
-    SubmitForm,
+    SubmitFormImage,
+    SubmitFormTrivy,
 };
 
 #[derive(Debug, Template)]
-#[template(path = "response.html")]
+#[template(path = "response_image.html")]
 pub(crate) struct ImageResponse {
     pub(crate) image_name: ImageName,
     pub(crate) docker_response: Result<DockerResponse, DockerClientError>,
     pub(crate) cosign_manifest: Result<Option<cosign::Cosign>, eyre::Error>,
     pub(crate) cosign_verify: Option<Result<cosign::CosignVerify, eyre::Error>>,
+}
+
+#[derive(Debug, Template)]
+#[template(path = "response_trivy.html")]
+pub(crate) struct TrivyResponse {
     pub(crate) trivy_information: Result<TrivyInformation, eyre::Error>,
 }
 
@@ -56,7 +62,10 @@ pub(crate) struct TrivyInformation {
 }
 
 #[tracing::instrument]
-pub(crate) async fn fetch(state: AppState, form: SubmitForm) -> Result<ImageResponse, eyre::Error> {
+pub(crate) async fn image(
+    state: AppState,
+    form: SubmitFormImage,
+) -> Result<ImageResponse, eyre::Error> {
     let image_name: ImageName = form.imagename.parse()?;
 
     let docker_and_cosign_manifest = task::spawn(
@@ -69,27 +78,30 @@ pub(crate) async fn fetch(state: AppState, form: SubmitForm) -> Result<ImageResp
             .instrument(info_span!("fetch_cosign_verify")),
     );
 
-    let trivy_information = task::spawn(
-        fetch_trivy(
-            image_name.clone(),
-            state.server.clone(),
-            form.username,
-            form.password,
-        )
-        .instrument(info_span!("fetch_trivy")),
-    );
-
     let (docker_response, cosign_manifest) = docker_and_cosign_manifest.await?;
     let cosign_verify = cosign_verify.await?;
-    let trivy_information = trivy_information.await?;
 
     let response = ImageResponse {
         image_name,
         docker_response,
         cosign_manifest,
         cosign_verify,
-        trivy_information,
     };
+
+    Ok(response)
+}
+
+#[tracing::instrument]
+pub(crate) async fn trivy(
+    state: AppState,
+    form: SubmitFormTrivy,
+) -> Result<TrivyResponse, eyre::Error> {
+    let image_name: ImageName = form.imagename.parse()?;
+
+    let trivy_information =
+        fetch_trivy(image_name, state.server, form.username, form.password).await;
+
+    let response = TrivyResponse { trivy_information };
 
     Ok(response)
 }

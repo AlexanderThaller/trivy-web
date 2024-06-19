@@ -1,53 +1,111 @@
 <!DOCTYPE html>
 <html lang="en">
+
   <head>
     <meta charset="utf-8" />
     <title>Trivy Web Scanner</title>
 
-    <link rel="stylesheet" type="text/css" href="/css/main.css" />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="/css/main.css"
+    />
     <script src="/js/htmx/2.0.0/htmx.min.js.gz"></script>
   </head>
+
   <body>
     <h1>Trivy Image Scanner</h1>
 
     <form
       id="form"
-      hx-target="#result"
-      hx-post="/clicked"
-      hx-indicator="#spinner"
-      hx-disabled-elt="input[type='text'], button"
+      onsubmit="updateDivs(); return false;"
     >
       <fieldset>
         <h2>Image</h2>
         <p>
           <label for="imagename">Image Name</label>
-          <input id="image" input="text" name="imagename" />
+          <input
+            id="image"
+            input="text"
+            name="imagename"
+          />
         </p>
 
         <h2>Credentials</h2>
         <p>
           <label for="username">Username</label>
-          <input input="text" name="username" />
+          <input
+            input="text"
+            name="username"
+          />
         </p>
 
         <p>
           <label for="password">Password</label>
-          <input input="text" type="password" name="password" />
+          <input
+            input="text"
+            type="password"
+            name="password"
+          />
         </p>
 
         <h2>Cosign</h2>
         <p>
           <label for="cosign_key">Cosign Key</label>
-          <input input="text" name="cosign_key" />
+          <input
+            input="text"
+            name="cosign_key"
+          />
         </p>
       </fieldset>
 
       <p>
         <button>Submit</button>
-        <img id="spinner" class="htmx-indicator" src="/img/bars.svg" />
+        <img
+          id="spinner"
+          class="htmx-indicator"
+          src="/img/bars.svg"
+        />
       </p>
     </form>
 
-    <div id="result"></div>
+    <hr>
+
+    <div id="image_information"></div>
+    <div id="scan_information"></div>
+
+    <script>
+      function updateDivs() {
+        var form = document.getElementById('form');
+        var formData = new FormData(form);
+
+        var imagename = formData.get('imagename');
+        var username = formData.get('username');
+        var password = formData.get('password');
+        var cosign_key = formData.get('cosign_key');
+
+        htmx.ajax('POST', '/image', {
+          target: '#image_information',
+          swap: 'innerHTML',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          values: {
+            imagename: imagename,
+            cosign_key: cosign_key
+          }
+        });
+
+        htmx.ajax('POST', '/trivy', {
+          target: '#scan_information',
+          swap: 'innerHTML',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          values: {
+            imagename: imagename,
+            username: username,
+            password: password,
+          }
+        });
+      }
+    </script>
   </body>
+
 </html>
