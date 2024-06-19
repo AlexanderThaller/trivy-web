@@ -537,6 +537,7 @@ dependencies = [
 [[package]]
 name = "docker-registry-client"
 version = "0.1.0"
+source = "git+https://github.com/AlexanderThaller/docker-registry-client-rs.git#80f1d2dff6155b6e1ddbfb06b7e6e7e56863294c"
 dependencies = [
  "chrono",
  "either",
