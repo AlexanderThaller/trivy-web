@@ -7,11 +7,16 @@ use chrono::{
 use docker_registry_client::{
     image_name::ImageName,
     Client as DockerRegistryClient,
+    ClientError as DockerClientError,
     Manifest as DockerManifest,
 };
 use eyre::Context;
 use serde::Deserialize;
 use tokio::process::Command;
+use tracing::{
+    info_span,
+    Instrument,
+};
 use x509_parser::{
     self,
     certificate::X509Certificate,
@@ -150,6 +155,7 @@ impl std::fmt::Display for CertificateError {
 
 impl std::error::Error for CertificateError {}
 
+#[tracing::instrument]
 fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, eyre::Error> {
     let DockerManifest::Image(manifest) = manifest else {
         return Err(eyre::Report::msg("Manifest is not a single manifest"));
@@ -206,6 +212,7 @@ fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, e
     Ok(signatures)
 }
 
+#[tracing::instrument]
 pub(crate) async fn cosign_manifest(
     client: &DockerRegistryClient,
     image: &ImageName,
@@ -214,6 +221,7 @@ pub(crate) async fn cosign_manifest(
 
     let manifest = client
         .get_manifest(&manifest_location)
+        .instrument(info_span!("get manifest"))
         .await
         .map(signature_from_manifest);
 
@@ -221,7 +229,7 @@ pub(crate) async fn cosign_manifest(
         Ok(manifest) => Ok(manifest),
 
         Err(err) => match err {
-            docker_registry_client::DockerError::ManifestNotFound(_) => return Ok(None),
+            DockerClientError::ManifestNotFound(_) => return Ok(None),
             _ => Err(err),
         },
     }
@@ -233,6 +241,7 @@ pub(crate) async fn cosign_manifest(
     }))
 }
 
+#[tracing::instrument]
 pub(crate) async fn cosign_verify(
     cosign_key: &str,
     image: &ImageName,
@@ -245,6 +254,7 @@ pub(crate) async fn cosign_verify(
         .arg(cosign_key)
         .arg(image.to_string())
         .output()
+        .instrument(info_span!("running cosign verify"))
         .await
         .context("Failed to run cosign verify")?;
 
@@ -267,6 +277,7 @@ pub(crate) async fn cosign_verify(
     })
 }
 
+#[tracing::instrument]
 async fn triangulate(image: &str) -> Result<String, eyre::Error> {
     let mut command = Command::new("cosign");
 
@@ -274,6 +285,7 @@ async fn triangulate(image: &str) -> Result<String, eyre::Error> {
 
     let output = command
         .output()
+        .instrument(info_span!("run cosign triangulate"))
         .await
         .context("Failed to run cosign triangulate")?;
 
