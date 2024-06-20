@@ -2,14 +2,20 @@
   /* General colors */
   --body-bg-color: rgb(19, 21, 22);
   --body-text-color: rgb(234, 234, 234);
+  --table-border-color: rgb(43, 43, 43);
 
-  /* Severity colors */
-  --critical-color: #cc0000;
-  --high-color: #cc2f00;
-  --medium-color: #cc5700;
-  --low-color: #009fbf;
-  --unknown-color: #bf29bf;
-  --fixed-version-color: #37bd37;
+  --critical-color: #FF6F6F;
+  --critical-bg: #330000;
+  --high-color: #FFA500;
+  --high-bg: #332600;
+  --medium-color: #FFD700;
+  --medium-bg: #333300;
+  --low-color: #00BFFF;
+  --low-bg: #001933;
+  --unknown-color: #BEBEBE;
+  --unknown-bg: #333333;
+  --fixed-color: #32CD32;
+  --fixed-bg: #003300;
 }
 
 body {
@@ -45,58 +51,83 @@ fieldset input {
 
 table {
   width: 100%;
+  border-collapse: collapse;
 }
 
 table th {
   text-align: left;
 }
 
+tr {
+  border-bottom: 1px solid var(--table-border-color);
+}
+
 table tr {
   line-height: 2em;
 }
 
+#cves th:not(:first-child) {
+  padding-left: 0.5em;
+  padding-right: 0.5em;
+}
+
+#cves td:not(:first-child) {
+  padding-left: 0.5em;
+  padding-right: 0.5em;
+}
+
 tr.CRITICAL > td:first-child {
+  color: var(--critical-color);
   background-color: var(--critical-color);
 }
 
 tr.CRITICAL > td:nth-child(2) {
   color: var(--critical-color);
+  background-color: var(--critical-bg);
 }
 
 tr.HIGH > td:first-child {
+  color: var(--high-color);
   background-color: var(--high-color);
 }
 
 tr.HIGH > td:nth-child(2) {
   color: var(--high-color);
+  background-color: var(--high-bg);
 }
 
 tr.MEDIUM > td:first-child {
+  color: var(--medium-color);
   background-color: var(--medium-color);
 }
 
 tr.MEDIUM > td:nth-child(2) {
   color: var(--medium-color);
+  background-color: var(--medium-bg);
 }
 
 tr.LOW > td:first-child {
+  color: var(--low-color);
   background-color: var(--low-color);
 }
 
 tr.LOW > td:nth-child(2) {
   color: var(--low-color);
+  background-color: var(--low-bg);
 }
 
 tr.UNKNOWN > td:first-child {
+  color: var(--unknown-color);
   background-color: var(--unknown-color);
 }
 
 tr.UNKNOWN > td:nth-child(2) {
   color: var(--unknown-color);
+  background-color: var(--unknown-bg);
 }
 
 .fixed_version {
-  color: var(--fixed-version-color);
+  color: var(--fixed-color);
 }
 
 .severity_count {
@@ -110,24 +141,30 @@ tr.UNKNOWN > td:nth-child(2) {
 .severity_count li {
   float: left;
   margin-right: 10px; /* Adjust value to your preference */
+  padding: 5px;
 }
 
 .severity_count li.critical {
-  background-color: var(--critical-color);
+  color: var(--critical-color);
+  background-color: var(--critical-bg);
 }
 
 .severity_count li.high {
-  background-color: var(--high-color);
+  color: var(--high-color);
+  background-color: var(--high-bg);
 }
 
 .severity_count li.medium {
-  background-color: var(--medium-color);
+  color: var(--medium-color);
+  background-color: var(--medium-bg);
 }
 
 .severity_count li.low {
-  background-color: var(--low-color);
+  color: var(--low-color);
+  background-color: var(--low-bg);
 }
 
 .severity_count li.unknown {
-  background-color: var(--unknown-color);
+  color: var(--unknown-color);
+  background-color: var(--unknown-bg);
 }
