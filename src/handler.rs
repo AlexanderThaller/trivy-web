@@ -100,10 +100,9 @@ pub(super) async fn js_htmx_2_0_0() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "application/javascript")
-        .header("Content-Encoding", "gzip")
         .header("Cache-Control", "max-age=31536000, immutable")
         .body(Body::from(
-            include_bytes!("../resources/js/htmx/2.0.0/htmx.min.js.gz").to_vec(),
+            include_bytes!("../resources/js/htmx/2.0.0/htmx.min.js").to_vec(),
         ))
         .expect("should never fail")
 }

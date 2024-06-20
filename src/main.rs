@@ -120,14 +120,15 @@ async fn main() -> Result<(), eyre::Error> {
     // assets
         .route("/css/main.css", get(handler::css_main))
         .route("/img/bars.svg", get(handler::img_bars))
-        .route("/js/htmx/2.0.0/htmx.min.js.gz", get(handler::js_htmx_2_0_0))
+        .route("/js/htmx/2.0.0/htmx.min.js", get(handler::js_htmx_2_0_0))
     // handlers
         .route("/", get(handler::root))
         .route("/image", post(handler::image))
         .route("/trivy", post(handler::trivy))
         .route("/healthz", get(handler::healthz))
     // state
-        .with_state(state);
+        .with_state(state)
+        .layer(tower_http::compression::CompressionLayer::new());
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await
