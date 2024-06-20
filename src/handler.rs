@@ -72,6 +72,11 @@ pub(super) async fn css_main() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "text/css")
+        .header(
+            "Cache-Control",
+            "max-age=604800, stale-while-revalidate=86400",
+        )
+        .header("ETag", "e339089d62020fba4b56615f6c6e2c00")
         .body(Body::from(include_str!("../resources/css/main.css")))
         .unwrap()
 }
@@ -96,6 +101,7 @@ pub(super) async fn js_htmx_2_0_0() -> impl IntoResponse {
         .status(StatusCode::OK)
         .header("Content-Type", "application/javascript")
         .header("Content-Encoding", "gzip")
+        .header("Cache-Control", "max-age=31536000, immutable")
         .body(Body::from(
             include_bytes!("../resources/js/htmx/2.0.0/htmx.min.js.gz").to_vec(),
         ))
@@ -107,6 +113,7 @@ pub(super) async fn img_bars() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "image/svg+xml")
+        .header("Cache-Control", "max-age=31536000, immutable")
         .body(Body::from(
             include_bytes!("../resources/img/bars.svg").to_vec(),
         ))
