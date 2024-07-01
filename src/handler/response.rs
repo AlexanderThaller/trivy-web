@@ -63,7 +63,7 @@ pub(crate) struct TrivyInformation {
 
 #[tracing::instrument]
 pub(crate) async fn image(
-    state: AppState,
+    state: &AppState,
     form: SubmitFormImage,
 ) -> Result<ImageResponse, eyre::Error> {
     let image_name: ImageName = form.imagename.trim().parse()?;
@@ -93,13 +93,13 @@ pub(crate) async fn image(
 
 #[tracing::instrument]
 pub(crate) async fn trivy(
-    state: AppState,
+    state: &AppState,
     form: SubmitFormTrivy,
 ) -> Result<TrivyResponse, eyre::Error> {
     let image_name: ImageName = form.imagename.trim().parse()?;
 
     let trivy_information =
-        fetch_trivy(image_name, state.server, form.username, form.password).await;
+        fetch_trivy(image_name, &state.server, form.username, form.password).await;
 
     let response = TrivyResponse { trivy_information };
 
@@ -149,7 +149,7 @@ async fn fetch_cosign_verify(
 #[tracing::instrument]
 async fn fetch_trivy(
     image_name: ImageName,
-    server: Option<String>,
+    server: &Option<String>,
     username: String,
     password: Password,
 ) -> Result<TrivyInformation, eyre::Error> {
