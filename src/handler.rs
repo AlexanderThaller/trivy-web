@@ -24,10 +24,11 @@ mod cosign;
 mod response;
 mod trivy;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(super) struct AppState {
     pub(super) server: Option<String>,
     pub(super) docker_registry_client: DockerRegistryClient,
+    pub(super) minify_config: minify_html::Cfg,
 }
 
 #[derive(Debug, Deserialize)]
@@ -49,7 +50,17 @@ struct Password(String);
 #[cfg(not(debug_assertions))]
 #[tracing::instrument]
 pub(super) async fn root() -> impl IntoResponse {
-    Html(include_str!("../resources/index.html"))
+    static RESPONSE: Lazy<Html<String>> = Lazy::new(|| {
+        let minified = minify_html::minify(
+            include_bytes!("../resources/index.html"),
+            &minify_html::Cfg::default(),
+        );
+        let minified = String::from_utf8_lossy(&minified);
+
+        Html(minified.to_string())
+    });
+
+    RESPONSE.clone()
 }
 
 #[cfg(debug_assertions)]
@@ -124,7 +135,7 @@ pub(super) async fn image(
     State(state): State<AppState>,
     Form(form): Form<SubmitFormImage>,
 ) -> impl IntoResponse {
-    let response = match response::image(state, form).await {
+    let response = match response::image(&state, form).await {
         Ok(response) => response,
 
         Err(err) => {
@@ -140,7 +151,12 @@ pub(super) async fn image(
     };
 
     match response.render() {
-        Ok(rendered) => Html(rendered),
+        Ok(rendered) => {
+            let minified = minify_html::minify(rendered.as_bytes(), &state.minify_config);
+            let minified = String::from_utf8_lossy(&minified);
+
+            Html(minified.to_string())
+        }
 
         Err(err) => {
             tracing::error!("failed to render response: {err}");
@@ -160,7 +176,7 @@ pub(super) async fn trivy(
     State(state): State<AppState>,
     Form(form): Form<SubmitFormTrivy>,
 ) -> impl IntoResponse {
-    let response = match response::trivy(state, form).await {
+    let response = match response::trivy(&state, form).await {
         Ok(response) => response,
 
         Err(err) => {
@@ -176,8 +192,12 @@ pub(super) async fn trivy(
     };
 
     match response.render() {
-        Ok(rendered) => Html(rendered),
+        Ok(rendered) => {
+            let minified = minify_html::minify(rendered.as_bytes(), &state.minify_config);
+            let minified = String::from_utf8_lossy(&minified);
 
+            Html(minified.to_string())
+        }
         Err(err) => {
             tracing::error!("failed to render response: {err}");
 
@@ -188,6 +208,15 @@ pub(super) async fn trivy(
                 .into_string(),
             )
         }
+    }
+}
+
+impl std::fmt::Debug for AppState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AppState")
+            .field("server", &self.server)
+            .field("docker_registry_client", &self.docker_registry_client)
+            .finish_non_exhaustive()
     }
 }
 
