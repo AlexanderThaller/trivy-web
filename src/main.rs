@@ -111,7 +111,12 @@ async fn main() -> Result<(), eyre::Error> {
     let state = AppState {
         server: opt.server,
         docker_registry_client: DockerRegistryClient::default(),
-        minify_config: minify_html::Cfg::default(),
+        minify_config: minify_html::Cfg {
+            do_not_minify_doctype: true,
+            ensure_spec_compliant_unquoted_attribute_values: true,
+            keep_spaces_between_attributes: true,
+            ..Default::default()
+        },
     };
 
     let addr = opt.binding;
