@@ -66,7 +66,7 @@ pub(crate) async fn image(
     state: AppState,
     form: SubmitFormImage,
 ) -> Result<ImageResponse, eyre::Error> {
-    let image_name: ImageName = form.imagename.parse()?;
+    let image_name: ImageName = form.imagename.trim().parse()?;
 
     let docker_and_cosign_manifest = task::spawn(
         fetch_docker_and_cosign_manifest(state.docker_registry_client.clone(), image_name.clone())
@@ -96,7 +96,7 @@ pub(crate) async fn trivy(
     state: AppState,
     form: SubmitFormTrivy,
 ) -> Result<TrivyResponse, eyre::Error> {
-    let image_name: ImageName = form.imagename.parse()?;
+    let image_name: ImageName = form.imagename.trim().parse()?;
 
     let trivy_information =
         fetch_trivy(image_name, state.server, form.username, form.password).await;
