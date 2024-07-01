@@ -54,10 +54,16 @@ struct Password(String);
 #[tracing::instrument]
 pub(super) async fn root() -> impl IntoResponse {
     static RESPONSE: Lazy<Html<String>> = Lazy::new(|| {
-        let minified = minify_html::minify(
-            include_bytes!("../resources/index.html"),
-            &minify_html::Cfg::default(),
-        );
+        let minify_config = minify_html::Cfg {
+            do_not_minify_doctype: true,
+            ensure_spec_compliant_unquoted_attribute_values: true,
+            keep_spaces_between_attributes: true,
+            ..Default::default()
+        };
+
+        let minified =
+            minify_html::minify(include_bytes!("../resources/index.html"), &minify_config);
+
         let minified = String::from_utf8_lossy(&minified);
 
         Html(minified.to_string())
@@ -154,6 +160,10 @@ pub(super) async fn image(
     };
 
     match response.render() {
+        #[cfg(debug_assertions)]
+        Ok(rendered) => Html(rendered),
+
+        #[cfg(not(debug_assertions))]
         Ok(rendered) => {
             let minified = minify_html::minify(rendered.as_bytes(), &state.minify_config);
             let minified = String::from_utf8_lossy(&minified);
@@ -195,6 +205,10 @@ pub(super) async fn trivy(
     };
 
     match response.render() {
+        #[cfg(debug_assertions)]
+        Ok(rendered) => Html(rendered),
+
+        #[cfg(not(debug_assertions))]
         Ok(rendered) => {
             let minified = minify_html::minify(rendered.as_bytes(), &state.minify_config);
             let minified = String::from_utf8_lossy(&minified);
