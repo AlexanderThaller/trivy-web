@@ -20,6 +20,9 @@ use serde::Deserialize;
 #[cfg(debug_assertions)]
 use tokio::fs::read_to_string;
 
+#[cfg(not(debug_assertions))]
+use once_cell::sync::Lazy;
+
 mod cosign;
 mod response;
 mod trivy;
