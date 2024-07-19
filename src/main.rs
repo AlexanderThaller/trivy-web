@@ -50,7 +50,6 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
     Registry,
 };
-use tracing_tree::HierarchicalLayer;
 
 use crate::handler::AppState;
 
@@ -94,11 +93,7 @@ async fn main() -> Result<(), eyre::Error> {
             "{}",
             opt.log_level
         )))
-        .with(
-            HierarchicalLayer::new(2)
-                .with_targets(true)
-                .with_bracketed_fields(true),
-        )
+        .with(tracing_subscriber::fmt::layer())
         .with(OpenTelemetryLayer::new(
             init_tracer().context("Failed to initialize tracer")?,
         ))
@@ -111,12 +106,6 @@ async fn main() -> Result<(), eyre::Error> {
     let state = AppState {
         server: opt.server,
         docker_registry_client: DockerRegistryClient::default(),
-        minify_config: minify_html::Cfg {
-            do_not_minify_doctype: true,
-            ensure_spec_compliant_unquoted_attribute_values: true,
-            keep_spaces_between_attributes: true,
-            ..Default::default()
-        },
     };
 
     let addr = opt.binding;

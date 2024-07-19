@@ -27,7 +27,6 @@ tower-http = { version = "0.5", features = ["compression-full"] }
 tracing = "0.1"
 tracing-opentelemetry = "0.24"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-tracing-tree = "0.3"
 url = { version = "2", features = ["serde"] }
 x509-parser = "0.16"
 

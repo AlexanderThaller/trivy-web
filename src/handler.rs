@@ -31,7 +31,6 @@ mod trivy;
 pub(super) struct AppState {
     pub(super) server: Option<String>,
     pub(super) docker_registry_client: DockerRegistryClient,
-    pub(super) minify_config: minify_html::Cfg,
 }
 
 #[derive(Debug, Deserialize)]
