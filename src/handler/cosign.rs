@@ -11,7 +11,10 @@ use docker_registry_client::{
     Manifest as DockerManifest,
 };
 use eyre::Context;
-use serde::Deserialize;
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use tokio::process::Command;
 use tracing::{
     info_span,
@@ -30,7 +33,7 @@ pub(crate) enum CertificateError {
     InvalidNotAfter,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub(crate) struct Cosign {
     pub(crate) manifest_location: ImageName,
     pub(crate) signatures: Vec<Signature>,
@@ -49,7 +52,7 @@ pub(crate) struct Certificate {
     pub(crate) extensions: BTreeMap<String, String>,
 }
 
-#[derive(Debug, PartialEq, Ord, Eq, PartialOrd)]
+#[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
 pub(crate) struct Signature {
     pub(crate) issuer: String,
     pub(crate) identity: String,

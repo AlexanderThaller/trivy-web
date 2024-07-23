@@ -1,7 +1,10 @@
 use std::collections::BTreeSet;
 
 use chrono::Utc;
-use docker_registry_client::image_name::ImageName;
+use docker_registry_client::{
+    image_name::ImageName,
+    Client as DockerRegistryClient,
+};
 use eyre::{
     Context,
     Result,
@@ -16,10 +19,13 @@ use tracing::{
     Instrument,
 };
 
-use crate::handler::trivy::{
-    self,
-    get_vulnerabilities_count,
-    Vulnerability,
+use crate::handler::{
+    cosign,
+    trivy::{
+        self,
+        get_vulnerabilities_count,
+        Vulnerability,
+    },
 };
 
 use super::{
@@ -170,5 +176,46 @@ impl<'a> Fetch for TrivyInformationFetcher<'a> {
             severity_count,
             fetch_time: Utc::now(),
         })
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct CosignInformationFetcher<'a> {
+    pub(crate) docker_registry_client: &'a DockerRegistryClient,
+    pub(crate) image_name: &'a ImageName,
+    pub(crate) docker_manifest: &'a Result<DockerInformation>,
+}
+
+impl<'a> Fetch for CosignInformationFetcher<'a> {
+    type Output = Option<cosign::Cosign>;
+
+    fn key(&self) -> String {
+        format!("trivy-web:cosign:{}", self.image_name)
+    }
+
+    async fn fetch(&self) -> Result<Self::Output> {
+        if self.docker_manifest.is_err() {
+            return Err(eyre::eyre!("Failed to get docker manifest"));
+        }
+
+        let docker_manifest = self
+            .docker_manifest
+            .as_ref()
+            .expect("already checked if its an error");
+
+        if docker_manifest.response.digest.is_none() {
+            return Err(eyre::eyre!("Missing docker manifest digest"));
+        }
+
+        let digest = docker_manifest
+            .response
+            .digest
+            .as_ref()
+            .expect("already checked if digest is some");
+
+        cosign::cosign_manifest(self.docker_registry_client, self.image_name, digest)
+            .instrument(info_span!("get cosign manifest"))
+            .await
+            .context("failed to get cosign manifest")
     }
 }
