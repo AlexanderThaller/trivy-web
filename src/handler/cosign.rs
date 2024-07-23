@@ -58,20 +58,20 @@ pub(crate) struct Signature {
     pub(crate) identity: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
 pub(crate) struct CosignVerify {
     pub(crate) message: String,
 
     pub(crate) signatures: Vec<VerifySignature>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
 pub(crate) struct VerifySignature {
     pub(crate) critical: Critical,
     pub(crate) optional: Option<Optional>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
 pub(crate) struct Critical {
     pub(crate) identity: Identity,
     pub(crate) image: Image,
@@ -80,19 +80,19 @@ pub(crate) struct Critical {
     pub(crate) cosign_type: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
 pub(crate) struct Identity {
     #[serde(rename = "docker-reference")]
     pub(crate) docker_reference: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
 pub(crate) struct Image {
     #[serde(rename = "docker-manifest-digest")]
     pub(crate) digest: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
 pub(crate) struct Optional {
     pub(crate) sig: String,
 }
