@@ -1,42 +1,42 @@
 {% if let Some(result) = cosign_verify %}
-  <h3>Verification</h3>
-  {% match result %}
-    {% when Ok with (manifest) %}
-    <h4>Message</h4>
-    <code>
-        {{ manifest.message|ansi_to_html|safe }}
-    </code>
+<h3>Verification</h3>
+{% match result %}
+{% when Ok with (manifest) %}
+<h4>Message</h4>
+<code>
+{{ manifest.message|ansi_to_html|safe }}
+</code>
 
-    <h4>Signatures</h4>
-    <table>
-      <thead>
-        <tr>
-          <th>Identity</th>
-          <th>Digest</th>
-          <th>Type</th>
-          <th>Optional</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for signature in manifest.signatures %}
-        <tr>
-          <td>{{ signature.critical.identity.docker_reference }}</td>
-          <td>{{ signature.critical.image.digest }}</td>
-          <td>{{ signature.critical.cosign_type }}</td>
-          {% if let Some(optional) = signature.optional %}
-          <td>{{ optional.sig }}</td>
-          {% else %}
-          <td>-</td>
-          {% endif %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<h4>Signatures</h4>
+<table>
+  <thead>
+    <tr>
+      <th>Identity</th>
+      <th>Digest</th>
+      <th>Type</th>
+      <th>Optional</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for signature in manifest.signatures %}
+    <tr>
+      <td>{{ signature.critical.identity.docker_reference }}</td>
+      <td>{{ signature.critical.image.digest }}</td>
+      <td>{{ signature.critical.cosign_type }}</td>
+      {% if let Some(optional) = signature.optional %}
+      <td>{{ optional.sig }}</td>
+      {% else %}
+      <td>-</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 
-    {% when Err with (err) %}
-    <h4>Error</h4>
-    <code>
-        {{ err|ansi_to_html|safe }}
-    </code>
-  {% endmatch %}
+{% when Err with (err) %}
+<h4>Error</h4>
+<code>
+{{ err|ansi_to_html|safe }}
+</code>
+{% endmatch %}
 {% endif %}

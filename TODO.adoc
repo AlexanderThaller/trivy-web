@@ -15,3 +15,4 @@ None
 None
 	
 1 KiB
+* [ ] Cosign Verify should also verify the image even when no key is provided
