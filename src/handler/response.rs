@@ -58,7 +58,7 @@ use super::{
 pub(crate) struct ImageResponse {
     pub(crate) image_name: ImageName,
     pub(crate) docker_information: Result<DockerInformation>,
-    pub(crate) cosign_manifest: Result<Option<cosign::Cosign>>,
+    pub(crate) cosign_information: Result<CosignInformation>,
     pub(crate) cosign_verify: Option<Result<cosign::CosignVerify>>,
 }
 
@@ -72,6 +72,12 @@ pub(crate) struct TrivyResponse {
 pub(crate) struct TrivyInformation {
     vulnerabilities: BTreeSet<Vulnerability>,
     severity_count: SeverityCount,
+    fetch_time: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRedisValue, ToRedisArgs, PartialEq)]
+pub(crate) struct CosignInformation {
+    cosign: Option<cosign::Cosign>,
     fetch_time: DateTime<Utc>,
 }
 
@@ -104,13 +110,13 @@ pub(crate) async fn image(
             .instrument(info_span!("fetch_cosign_verify")),
     );
 
-    let (docker_information, cosign_manifest) = docker_and_cosign_manifest.await?;
+    let (docker_information, cosign_information) = docker_and_cosign_manifest.await?;
     let cosign_verify = cosign_verify.await?;
 
     let response = ImageResponse {
         image_name,
         docker_information,
-        cosign_manifest,
+        cosign_information,
         cosign_verify,
     };
 
@@ -122,7 +128,7 @@ async fn fetch_docker_and_cosign_manifest(
     docker_registry_client: DockerRegistryClient,
     image_name: ImageName,
     redis_client: Option<redis::Client>,
-) -> (Result<DockerInformation>, Result<Option<cosign::Cosign>>) {
+) -> (Result<DockerInformation>, Result<CosignInformation>) {
     let docker_manifest = DockerInformationFetcher {
         docker_registry_client: &docker_registry_client,
         image_name: &image_name,

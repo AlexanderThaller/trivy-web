@@ -29,6 +29,7 @@ use crate::handler::{
 };
 
 use super::{
+    CosignInformation,
     DockerInformation,
     TrivyInformation,
 };
@@ -187,7 +188,7 @@ pub(crate) struct CosignInformationFetcher<'a> {
 }
 
 impl<'a> Fetch for CosignInformationFetcher<'a> {
-    type Output = Option<cosign::Cosign>;
+    type Output = CosignInformation;
 
     fn key(&self) -> String {
         format!("trivy-web:cosign:{}", self.image_name)
@@ -213,9 +214,14 @@ impl<'a> Fetch for CosignInformationFetcher<'a> {
             .as_ref()
             .expect("already checked if digest is some");
 
-        cosign::cosign_manifest(self.docker_registry_client, self.image_name, digest)
+        let cosign = cosign::cosign_manifest(self.docker_registry_client, self.image_name, digest)
             .instrument(info_span!("get cosign manifest"))
             .await
-            .context("failed to get cosign manifest")
+            .context("failed to get cosign manifest")?;
+
+        Ok(CosignInformation {
+            cosign,
+            fetch_time: Utc::now(),
+        })
     }
 }
