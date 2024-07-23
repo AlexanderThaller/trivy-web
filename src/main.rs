@@ -4,6 +4,7 @@
 #![warn(clippy::unwrap_used)]
 #![warn(rust_2018_idioms, unused_lifetimes, missing_debug_implementations)]
 #![warn(clippy::dbg_macro)]
+#![allow(dependency_on_unit_never_type_fallback)]
 
 use std::net::SocketAddr;
 
@@ -19,7 +20,10 @@ use clap::{
     Parser,
 };
 use docker_registry_client::Client as DockerRegistryClient;
-use eyre::Context;
+use eyre::{
+    Context,
+    Result,
+};
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::{
     runtime,
@@ -79,13 +83,22 @@ struct Opt {
     )]
     pub binding: SocketAddr,
 
+    /// When set use a redis server for caching
+    #[clap(
+        long,
+        value_name = "address:port",
+        default_value = "redis://127.0.0.1:6379",
+        env = "TRIVY_REDIS_SERVER"
+    )]
+    pub redis_server: Option<String>,
+
     /// Optionally use an trivy server for scanning
     #[clap(long, value_name = "address:port", env = "TRIVY_SERVER")]
     pub server: Option<String>,
 }
 
 #[tokio::main]
-async fn main() -> Result<(), eyre::Error> {
+async fn main() -> Result<()> {
     let opt = Opt::parse();
 
     Registry::default()
@@ -103,9 +116,22 @@ async fn main() -> Result<(), eyre::Error> {
         info!("Using trivy server at {server}");
     }
 
+    let redis_client = opt
+        .redis_server
+        .map(|server| -> Result<redis::Client> {
+            info!("Using redis server at {server}");
+
+            let client =
+                redis::Client::open(server).context("Failed to connect to redis server")?;
+
+            Ok(client)
+        })
+        .transpose()?;
+
     let state = AppState {
         server: opt.server,
         docker_registry_client: DockerRegistryClient::default(),
+        redis_client,
 
         #[cfg(not(debug_assertions))]
         minify_config: minify_html::Cfg {
