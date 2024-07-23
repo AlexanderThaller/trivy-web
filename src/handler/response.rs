@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use askama::Template;
 use cache::{
+    CosignInformationFetcher,
     DockerInformationFetcher,
     Fetch,
 };
@@ -87,14 +88,16 @@ pub(crate) async fn image(
 ) -> Result<ImageResponse, eyre::Error> {
     let image_name: ImageName = form.imagename.trim().parse()?;
 
-    let docker_and_cosign_manifest = task::spawn(
-        fetch_docker_and_cosign_manifest(
-            state.docker_registry_client.clone(),
-            image_name.clone(),
-            state.redis_client.clone(),
+    let docker_and_cosign_manifest = {
+        task::spawn(
+            fetch_docker_and_cosign_manifest(
+                state.docker_registry_client.clone(),
+                image_name.clone(),
+                state.redis_client.clone(),
+            )
+            .instrument(info_span!("fetch_docker_and_cosign_manifest")),
         )
-        .instrument(info_span!("fetch_docker_and_cosign_manifest")),
-    );
+    };
 
     let cosign_verify = task::spawn(
         fetch_cosign_verify(form.cosign_key, image_name.clone())
@@ -128,47 +131,16 @@ async fn fetch_docker_and_cosign_manifest(
     .await
     .context("failed to fetch docker manifest");
 
-    let cosign_manifest = cosign_manifest(
-        &docker_registry_client,
-        &image_name,
-        &docker_manifest,
-        &redis_client,
-    )
+    let cosign_manifest = CosignInformationFetcher {
+        docker_registry_client: &docker_registry_client,
+        image_name: &image_name,
+        docker_manifest: &docker_manifest,
+    }
+    .cache_or_fetch(&redis_client)
     .await
     .context("failed to get cosign manifest");
 
     (docker_manifest, cosign_manifest)
-}
-
-#[tracing::instrument]
-async fn cosign_manifest(
-    docker_registry_client: &DockerRegistryClient,
-    image_name: &ImageName,
-    docker_manifest: &Result<DockerInformation>,
-    redis_client: &Option<redis::Client>,
-) -> Result<Option<cosign::Cosign>> {
-    if docker_manifest.is_err() {
-        return Err(eyre::eyre!("Failed to get docker manifest"));
-    }
-
-    let docker_manifest = docker_manifest
-        .as_ref()
-        .expect("already checked if its an error");
-
-    if docker_manifest.response.digest.is_none() {
-        return Err(eyre::eyre!("Missing docker manifest digest"));
-    }
-
-    let digest = docker_manifest
-        .response
-        .digest
-        .as_ref()
-        .expect("already checked if digest is some");
-
-    cosign::cosign_manifest(docker_registry_client, image_name, digest)
-        .instrument(info_span!("get cosign manifest"))
-        .await
-        .context("failed to get cosign manifest")
 }
 
 #[tracing::instrument]
