@@ -1,14 +1,15 @@
 <p>Image Name: {{ image_name }}</p>
 
-{% match docker_response %}
-{% when Ok(response) %}
-{% if let Some(digest) = response.digest %}
+{% match docker_information %}
+{% when Ok(information) %}
+<p>Fetch Time: {{ information.fetch_time }}</p>
+{% if let Some(digest) = information.response.digest %}
 Digest: {{ digest }}
 {% else %}
 Digest: Not available
 {% endif %}
 
-{% match response.manifest %}
+{% match information.response.manifest %}
 {% when DockerManifest::Image with (image) %}
 <table>
   <thead>
@@ -67,6 +68,6 @@ Digest: Not available
 {% when Err(err) %}
 <h4>Error</h4>
 <code>
-  {{ err|ansi_to_html|safe }}
+{{ err|ansi_to_html|safe }}
 </code>
 {% endmatch %}
