@@ -17,7 +17,12 @@ use axum::{
     Form,
 };
 use docker_registry_client::Client as DockerRegistryClient;
+use eyre::Context;
 use maud::html;
+use response::{
+    cache::Fetch,
+    TrivyResponse,
+};
 use serde::Deserialize;
 
 #[cfg(debug_assertions)]
@@ -26,6 +31,8 @@ use tokio::fs::read_to_string;
 mod cosign;
 mod response;
 mod trivy;
+
+use crate::handler::response::cache::TrivyInformationFetcher;
 
 #[derive(Clone)]
 pub(super) struct AppState {
@@ -215,20 +222,29 @@ pub(super) async fn trivy(
     State(state): State<AppState>,
     Form(form): Form<SubmitFormTrivy>,
 ) -> impl IntoResponse {
-    let response = match response::trivy(&state, form).await {
-        Ok(response) => response,
+    let image_name = form.imagename.parse().unwrap();
 
-        Err(err) => {
-            tracing::error!("error while fetching: {err}");
+    let information = TrivyInformationFetcher {
+        image_name: &image_name,
+        trivy_server: state.server.as_deref(),
 
-            return Html(
-                html! {
-                    p { "Internal server error" }
-                }
-                .into_string(),
-            );
-        }
-    };
+        trivy_username: if form.username.is_empty() {
+            None
+        } else {
+            Some(&form.username)
+        },
+
+        trivy_password: if form.password.0.is_empty() {
+            None
+        } else {
+            Some(&form.password.0)
+        },
+    }
+    .cache_or_fetch(&state.redis_client)
+    .await
+    .context("failed to fetch trivy information");
+
+    let response = TrivyResponse { information };
 
     match response.render() {
         #[cfg(debug_assertions)]

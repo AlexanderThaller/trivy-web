@@ -1,6 +1,10 @@
 use std::collections::BTreeSet;
 
 use askama::Template;
+use cache::{
+    DockerInformationFetcher,
+    Fetch,
+};
 use chrono::{
     DateTime,
     Utc,
@@ -8,7 +12,6 @@ use chrono::{
 use docker_registry_client::{
     image_name::ImageName,
     Client as DockerRegistryClient,
-    ClientError as DockerClientError,
     Manifest as DockerManifest,
     Response as DockerResponse,
 };
@@ -16,7 +19,6 @@ use eyre::{
     Result,
     WrapErr,
 };
-use redis::AsyncCommands;
 use redis_macros::{
     FromRedisValue,
     ToRedisArgs,
@@ -31,6 +33,8 @@ use tracing::{
     Instrument,
 };
 
+pub(crate) mod cache;
+
 use crate::{
     filters,
     handler::{
@@ -43,39 +47,36 @@ use crate::{
 };
 
 use super::{
-    cosign::{
-        cosign_manifest,
-        cosign_verify,
-    },
-    trivy::{
-        self,
-        get_vulnerabilities_count,
-    },
+    cosign::cosign_verify,
     AppState,
-    Password,
     SubmitFormImage,
-    SubmitFormTrivy,
 };
 
 #[derive(Debug, Template)]
 #[template(path = "response_image.html")]
 pub(crate) struct ImageResponse {
     pub(crate) image_name: ImageName,
-    pub(crate) docker_response: Result<DockerResponse, DockerClientError>,
-    pub(crate) cosign_manifest: Result<Option<cosign::Cosign>, eyre::Error>,
-    pub(crate) cosign_verify: Option<Result<cosign::CosignVerify, eyre::Error>>,
+    pub(crate) docker_information: Result<DockerInformation>,
+    pub(crate) cosign_manifest: Result<Option<cosign::Cosign>>,
+    pub(crate) cosign_verify: Option<Result<cosign::CosignVerify>>,
 }
 
 #[derive(Debug, Template)]
 #[template(path = "response_trivy.html")]
 pub(crate) struct TrivyResponse {
-    pub(crate) trivy_information: Result<TrivyInformation, eyre::Error>,
+    pub(crate) information: Result<TrivyInformation>,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRedisValue, ToRedisArgs, PartialEq)]
 pub(crate) struct TrivyInformation {
     vulnerabilities: BTreeSet<Vulnerability>,
     severity_count: SeverityCount,
+    fetch_time: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct DockerInformation {
+    response: DockerResponse,
     fetch_time: DateTime<Utc>,
 }
 
@@ -87,8 +88,12 @@ pub(crate) async fn image(
     let image_name: ImageName = form.imagename.trim().parse()?;
 
     let docker_and_cosign_manifest = task::spawn(
-        fetch_docker_and_cosign_manifest(state.docker_registry_client.clone(), image_name.clone())
-            .instrument(info_span!("fetch_docker_and_cosign_manifest")),
+        fetch_docker_and_cosign_manifest(
+            state.docker_registry_client.clone(),
+            image_name.clone(),
+            state.redis_client.clone(),
+        )
+        .instrument(info_span!("fetch_docker_and_cosign_manifest")),
     );
 
     let cosign_verify = task::spawn(
@@ -96,12 +101,12 @@ pub(crate) async fn image(
             .instrument(info_span!("fetch_cosign_verify")),
     );
 
-    let (docker_response, cosign_manifest) = docker_and_cosign_manifest.await?;
+    let (docker_information, cosign_manifest) = docker_and_cosign_manifest.await?;
     let cosign_verify = cosign_verify.await?;
 
     let response = ImageResponse {
         image_name,
-        docker_response,
+        docker_information,
         cosign_manifest,
         cosign_verify,
     };
@@ -110,89 +115,60 @@ pub(crate) async fn image(
 }
 
 #[tracing::instrument]
-pub(crate) async fn trivy(state: &AppState, form: SubmitFormTrivy) -> Result<TrivyResponse> {
-    let image_name: ImageName = form.imagename.trim().parse()?;
-
-    let trivy_information = if let Some(redis_client) = &state.redis_client {
-        let mut connection = redis_client
-            .get_multiplexed_async_connection()
-            .instrument(info_span!("get redis connection"))
-            .await
-            .context("failed to get redis connection")?;
-
-        let key = format!("trivy:{image_name}");
-
-        let exists: bool = redis::cmd("EXISTS")
-            .arg(&key)
-            .query_async(&mut connection)
-            .instrument(info_span!("check if trivy information exists in redis"))
-            .await
-            .context("failed to check if trivy information exists in redis")?;
-
-        if exists {
-            let information = redis::cmd("GET")
-                .arg(&key)
-                .query_async(&mut connection)
-                .instrument(info_span!("get trivy information from redis"))
-                .await
-                .context("failed to get trivy information from redis")?;
-
-            Ok(information)
-        } else {
-            let information =
-                fetch_trivy(image_name, &state.server, form.username, form.password).await;
-
-            if let Ok(information) = &information {
-                connection
-                    .set(&key, information)
-                    .instrument(info_span!("set trivy information in redis"))
-                    .await
-                    .context("failed to set trivy information in redis")?;
-
-                connection
-                    .expire(&key, 3600)
-                    .instrument(info_span!("set trivy information expiration in redis"))
-                    .await
-                    .context("failed to set trivy information expiration in redis")?;
-            }
-
-            information
-        }
-    } else {
-        fetch_trivy(image_name, &state.server, form.username, form.password).await
-    };
-
-    let response = TrivyResponse { trivy_information };
-
-    Ok(response)
-}
-
-#[tracing::instrument]
 async fn fetch_docker_and_cosign_manifest(
     docker_registry_client: DockerRegistryClient,
     image_name: ImageName,
-) -> (
-    Result<DockerResponse, DockerClientError>,
-    Result<Option<cosign::Cosign>, eyre::Error>,
-) {
-    let docker_response = docker_registry_client
-        .get_manifest(&image_name)
-        .instrument(info_span!("get docker manifest"))
-        .await;
+    redis_client: Option<redis::Client>,
+) -> (Result<DockerInformation>, Result<Option<cosign::Cosign>>) {
+    let docker_manifest = DockerInformationFetcher {
+        docker_registry_client: &docker_registry_client,
+        image_name: &image_name,
+    }
+    .cache_or_fetch(&redis_client)
+    .await
+    .context("failed to fetch docker manifest");
 
-    let cosign_manifest = if let Ok(ref docker_response) = docker_response {
-        if let Some(digest) = &docker_response.digest {
-            cosign_manifest(&docker_registry_client, &image_name, digest)
-                .instrument(info_span!("get cosign manifest"))
-                .await
-        } else {
-            Err(eyre::eyre!("Failed to get docker manifest"))
-        }
-    } else {
-        Err(eyre::eyre!("Failed to get docker manifest"))
-    };
+    let cosign_manifest = cosign_manifest(
+        &docker_registry_client,
+        &image_name,
+        &docker_manifest,
+        &redis_client,
+    )
+    .await
+    .context("failed to get cosign manifest");
 
-    (docker_response, cosign_manifest)
+    (docker_manifest, cosign_manifest)
+}
+
+#[tracing::instrument]
+async fn cosign_manifest(
+    docker_registry_client: &DockerRegistryClient,
+    image_name: &ImageName,
+    docker_manifest: &Result<DockerInformation>,
+    redis_client: &Option<redis::Client>,
+) -> Result<Option<cosign::Cosign>> {
+    if docker_manifest.is_err() {
+        return Err(eyre::eyre!("Failed to get docker manifest"));
+    }
+
+    let docker_manifest = docker_manifest
+        .as_ref()
+        .expect("already checked if its an error");
+
+    if docker_manifest.response.digest.is_none() {
+        return Err(eyre::eyre!("Missing docker manifest digest"));
+    }
+
+    let digest = docker_manifest
+        .response
+        .digest
+        .as_ref()
+        .expect("already checked if digest is some");
+
+    cosign::cosign_manifest(docker_registry_client, image_name, digest)
+        .instrument(info_span!("get cosign manifest"))
+        .await
+        .context("failed to get cosign manifest")
 }
 
 #[tracing::instrument]
@@ -207,51 +183,10 @@ async fn fetch_cosign_verify(
     }
 }
 
-#[tracing::instrument]
-async fn fetch_trivy(
-    image_name: ImageName,
-    server: &Option<String>,
-    username: String,
-    password: Password,
-) -> Result<TrivyInformation, eyre::Error> {
-    let username = if username.is_empty() {
-        None
-    } else {
-        Some(username.as_str())
-    };
-
-    let password = if password.0.is_empty() {
-        None
-    } else {
-        Some(password.0.as_str())
-    };
-
-    let trivy_result =
-        trivy::scan_image(&image_name, server.as_deref(), username, password).await?;
-
-    let vulnerabilities = trivy_result
-        .results
-        .into_iter()
-        .filter_map(|result| result.vulnerabilities)
-        .flatten()
-        .collect::<BTreeSet<Vulnerability>>();
-
-    let severity_count = get_vulnerabilities_count(vulnerabilities.clone());
-
-    Ok(TrivyInformation {
-        vulnerabilities,
-        severity_count,
-        fetch_time: Utc::now(),
-    })
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use std::{
-        collections::BTreeSet,
-        io::Write,
-    };
+    use std::collections::BTreeSet;
 
     use redis::AsyncCommands;
 
