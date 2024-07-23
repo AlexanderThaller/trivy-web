@@ -5,7 +5,10 @@ use std::collections::{
 
 use docker_registry_client::image_name::ImageName;
 use eyre::WrapErr;
-use serde::Deserialize;
+use serde::{
+    Deserialize,
+    Serialize,
+};
 use tokio::process::Command;
 use tracing::{
     info_span,
@@ -26,7 +29,7 @@ pub(super) struct Results {
     pub(super) vulnerabilities: Option<Vec<Vulnerability>>,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub(super) struct Vulnerability {
     pub(super) severity: Severity,
@@ -45,7 +48,7 @@ pub(super) struct Vulnerability {
     pub(super) cvss: Option<BTreeMap<String, Cvss>>,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub(super) struct Cvss {
     #[serde(rename = "V2Vector")]
     v2vector: Option<String>,
@@ -59,6 +62,16 @@ pub(super) struct Cvss {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub(super) struct Score(String);
+
+impl Serialize for Score {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let value = self.0.parse::<f64>().map_err(serde::ser::Error::custom)?;
+        f64::serialize(&value, serializer)
+    }
+}
 
 impl<'de> Deserialize<'de> for Score {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -82,7 +95,7 @@ impl Cvss {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 #[serde(rename_all = "UPPERCASE")]
 pub(super) enum Severity {
     Critical,
@@ -92,7 +105,7 @@ pub(super) enum Severity {
     Unknown,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub(super) struct SeverityCount {
     pub(super) critical: usize,
     pub(super) high: usize,

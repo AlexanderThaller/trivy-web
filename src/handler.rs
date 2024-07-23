@@ -23,9 +23,6 @@ use serde::Deserialize;
 #[cfg(debug_assertions)]
 use tokio::fs::read_to_string;
 
-#[cfg(not(debug_assertions))]
-use once_cell::sync::Lazy;
-
 mod cosign;
 mod response;
 mod trivy;
@@ -34,6 +31,7 @@ mod trivy;
 pub(super) struct AppState {
     pub(super) server: Option<String>,
     pub(super) docker_registry_client: DockerRegistryClient,
+    pub(super) redis_client: Option<redis::Client>,
     #[cfg(not(debug_assertions))]
     pub(super) minify_config: minify_html::Cfg,
 }
@@ -91,6 +89,7 @@ pub(super) async fn root(Query(parameters): Query<RootParameters>) -> impl IntoR
     Html(minified.to_string())
 }
 
+#[cfg(debug_assertions)]
 #[tracing::instrument]
 pub(super) async fn root(Query(parameters): Query<RootParameters>) -> impl IntoResponse {
     match parameters.render() {
