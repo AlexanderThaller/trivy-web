@@ -1,8 +1,9 @@
 <h3>Manifest</h3>
 
-{% match cosign_manifest %}
-{% when Ok(manifest) %}
-{% if let Some(manifest) = manifest %}
+{% match cosign_information %}
+{% when Ok(information) %}
+<p>Fetch Time: {{ information.fetch_time }}</p>
+{% if let Some(manifest) = information.cosign %}
 <p>Location: {{ manifest.manifest_location }}</p>
 <table>
   <thead>
@@ -26,6 +27,6 @@
 {% when Err(err) %}
 <h4>Error</h4>
 <code>
-  {{ err|format_error|ansi_to_html|safe }}
+{{ err|format_error|ansi_to_html|safe }}
 </code>
 {% endmatch %}
