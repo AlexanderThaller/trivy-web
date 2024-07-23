@@ -2,7 +2,10 @@ use askama::Template;
 use axum::{
     self,
     body::Body,
-    extract::State,
+    extract::{
+        Query,
+        State,
+    },
     http::{
         Response,
         StatusCode,
@@ -48,39 +51,62 @@ pub(super) struct SubmitFormTrivy {
     password: Password,
 }
 
+#[derive(Debug, Deserialize, Template)]
+#[template(path = "index.html")]
+pub(super) struct RootParameters {
+    imagename: Option<String>,
+}
+
 #[derive(Deserialize)]
 struct Password(String);
 
 #[cfg(not(debug_assertions))]
 #[tracing::instrument]
-pub(super) async fn root() -> impl IntoResponse {
-    static RESPONSE: Lazy<Html<String>> = Lazy::new(|| {
-        let minify_config = minify_html::Cfg {
-            do_not_minify_doctype: true,
-            ensure_spec_compliant_unquoted_attribute_values: true,
-            keep_spaces_between_attributes: true,
-            ..Default::default()
-        };
+pub(super) async fn root(Query(parameters): Query<RootParameters>) -> impl IntoResponse {
+    let minify_config = minify_html::Cfg {
+        do_not_minify_doctype: true,
+        ensure_spec_compliant_unquoted_attribute_values: true,
+        keep_spaces_between_attributes: true,
+        ..Default::default()
+    };
 
-        let minified =
-            minify_html::minify(include_bytes!("../resources/index.html"), &minify_config);
+    let rendered = match parameters.render() {
+        Ok(rendered) => rendered,
 
-        let minified = String::from_utf8_lossy(&minified);
+        Err(err) => {
+            tracing::error!("failed to render response: {err}");
 
-        Html(minified.to_string())
-    });
+            return Html(
+                html! {
+                    p { "Internal server error" }
+                }
+                .into_string(),
+            );
+        }
+    };
 
-    RESPONSE.clone()
+    let minified = minify_html::minify(rendered.as_bytes(), &minify_config);
+    let minified = String::from_utf8_lossy(&minified);
+
+    Html(minified.to_string())
 }
 
-#[cfg(debug_assertions)]
 #[tracing::instrument]
-pub(super) async fn root() -> impl IntoResponse {
-    Html(
-        read_to_string("resources/index.html")
-            .await
-            .expect("failed to read index.html file"),
-    )
+pub(super) async fn root(Query(parameters): Query<RootParameters>) -> impl IntoResponse {
+    match parameters.render() {
+        Ok(rendered) => Html(rendered),
+
+        Err(err) => {
+            tracing::error!("failed to render response: {err}");
+
+            Html(
+                html! {
+                    p { "Internal server error" }
+                }
+                .into_string(),
+            )
+        }
+    }
 }
 
 pub(super) async fn healthz() -> impl IntoResponse {

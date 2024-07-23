@@ -37,6 +37,9 @@
           <input
             id="imagename"
             name="imagename"
+            {% if let Some(imagename) = imagename %}
+            value="{{ imagename }}"
+            {% endif %}
           />
         </p>
 
@@ -88,6 +91,10 @@
         var password = formData.get('password');
         var cosign_key = formData.get('cosign_key');
 
+        let thisPage = new URL(window.location.href);
+        thisPage.searchParams.set('imagename', imagename);
+        window.history.pushState({}, '', thisPage);
+
         document.getElementById('image_information').innerHTML = `<h2>Image Information</h2>
         <img src="/img/bars.svg">
         <h2>Cosign Information</h2>
@@ -117,6 +124,16 @@
           }
         });
       }
+
+      function submitCheck() {
+        if (window.location.href.includes('?')) {
+          updateDivs();
+        }
+      }
+
+      window.addEventListener("load", () => {
+        submitCheck();
+      });
     </script>
   </body>
 
