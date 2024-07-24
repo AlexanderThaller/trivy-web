@@ -1,27 +1,30 @@
-# build rust code in alpine
-FROM rust:1.79.0-alpine3.20 as builder
+FROM rust:1.79.0-alpine3.20 AS rust-base
 
-RUN apk add --no-cache musl-dev=1.2.5-r0
+RUN apk add --no-cache musl-dev=1.2.5-r0 && cargo install cargo-chef
 
-WORKDIR /usr/src
+FROM rust-base AS planner
 
-RUN cargo new trivy-web
+WORKDIR /app
 
-COPY Cargo.toml Cargo.lock /usr/src/trivy-web/
+COPY . .
 
-WORKDIR /usr/src/trivy-web
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM rust-base AS builder
+
+WORKDIR /app
+
+COPY --from=planner /app/recipe.json recipe.json
+
+RUN cargo chef cook --release --recipe-path recipe.json
+
+COPY . .
 
 RUN cargo build --release
 
-COPY src /usr/src/trivy-web/src
-COPY templates /usr/src/trivy-web/templates
-COPY resources /usr/src/trivy-web/resources
-
-RUN touch /usr/src/trivy-web/src/main.rs && cargo build --release
-
 FROM ghcr.io/aquasecurity/trivy:0.53.0
 
-COPY --from=builder /usr/src/trivy-web/target/release/trivy-web /usr/local/bin/trivy-web
+COPY --from=builder /app/target/release/trivy-web /usr/local/bin/trivy-web
 
 EXPOSE 16223
 
