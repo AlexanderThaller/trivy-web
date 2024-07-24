@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: trivy-web-nodeport
+  namespace: trivy-web
+spec:
+  type: NodePort
+  selector:
+    app: trivy-web
+  ports:
+    - port: 16223
+      targetPort: 16223
+      nodePort: 30002
