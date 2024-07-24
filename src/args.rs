@@ -36,8 +36,4 @@ pub(super) struct Args {
     /// Optionally use an trivy server for scanning
     #[clap(long, value_name = "address:port", env = "TRIVY_SERVER")]
     pub server: Option<String>,
-
-    /// Set the address of the jaeger server
-    #[clap(long, value_name = "address", env = "TRIVY_JAEGER_HOST")]
-    pub jaeger_host: Option<String>,
 }
