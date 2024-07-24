@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   name: trivy-web
 spec:
-  replicas: 5
   selector:
     matchLabels:
       app: trivy-web
