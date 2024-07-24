@@ -23,14 +23,9 @@ mod handler;
 mod signal;
 mod telemetry;
 
-use crate::{
-    args::Args,
-    handler::AppState,
-};
-
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opt = Args::parse();
+    let opt = args::Args::parse();
 
     telemetry::setup(opt.log_level).context("failed to setup telemetry")?;
 
@@ -50,7 +45,7 @@ async fn main() -> Result<()> {
         })
         .transpose()?;
 
-    let state = AppState {
+    let state = handler::AppState {
         server: opt.server,
         docker_registry_client: DockerRegistryClient::default(),
         redis_client,
