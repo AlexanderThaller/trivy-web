@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: trivy-server
-          image: ghcr.io/aquasecurity/trivy:0.45.1
+          image: ghcr.io/aquasecurity/trivy:0.53.0
           args:
             - "server"
             - "--listen"
