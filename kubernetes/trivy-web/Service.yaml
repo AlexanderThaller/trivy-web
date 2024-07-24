@@ -5,9 +5,9 @@ metadata:
   labels:
     app: trivy-web
 spec:
+  selector:
+    app: trivy-web
   ports:
     - port: 16223
       targetPort: 16223
       name: http
-  selector:
-    app: trivy-web

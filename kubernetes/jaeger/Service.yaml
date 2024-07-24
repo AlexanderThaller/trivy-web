@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  labels:
+    app: jaeger
+spec:
+  selector:
+    app: jaeger
+  ports:
+    - port: 16685
+      targetPort: 16685
+      name: grpc
+    - port: 16686
+      targetPort: 16686
+      name: http
