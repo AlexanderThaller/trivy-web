@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: redis
+  name: redis-web
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: redis
-  serviceName: redis
+      app: redis-web
+  serviceName: redis-web
   template:
     metadata:
       labels:
-        app: redis
+        app: redis-web
         version: 1.0.0
       annotations:
         sidecar.istio.io/inject: "true"
