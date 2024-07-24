@@ -31,9 +31,6 @@ spec:
             limits:
               cpu: '1'
               memory: 2Gi
-          resizePolicy:
-            - resourceName: cpu
-              restartPolicy: "NotRequired"
           volumeMounts:
             - name: redis-data
               mountPath: /data
