@@ -10,4 +10,4 @@ spec:
   ports:
     - port: 16223
       targetPort: 16223
-      nodePort: 30002
+      nodePort: 30003
