@@ -16,15 +16,18 @@ spec:
     spec:
       containers:
         - name: trivy-web
-          image: athallerde/trivy-web:2024-07-24-0
+          image: athallerde/trivy-web:2024-07-24-1
           args:
             - "--binding=0.0.0.0:16223"
             - "--server"
             - "http://trivy-server.trivy-web.svc.cluster.local:4954"
             - "--redis-server"
             - "redis://redis-web.trivy-web.svc.cluster.local:6379"
+            - "--jaeger-host"
+            - "jaeger.trivy-web.svc.cluster.local"
           ports:
-            - containerPort: 16223
+            - name: http
+              containerPort: 16223
           resources:
             requests:
               cpu: 100m

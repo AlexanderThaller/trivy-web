@@ -24,7 +24,8 @@ spec:
             - "--cache-backend"
             - "redis://redis-server.trivy-web.svc.cluster.local:6379"
           ports:
-            - containerPort: 4954
+            - name: http
+              containerPort: 4954
           resources:
             requests:
               cpu: 100m
