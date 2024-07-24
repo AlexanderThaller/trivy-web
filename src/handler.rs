@@ -14,7 +14,12 @@ use axum::{
         Html,
         IntoResponse,
     },
+    routing::{
+        get,
+        post,
+    },
     Form,
+    Router,
 };
 use docker_registry_client::Client as DockerRegistryClient;
 use eyre::Context;
@@ -64,6 +69,22 @@ pub(super) struct RootParameters {
 
 #[derive(Deserialize)]
 struct Password(String);
+
+pub(super) fn router(state: AppState) -> Router {
+    Router::new()
+    // assets
+        .route("/css/main.css", get(css_main))
+        .route("/img/bars.svg", get(img_bars))
+        .route("/js/htmx/2.0.0/htmx.min.js", get(js_htmx_2_0_0))
+    // handlers
+        .route("/", get(root))
+        .route("/image", post(image))
+        .route("/trivy", post(trivy))
+        .route("/healthz", get(healthz))
+    // state
+        .with_state(state)
+        .layer(tower_http::compression::CompressionLayer::new())
+}
 
 #[cfg(not(debug_assertions))]
 #[tracing::instrument]

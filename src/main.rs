@@ -6,123 +6,45 @@
 #![warn(clippy::dbg_macro)]
 #![allow(dependency_on_unit_never_type_fallback)]
 
-use std::net::SocketAddr;
-
-use axum::{
-    routing::{
-        get,
-        post,
-    },
-    Router,
-};
-use clap::{
-    value_parser,
-    Parser,
-};
+use clap::Parser;
 use docker_registry_client::Client as DockerRegistryClient;
 use eyre::{
     Context,
     Result,
 };
-use opentelemetry::KeyValue;
-use opentelemetry_sdk::{
-    runtime,
-    trace::{
-        BatchConfig,
-        RandomIdGenerator,
-        Sampler,
-        Tracer,
-    },
-    Resource,
-};
-use opentelemetry_semantic_conventions::{
-    resource::{
-        DEPLOYMENT_ENVIRONMENT,
-        SERVICE_NAME,
-        SERVICE_VERSION,
-    },
-    SCHEMA_URL,
-};
-use tokio::signal;
 use tracing::{
-    info,
+    event,
     Level,
 };
-use tracing_opentelemetry::OpenTelemetryLayer;
-use tracing_subscriber::{
-    layer::SubscriberExt,
-    util::SubscriberInitExt,
-    Registry,
-};
 
-use crate::handler::AppState;
-
+mod args;
 mod filters;
 mod handler;
+mod signal;
+mod telemetry;
 
-/// Simple uploading service
-#[derive(Parser, Debug)]
-#[clap()]
-struct Opt {
-    /// Loglevel to run under
-    #[clap(
-        long,
-        value_name = "level",
-        default_value = "info",
-        value_parser = value_parser!(Level),
-        env = "TRIVY_WEB_LOG_LEVEL"
-    )]
-    pub log_level: Level,
-
-    /// Where to listen for requests
-    #[clap(
-        long,
-        value_name = "address:port",
-        default_value = "0.0.0.0:16223",
-        env = "TRIVY_WEB_BINDING"
-    )]
-    pub binding: SocketAddr,
-
-    /// When set use a redis server for caching
-    #[clap(
-        long,
-        value_name = "address:port",
-        default_value = "redis://127.0.0.1:6379",
-        env = "TRIVY_REDIS_SERVER"
-    )]
-    pub redis_server: Option<String>,
-
-    /// Optionally use an trivy server for scanning
-    #[clap(long, value_name = "address:port", env = "TRIVY_SERVER")]
-    pub server: Option<String>,
-}
+use crate::{
+    args::Args,
+    handler::AppState,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opt = Opt::parse();
+    let opt = Args::parse();
 
-    Registry::default()
-        .with(tracing_subscriber::EnvFilter::new(format!(
-            "{}",
-            opt.log_level
-        )))
-        .with(tracing_subscriber::fmt::layer())
-        .with(OpenTelemetryLayer::new(
-            init_tracer().context("Failed to initialize tracer")?,
-        ))
-        .init();
+    telemetry::setup(opt.log_level).context("failed to setup telemetry")?;
 
     if let Some(server) = &opt.server {
-        info!("Using trivy server at {server}");
+        event!(Level::INFO, server = server, "Using trivy server");
     }
 
     let redis_client = opt
         .redis_server
         .map(|server| -> Result<redis::Client> {
-            info!("Using redis server at {server}");
+            event!(Level::INFO, server = server, "Using redis server");
 
             let client =
-                redis::Client::open(server).context("Failed to connect to redis server")?;
+                redis::Client::open(server).context("failed to connect to redis server")?;
 
             Ok(client)
         })
@@ -142,84 +64,22 @@ async fn main() -> Result<()> {
         },
     };
 
-    let addr = opt.binding;
-    info!("Listening on http://{addr}");
+    let router = handler::router(state);
 
-    let router = Router::new()
-    // assets
-        .route("/css/main.css", get(handler::css_main))
-        .route("/img/bars.svg", get(handler::img_bars))
-        .route("/js/htmx/2.0.0/htmx.min.js", get(handler::js_htmx_2_0_0))
-    // handlers
-        .route("/", get(handler::root))
-        .route("/image", post(handler::image))
-        .route("/trivy", post(handler::trivy))
-        .route("/healthz", get(handler::healthz))
-    // state
-        .with_state(state)
-        .layer(tower_http::compression::CompressionLayer::new());
-
-    let listener = tokio::net::TcpListener::bind(addr)
+    let listener = tokio::net::TcpListener::bind(opt.binding)
         .await
-        .context("Failed to bind to address")?;
+        .context("failed to bind to address")?;
+
+    event!(
+        Level::INFO,
+        binding = opt.binding.to_string(),
+        "Starting trivy-web"
+    );
 
     axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+        .with_graceful_shutdown(signal::shutdown_signal())
+        .await
+        .context("failed to start server")?;
 
     Ok(())
-}
-
-fn resource() -> Resource {
-    Resource::from_schema_url(
-        [
-            KeyValue::new(SERVICE_NAME, env!("CARGO_PKG_NAME")),
-            KeyValue::new(SERVICE_VERSION, env!("CARGO_PKG_VERSION")),
-            #[cfg(debug_assertions)]
-            KeyValue::new(DEPLOYMENT_ENVIRONMENT, "develop"),
-            #[cfg(not(debug_assertions))]
-            KeyValue::new(DEPLOYMENT_ENVIRONMENT, "release"),
-        ],
-        SCHEMA_URL,
-    )
-}
-
-fn init_tracer() -> Result<Tracer, opentelemetry::trace::TraceError> {
-    opentelemetry_otlp::new_pipeline()
-        .tracing()
-        .with_trace_config(
-            opentelemetry_sdk::trace::Config::default()
-                // Customize sampling strategy
-                .with_sampler(Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(
-                    1.0,
-                ))))
-                // If export trace to AWS X-Ray, you can use XrayIdGenerator
-                .with_id_generator(RandomIdGenerator::default())
-                .with_resource(resource()),
-        )
-        .with_batch_config(BatchConfig::default())
-        .with_exporter(opentelemetry_otlp::new_exporter().tonic())
-        .install_batch(runtime::Tokio)
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
-    };
-
-    tokio::select! {
-        () = ctrl_c => {},
-        () = terminate => {},
-    }
-
-    info!("signal received, starting graceful shutdown");
 }
