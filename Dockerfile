@@ -1,7 +1,7 @@
 # build rust code in alpine
-FROM rust:1.72.0-alpine3.18 as builder
+FROM rust:1.79.0-alpine3.20 as builder
 
-RUN apk add --no-cache musl-dev
+RUN apk add --no-cache musl-dev=1.2.5-r0
 
 WORKDIR /usr/src
 
@@ -17,11 +17,9 @@ COPY src /usr/src/trivy-web/src
 COPY templates /usr/src/trivy-web/templates
 COPY resources /usr/src/trivy-web/resources
 
-RUN touch /usr/src/trivy-web/src/main.rs
+RUN touch /usr/src/trivy-web/src/main.rs && cargo build --release
 
-RUN cargo build --release
-
-FROM ghcr.io/aquasecurity/trivy:0.45.1
+FROM ghcr.io/aquasecurity/trivy:0.53.0
 
 COPY --from=builder /usr/src/trivy-web/target/release/trivy-web /usr/local/bin/trivy-web
 
