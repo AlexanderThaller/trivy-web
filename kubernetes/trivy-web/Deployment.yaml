@@ -38,6 +38,20 @@ spec:
           volumeMounts:
             - name: cache
               mountPath: /.cache
+        - name: jaeger
+          image: jaegertracing/all-in-one:1.59.0
+          ports:
+            - name: grpc
+              containerPort: 16685
+            - name: http
+              containerPort: 16686
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 5
+              memory: 2Gi
       volumes:
         - name: cache
           emptyDir: {}
