@@ -27,7 +27,7 @@ mod telemetry;
 async fn main() -> Result<()> {
     let opt = args::Args::parse();
 
-    telemetry::setup(opt.log_level).context("failed to setup telemetry")?;
+    telemetry::setup(opt.log_level, opt.jaeger_host).context("failed to setup telemetry")?;
 
     if let Some(server) = &opt.server {
         event!(Level::INFO, server = server, "Using trivy server");

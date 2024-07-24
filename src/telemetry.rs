@@ -28,14 +28,23 @@ use tracing_subscriber::{
     Registry,
 };
 
-pub(super) fn setup(log_level: tracing::Level) -> Result<()> {
-    Registry::default()
-        .with(tracing_subscriber::EnvFilter::new(format!("{log_level}")))
-        .with(tracing_subscriber::fmt::layer())
-        .with(OpenTelemetryLayer::new(
-            init_tracer().context("Failed to initialize tracer")?,
-        ))
-        .init();
+pub(super) fn setup(log_level: tracing::Level, jaeger_host: Option<String>) -> Result<()> {
+    if let Some(jaeger_host) = jaeger_host {
+        std::env::set_var("JAEGER_AGENT_HOST", jaeger_host);
+
+        Registry::default()
+            .with(tracing_subscriber::EnvFilter::new(format!("{log_level}")))
+            .with(tracing_subscriber::fmt::layer())
+            .with(OpenTelemetryLayer::new(
+                init_tracer().context("Failed to initialize tracer")?,
+            ))
+            .init();
+    } else {
+        Registry::default()
+            .with(tracing_subscriber::EnvFilter::new(format!("{log_level}")))
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+    }
 
     Ok(())
 }
