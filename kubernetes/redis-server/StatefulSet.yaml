@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis-server
+  serviceName: redis-server
+  template:
+    metadata:
+      labels:
+        app: redis-server
+        version: 1.0.0
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          args:
+            - "--bind"
+            - "0.0.0.0"
+          resources:
+            requests:
+              cpu: '100m'
+              memory: 128Mi
+            limits:
+              cpu: '1'
+              memory: 2Gi
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

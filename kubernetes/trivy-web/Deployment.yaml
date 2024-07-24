@@ -19,8 +19,8 @@ spec:
           image: athallerde/trivy-web:2024-07-24-0
           args:
             - "--binding=0.0.0.0:16223"
-            - "--server=http://trivy-server.trivy-web.svc.cluster.local:4954"
-            - "--redis-server=redis://redis.trivy-web.svc.cluster.local:6379"
+            - "--server='http://trivy-server.trivy-web.svc.cluster.local:4954'"
+            - "--redis-server='redis://redis-web.trivy-web.svc.cluster.local:6379'"
           ports:
             - containerPort: 16223
           resources:
