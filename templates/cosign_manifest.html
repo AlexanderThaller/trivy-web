@@ -1,8 +1,10 @@
-<h3>Manifest</h3>
 
 {% match cosign_information %}
 {% when Ok(information) %}
-<p>Fetch Time: {{ information.fetch_time }}</p>
+<h3>Cache Information</h3>
+<p>Fetch Time: {{ information.fetch_time }} ({{ information.fetch_duration() }})</p>
+<p>Expires: {{ information.expires() }} ({{ information.expires_duration() }})</p>
+<h3>Manifest</h3>
 {% if let Some(manifest) = information.cosign %}
 <p>Location: {{ manifest.manifest_location }}</p>
 <table>

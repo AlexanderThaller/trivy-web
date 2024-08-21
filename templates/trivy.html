@@ -1,7 +1,9 @@
 {% match information %}
 {% when Ok(information) %}
-<p>Fetch Time: {{ information.fetch_time }}</p>
-<p>Vulnerabilities:</p>
+<h3>Cache Information</h3>
+<p>Fetch Time: {{ information.fetch_time }} ({{ information.fetch_duration() }})</p>
+<p>Expires: {{ information.expires() }} ({{ information.expires_duration() }})</p>
+<h3>Vulnerabilities</h3>
 <ul class="severity_count">
     <li
         class="critical"
