@@ -243,7 +243,19 @@ pub(super) async fn trivy(
     State(state): State<AppState>,
     Form(form): Form<SubmitFormTrivy>,
 ) -> impl IntoResponse {
-    let image_name = form.imagename.parse().unwrap();
+    let image_name = match form.imagename.parse() {
+        Ok(image_name) => image_name,
+        Err(err) => {
+            tracing::error!("failed to parse image name: {err}");
+
+            return Html(
+                html! {
+                    p { "Internal server error" }
+                }
+                .into_string(),
+            );
+        }
+    };
 
     let information = TrivyInformationFetcher {
         image_name: &image_name,
