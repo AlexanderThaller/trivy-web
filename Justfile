@@ -22,4 +22,5 @@ deploy-local:
   cargo install --path .
   mv ~/.cargo/bin/trivy-web /opt/pot/jails/trivy/m/usr/local/bin/trivy-web
   pot exec -p trivy supervisorctl restart trivy-web-0
+  sleep 1
   pot exec -p trivy supervisorctl restart trivy-web-1
