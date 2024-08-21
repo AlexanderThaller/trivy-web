@@ -35,7 +35,7 @@ use super::{
 };
 
 const REDIS_KEY_PREFIX: &str = "trivy-web";
-const REDIS_TTL: i64 = 86400;
+pub(crate) const REDIS_TTL: i64 = 86400;
 
 pub(crate) trait Fetch {
     type Output: Serialize + for<'de> Deserialize<'de>;
@@ -200,7 +200,7 @@ impl<'a> Fetch for CosignInformationFetcher<'a> {
     type Output = CosignInformation;
 
     fn key(&self) -> String {
-        format!("trivy-web:cosign:{}", self.image_name)
+        format!("{{ REDIS_KEY_PREFIX }}:cosign:{}", self.image_name)
     }
 
     async fn fetch(&self) -> Result<Self::Output> {
