@@ -16,3 +16,10 @@ deploy:
 
 undeploy:
     find kubernetes -type f -exec oc delete -f {} \;
+
+deploy-local:
+  git pull
+  cargo install --path .
+  mv ~/.cargo/bin/trivy-web /opt/pot/jails/trivy/m/usr/local/bin/trivy-web
+  pot exec -p trivy supervisorctl restart trivy-web-0
+  pot exec -p trivy supervisorctl restart trivy-web-1
