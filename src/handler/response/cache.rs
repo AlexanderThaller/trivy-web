@@ -34,6 +34,9 @@ use super::{
     TrivyInformation,
 };
 
+const REDIS_KEY_PREFIX: &str = "trivy-web";
+const REDIS_TTL: i64 = 86400;
+
 pub(crate) trait Fetch {
     type Output: Serialize + for<'de> Deserialize<'de>;
 
@@ -101,7 +104,7 @@ pub(crate) trait Fetch {
                 .context("failed to set output in redis")?;
 
             connection
-                .expire(&key, 3600)
+                .expire(&key, REDIS_TTL)
                 .instrument(info_span!("set output expiration in redis"))
                 .await
                 .context("failed to set output expiration in redis")?;
@@ -121,7 +124,10 @@ impl<'a> Fetch for DockerInformationFetcher<'a> {
     type Output = DockerInformation;
 
     fn key(&self) -> String {
-        format!("trivy-web:docker_manifest:{}", self.image_name)
+        format!(
+            "{REDIS_KEY_PREFIX}:docker_manifest:{image_name}",
+            image_name = self.image_name
+        )
     }
 
     async fn fetch(&self) -> Result<Self::Output> {
@@ -151,7 +157,10 @@ impl<'a> Fetch for TrivyInformationFetcher<'a> {
     type Output = TrivyInformation;
 
     fn key(&self) -> String {
-        format!("trivy-web:trivy:{}", self.image_name)
+        format!(
+            "{REDIS_KEY_PREFIX}:trivy:{image_name}",
+            image_name = self.image_name
+        )
     }
 
     async fn fetch(&self) -> Result<Self::Output> {
