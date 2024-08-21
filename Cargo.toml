@@ -12,6 +12,7 @@ axum = { version = "0.7", features = ["json", "macros", "tracing"] }
 chrono = "0.4"
 clap = { version = "4", features = ["derive", "env", "cargo"] }
 docker-registry-client = { git = "https://github.com/AlexanderThaller/docker-registry-client-rs.git" }
+#docker-registry-client = { path = "../docker-registry-client-rs" }
 eyre = "0.6"
 maud = "0.26"
 minify-html = "0.15"
