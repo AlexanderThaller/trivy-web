@@ -31,6 +31,7 @@ use serde::{
 };
 use tokio::task;
 use tracing::{
+    error,
     info_span,
     Instrument,
 };
@@ -138,6 +139,10 @@ async fn fetch_docker_and_cosign_manifest(
     .cache_or_fetch(&redis_client)
     .await
     .context("failed to fetch docker manifest");
+
+    if let Err(err) = &docker_manifest {
+        error!("{err}");
+    }
 
     let cosign_manifest = CosignInformationFetcher {
         docker_registry_client: &docker_registry_client,

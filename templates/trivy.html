@@ -92,6 +92,6 @@
 {% when Err(err) %}
 <h3>Error</h3>
 <code>
-{{ err|ansi_to_html|safe }}
+{{ err|format_error|ansi_to_html|safe }}
 </code>
 {% endmatch %}
