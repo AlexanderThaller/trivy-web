@@ -288,11 +288,14 @@ fn triangulate(image_name: &ImageName, digest: &str) -> String {
     // sha256-9c0527cab629b61bd60c20f0c25615a8593314d3504add968b42bc5b891b253a.sig
 
     let out = format!(
-        "{}/{}/{}:{}.sig",
-        image_name.registry.registry_domain(),
-        image_name.repository,
-        image_name.image_name,
-        digest.replace(':', "-")
+        "{registry}/{repository}{image_name}:{digest}.sig",
+        registry = image_name.registry.registry_domain(),
+        repository = match &image_name.repository {
+            Some(repository) => format!("{repository}/"),
+            None => String::new(),
+        },
+        image_name = image_name.image_name,
+        digest = digest.replace(':', "-")
     );
 
     out
