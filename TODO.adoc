@@ -16,3 +16,5 @@ None
 	
 1 KiB
 * [ ] Cosign Verify should also verify the image even when no key is provided
+* [ ] Expire tokens correctly
+* [ ] Store tokens in redis when using the docker client library
