@@ -3,7 +3,7 @@ use std::collections::{
     BTreeSet,
 };
 
-use docker_registry_client::image_name::ImageName;
+use docker_registry_client::Image;
 use eyre::WrapErr;
 use serde::{
     Deserialize,
@@ -155,7 +155,7 @@ impl Vulnerability {
 
 #[tracing::instrument]
 pub(super) async fn scan_image(
-    image: &ImageName,
+    image: &Image,
     server: Option<&str>,
     username: Option<&str>,
     password: Option<&str>,

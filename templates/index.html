@@ -33,12 +33,12 @@
       <fieldset>
         <h2>Image</h2>
         <p>
-          <label for="imagename">Image Name</label>
+          <label for="image">Image</label>
           <input
-            id="imagename"
-            name="imagename"
-            {% if let Some(imagename) = imagename %}
-            value="{{ imagename }}"
+            id="image"
+            name="image"
+            {% if let Some(image) = image %}
+            value="{{ image }}"
             {% endif %}
           />
         </p>
@@ -86,13 +86,13 @@
         var form = document.getElementById('form');
         var formData = new FormData(form);
 
-        var imagename = formData.get('imagename');
+        var image = formData.get('image');
         var username = formData.get('username');
         var password = formData.get('password');
         var cosign_key = formData.get('cosign_key');
 
         let thisPage = new URL(window.location.href);
-        thisPage.searchParams.set('imagename', imagename);
+        thisPage.searchParams.set('image', image);
         window.history.pushState({}, '', thisPage);
 
         document.getElementById('image_information').innerHTML = `<h2>Image Information</h2>
@@ -108,7 +108,7 @@
           swap: 'innerHTML',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           values: {
-            imagename: imagename,
+            image: image,
             cosign_key: cosign_key
           }
         });
@@ -118,7 +118,7 @@
           swap: 'innerHTML',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           values: {
-            imagename: imagename,
+            image: image,
             username: username,
             password: password,
           }

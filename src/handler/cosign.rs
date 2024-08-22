@@ -5,12 +5,15 @@ use chrono::{
     Utc,
 };
 use docker_registry_client::{
-    image_name::ImageName,
     Client as DockerRegistryClient,
     ClientError as DockerClientError,
+    Image,
     Manifest as DockerManifest,
 };
-use eyre::Context;
+use eyre::{
+    Context,
+    Result,
+};
 use serde::{
     Deserialize,
     Serialize,
@@ -20,6 +23,7 @@ use tracing::{
     info_span,
     Instrument,
 };
+use url::Url;
 use x509_parser::{
     self,
     certificate::X509Certificate,
@@ -35,7 +39,7 @@ pub(crate) enum CertificateError {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub(crate) struct Cosign {
-    pub(crate) manifest_location: ImageName,
+    pub(crate) manifest_location: Url,
     pub(crate) signatures: Vec<Signature>,
 }
 
@@ -74,7 +78,7 @@ pub(crate) struct VerifySignature {
 #[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
 pub(crate) struct Critical {
     pub(crate) identity: Identity,
-    pub(crate) image: Image,
+    pub(crate) image: CosignImage,
 
     #[serde(rename = "type")]
     pub(crate) cosign_type: String,
@@ -87,7 +91,7 @@ pub(crate) struct Identity {
 }
 
 #[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
-pub(crate) struct Image {
+pub(crate) struct CosignImage {
     #[serde(rename = "docker-manifest-digest")]
     pub(crate) digest: String,
 }
@@ -217,15 +221,13 @@ fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, e
 #[tracing::instrument]
 pub(crate) async fn cosign_manifest(
     client: &DockerRegistryClient,
-    image: &ImageName,
+    image: &Image,
     digest: &str,
 ) -> Result<Option<Cosign>, eyre::Error> {
-    let manifest_location = triangulate(image, digest)
-        .parse()
-        .context("Failed to parse manifest location")?;
+    let manifest_location = triangulate(image, digest).context("failed to triangulate url")?;
 
     let manifest = client
-        .get_manifest(&manifest_location)
+        .get_manifest_url(&manifest_location, image)
         .instrument(info_span!("get manifest"))
         .await
         .map(|response| signature_from_manifest(response.manifest));
@@ -249,7 +251,7 @@ pub(crate) async fn cosign_manifest(
 #[tracing::instrument]
 pub(crate) async fn cosign_verify(
     cosign_key: &str,
-    image: &ImageName,
+    image: &Image,
 ) -> Result<CosignVerify, eyre::Error> {
     let output = Command::new("cosign")
         .arg("verify")
@@ -283,22 +285,22 @@ pub(crate) async fn cosign_verify(
 }
 
 #[tracing::instrument]
-fn triangulate(image_name: &ImageName, digest: &str) -> String {
+fn triangulate(image: &Image, digest: &str) -> Result<Url> {
     // quay.io/jetstack/cert-manager-controller:
     // sha256-9c0527cab629b61bd60c20f0c25615a8593314d3504add968b42bc5b891b253a.sig
 
-    let out = format!(
-        "{registry}/{repository}{image_name}:{digest}.sig",
-        registry = image_name.registry.registry_domain(),
-        repository = match &image_name.repository {
+    format!(
+        "https://{registry}/{repository}{image_name}:{digest}.sig",
+        registry = image.registry.registry_domain(),
+        repository = match &image.repository {
             Some(repository) => format!("{repository}/"),
             None => String::new(),
         },
-        image_name = image_name.image_name,
+        image_name = image.image_name,
         digest = digest.replace(':', "-")
-    );
-
-    out
+    )
+    .parse()
+    .context("failed to parse triangulated url")
 }
 
 #[cfg(test)]
@@ -350,10 +352,8 @@ mod test {
     fn parse_manifest() {
         const INPUT: &str = include_str!("resources/tests/cosign_manifest.json");
         let docker_manifest: DockerManifest = serde_json::from_str(INPUT).unwrap();
-        dbg!(&docker_manifest);
 
         let got = signature_from_manifest(docker_manifest).unwrap();
-        dbg!(&got);
 
         todo!();
 
