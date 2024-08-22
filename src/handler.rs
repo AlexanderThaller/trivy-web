@@ -50,13 +50,13 @@ pub(super) struct AppState {
 
 #[derive(Debug, Deserialize)]
 pub(super) struct SubmitFormImage {
-    imagename: String,
+    image: String,
     cosign_key: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub(super) struct SubmitFormTrivy {
-    imagename: String,
+    image: String,
     username: String,
     password: Password,
 }
@@ -64,7 +64,7 @@ pub(super) struct SubmitFormTrivy {
 #[derive(Debug, Deserialize, Template)]
 #[template(path = "index.html")]
 pub(super) struct RootParameters {
-    imagename: Option<String>,
+    image: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -243,10 +243,10 @@ pub(super) async fn trivy(
     State(state): State<AppState>,
     Form(form): Form<SubmitFormTrivy>,
 ) -> impl IntoResponse {
-    let image_name = match form.imagename.parse() {
-        Ok(image_name) => image_name,
+    let image = match form.image.parse() {
+        Ok(image) => image,
         Err(err) => {
-            tracing::error!("failed to parse image name: {err}");
+            tracing::error!("failed to parse image: {err}");
 
             return Html(
                 html! {
@@ -258,7 +258,7 @@ pub(super) async fn trivy(
     };
 
     let information = TrivyInformationFetcher {
-        image_name: &image_name,
+        image: &image,
         trivy_server: state.server.as_deref(),
 
         trivy_username: if form.username.is_empty() {

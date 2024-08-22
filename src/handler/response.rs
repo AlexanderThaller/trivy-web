@@ -12,8 +12,8 @@ use chrono::{
     Utc,
 };
 use docker_registry_client::{
-    image_name::ImageName,
     Client as DockerRegistryClient,
+    Image,
     Manifest as DockerManifest,
     Response as DockerResponse,
 };
@@ -59,7 +59,7 @@ use super::{
 #[derive(Debug, Template)]
 #[template(path = "response_image.html")]
 pub(crate) struct ImageResponse {
-    pub(crate) image_name: ImageName,
+    pub(crate) image: Image,
     pub(crate) docker_information: Result<DockerInformation>,
     pub(crate) cosign_information: Result<CosignInformation>,
     pub(crate) cosign_verify: Option<Result<cosign::CosignVerify>>,
@@ -95,13 +95,13 @@ pub(crate) async fn image(
     state: &AppState,
     form: SubmitFormImage,
 ) -> Result<ImageResponse, eyre::Error> {
-    let image_name: ImageName = form.imagename.trim().parse()?;
+    let image: Image = form.image.trim().parse()?;
 
     let docker_and_cosign_manifest = {
         task::spawn(
             fetch_docker_and_cosign_manifest(
                 state.docker_registry_client.clone(),
-                image_name.clone(),
+                image.clone(),
                 state.redis_client.clone(),
             )
             .instrument(info_span!("fetch_docker_and_cosign_manifest")),
@@ -109,7 +109,7 @@ pub(crate) async fn image(
     };
 
     let cosign_verify = task::spawn(
-        fetch_cosign_verify(form.cosign_key, image_name.clone())
+        fetch_cosign_verify(form.cosign_key, image.clone())
             .instrument(info_span!("fetch_cosign_verify")),
     );
 
@@ -117,7 +117,7 @@ pub(crate) async fn image(
     let cosign_verify = cosign_verify.await?;
 
     let response = ImageResponse {
-        image_name,
+        image,
         docker_information,
         cosign_information,
         cosign_verify,
@@ -129,12 +129,12 @@ pub(crate) async fn image(
 #[tracing::instrument]
 async fn fetch_docker_and_cosign_manifest(
     docker_registry_client: DockerRegistryClient,
-    image_name: ImageName,
+    image: Image,
     redis_client: Option<redis::Client>,
 ) -> (Result<DockerInformation>, Result<CosignInformation>) {
     let docker_manifest = DockerInformationFetcher {
         docker_registry_client: &docker_registry_client,
-        image_name: &image_name,
+        image: &image,
     }
     .cache_or_fetch(&redis_client)
     .await
@@ -146,7 +146,7 @@ async fn fetch_docker_and_cosign_manifest(
 
     let cosign_manifest = CosignInformationFetcher {
         docker_registry_client: &docker_registry_client,
-        image_name: &image_name,
+        image: &image,
         docker_manifest: &docker_manifest,
     }
     .cache_or_fetch(&redis_client)
@@ -159,12 +159,12 @@ async fn fetch_docker_and_cosign_manifest(
 #[tracing::instrument]
 async fn fetch_cosign_verify(
     cosign_key: String,
-    image_name: ImageName,
+    image: Image,
 ) -> Option<Result<cosign::CosignVerify, eyre::Error>> {
     if cosign_key.is_empty() {
         None
     } else {
-        Some(cosign_verify(&cosign_key, &image_name).await)
+        Some(cosign_verify(&cosign_key, &image).await)
     }
 }
 

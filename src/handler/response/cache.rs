@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 
 use chrono::Utc;
 use docker_registry_client::{
-    image_name::ImageName,
     Client as DockerRegistryClient,
+    Image,
 };
 use eyre::{
     Context,
@@ -117,7 +117,7 @@ pub(crate) trait Fetch {
 #[derive(Debug)]
 pub(crate) struct DockerInformationFetcher<'a> {
     pub(crate) docker_registry_client: &'a docker_registry_client::Client,
-    pub(crate) image_name: &'a ImageName,
+    pub(crate) image: &'a Image,
 }
 
 impl<'a> Fetch for DockerInformationFetcher<'a> {
@@ -125,15 +125,15 @@ impl<'a> Fetch for DockerInformationFetcher<'a> {
 
     fn key(&self) -> String {
         format!(
-            "{REDIS_KEY_PREFIX}:docker_manifest:{image_name}",
-            image_name = self.image_name
+            "{REDIS_KEY_PREFIX}:docker_manifest:{image}",
+            image = self.image
         )
     }
 
     async fn fetch(&self) -> Result<Self::Output> {
         let response = self
             .docker_registry_client
-            .get_manifest(self.image_name)
+            .get_manifest(self.image)
             .instrument(info_span!("get docker manifest from docker registry"))
             .await
             .context("can not get manifest from docker registry")?;
@@ -147,7 +147,7 @@ impl<'a> Fetch for DockerInformationFetcher<'a> {
 
 #[derive(Debug)]
 pub(crate) struct TrivyInformationFetcher<'a> {
-    pub(crate) image_name: &'a ImageName,
+    pub(crate) image: &'a Image,
     pub(crate) trivy_server: Option<&'a str>,
     pub(crate) trivy_username: Option<&'a str>,
     pub(crate) trivy_password: Option<&'a str>,
@@ -157,15 +157,12 @@ impl<'a> Fetch for TrivyInformationFetcher<'a> {
     type Output = TrivyInformation;
 
     fn key(&self) -> String {
-        format!(
-            "{REDIS_KEY_PREFIX}:trivy:{image_name}",
-            image_name = self.image_name
-        )
+        format!("{REDIS_KEY_PREFIX}:trivy:{image}", image = self.image)
     }
 
     async fn fetch(&self) -> Result<Self::Output> {
         let trivy_result = trivy::scan_image(
-            self.image_name,
+            self.image,
             self.trivy_server,
             self.trivy_username,
             self.trivy_password,
@@ -192,7 +189,7 @@ impl<'a> Fetch for TrivyInformationFetcher<'a> {
 #[derive(Debug)]
 pub(crate) struct CosignInformationFetcher<'a> {
     pub(crate) docker_registry_client: &'a DockerRegistryClient,
-    pub(crate) image_name: &'a ImageName,
+    pub(crate) image: &'a Image,
     pub(crate) docker_manifest: &'a Result<DockerInformation>,
 }
 
@@ -200,7 +197,7 @@ impl<'a> Fetch for CosignInformationFetcher<'a> {
     type Output = CosignInformation;
 
     fn key(&self) -> String {
-        format!("{{ REDIS_KEY_PREFIX }}:cosign:{}", self.image_name)
+        format!("{{ REDIS_KEY_PREFIX }}:cosign:{}", self.image)
     }
 
     async fn fetch(&self) -> Result<Self::Output> {
@@ -223,7 +220,7 @@ impl<'a> Fetch for CosignInformationFetcher<'a> {
             .as_ref()
             .expect("already checked if digest is some");
 
-        let cosign = cosign::cosign_manifest(self.docker_registry_client, self.image_name, digest)
+        let cosign = cosign::cosign_manifest(self.docker_registry_client, self.image, digest)
             .instrument(info_span!("get cosign manifest"))
             .await
             .context("failed to get cosign manifest")?;
