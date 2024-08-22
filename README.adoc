@@ -1,0 +1,3 @@
+= trivy-web
+
+Webinterface for the link:https://github.com/aquasecurity/trivy[trivy image scanner].
