@@ -20,4 +20,4 @@ jobs:
       - name: Docker Login
         run: docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_TOKEN"
       - name: Run build
-        run: earthly --org AlexanderThaller --sat desktop --ci --push +build
+        run: earthly --org AlexanderThaller --sat nas --ci --push +build
