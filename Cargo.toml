@@ -3,6 +3,9 @@ name = "trivy-web"
 version = "0.1.0"
 edition = "2021"
 
+[build]
+build = "build.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -32,6 +35,9 @@ tracing-opentelemetry = "0.24"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = { version = "2", features = ["serde"] }
 x509-parser = "0.16"
+
+[build-dependencies]
+chrono = "0.4"
 
 [dev-dependencies]
 pretty_assertions = "1"
