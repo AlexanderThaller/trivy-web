@@ -19,7 +19,5 @@ jobs:
       - uses: actions/checkout@v2
       - name: Docker Login
         run: docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_TOKEN"
-      - name: Run check
-        run: earthly --org AlexanderThaller --sat nas --ci --push +check
       - name: Run build
         run: earthly --org AlexanderThaller --sat nas --ci --push +build

@@ -1,7 +1,7 @@
 VERSION --global-cache 0.7
 IMPORT github.com/earthly/lib/rust:2.2.11 AS rust
 
-FROM rust:1.80.1-alpine3.20
+FROM rust:1.80.1
 WORKDIR /app
 
 install:
@@ -19,10 +19,9 @@ build:
   DO rust+CARGO --args="build --release" --output="release/[^/\.]+"
   SAVE ARTIFACT ./target/release/trivy-web
 
-check:
+test:
   FROM +source
-  DO rust+CARGO --args="check" --output="debug/[^/\.]+"
-  SAVE ARTIFACT ./target/release/trivy-web
+  DO rust+CARGO --args="test" --output="debug/[^/\.]+"
 
 docker:
   COPY +build/trivy-web .
