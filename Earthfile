@@ -10,6 +10,7 @@ install:
 source:
   FROM +install
   COPY --keep-ts Cargo.toml ./
+  COPY --keep-ts build.rs ./
   COPY --keep-ts --dir src ./
   COPY --keep-ts --dir templates ./
   COPY --keep-ts --dir resources ./
@@ -18,6 +19,10 @@ build:
   FROM +source
   DO rust+CARGO --args="build --release" --output="release/[^/\.]+"
   SAVE ARTIFACT ./target/release/trivy-web
+
+debug:
+  FROM +source
+  DO rust+CARGO --args="build" --output="release/[^/\.]+"
 
 test:
   FROM +source
