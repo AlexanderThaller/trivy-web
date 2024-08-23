@@ -61,10 +61,18 @@ pub(super) struct SubmitFormTrivy {
     password: Password,
 }
 
-#[derive(Debug, Deserialize, Template)]
-#[template(path = "index.html")]
+#[derive(Debug, Deserialize)]
 pub(super) struct RootParameters {
     image: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Template)]
+#[template(path = "index.html")]
+pub(super) struct Index {
+    image: Option<String>,
+    build_time: String,
+    commit_hash: String,
+    crate_version: String,
 }
 
 #[derive(Deserialize)]
@@ -96,7 +104,14 @@ pub(super) async fn root(Query(parameters): Query<RootParameters>) -> impl IntoR
         ..Default::default()
     };
 
-    let rendered = match parameters.render() {
+    let index = Index {
+        image: parameters.image,
+        build_time: env!("BUILD_TIME").to_string(),
+        commit_hash: env!("GIT_COMMIT").to_string(),
+        crate_version: env!("CRATE_VERSION").to_string(),
+    };
+
+    let rendered = match index.render() {
         Ok(rendered) => rendered,
 
         Err(err) => {
@@ -120,7 +135,14 @@ pub(super) async fn root(Query(parameters): Query<RootParameters>) -> impl IntoR
 #[cfg(debug_assertions)]
 #[tracing::instrument]
 pub(super) async fn root(Query(parameters): Query<RootParameters>) -> impl IntoResponse {
-    match parameters.render() {
+    let index = Index {
+        image: parameters.image,
+        build_time: env!("BUILD_TIME").to_string(),
+        commit_hash: env!("GIT_COMMIT").to_string(),
+        crate_version: env!("CRATE_VERSION").to_string(),
+    };
+
+    match index.render() {
         Ok(rendered) => Html(rendered),
 
         Err(err) => {

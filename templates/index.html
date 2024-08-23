@@ -76,10 +76,10 @@
       </p>
     </form>
 
-    <hr>
-
     <div id="image_information"></div>
     <div id="scan_information"></div>
+
+    {% include "footer.html" %}
 
     <script>
       function updateDivs() {
@@ -95,7 +95,7 @@
         thisPage.searchParams.set('image', image);
         window.history.pushState({}, '', thisPage);
 
-        document.getElementById('image_information').innerHTML = `<h2>Image Information</h2>
+        document.getElementById('image_information').innerHTML = `<hr><h2>Image Information</h2>
         <img src="/img/bars.svg">
         <h2>Cosign Information</h2>
         <img src="/img/bars.svg">`;
