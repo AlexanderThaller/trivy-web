@@ -1,7 +1,7 @@
 VERSION --global-cache 0.7
 IMPORT github.com/earthly/lib/rust:2.2.11 AS rust
 
-FROM rust:1.80.1
+FROM rust:1.80.1-alpine3.20
 WORKDIR /app
 
 install:
