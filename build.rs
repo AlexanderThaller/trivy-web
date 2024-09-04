@@ -1,7 +1,7 @@
 fn main() {
     // Get the current Git commit hash
     let output = std::process::Command::new("git")
-        .args(&["rev-parse", "HEAD"])
+        .args(["rev-parse", "HEAD"])
         .output()
         .expect("Failed to execute Git command");
 
