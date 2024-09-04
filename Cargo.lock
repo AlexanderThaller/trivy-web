@@ -803,7 +803,7 @@ dependencies = [
 [[package]]
 name = "docker-registry-client"
 version = "0.1.0"
-source = "git+https://github.com/AlexanderThaller/docker-registry-client-rs.git#00958278427892a45c4df76ea403ef60f83bcfbc"
+source = "git+https://github.com/AlexanderThaller/docker-registry-client-rs.git#bfac2fa371efe047c2923e4f20cbaccbd6ff8c23"
 dependencies = [
  "chrono",
  "either",
