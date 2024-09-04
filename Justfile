@@ -1,6 +1,9 @@
 image_name := "trivy-web"
 image_tag := "2024-07-24-1"
 
+@_default:
+  @just --list
+
 build:
     docker build -t "{{ image_name }}:{{ image_tag }}" .
 
