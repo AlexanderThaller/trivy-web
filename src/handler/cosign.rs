@@ -304,8 +304,7 @@ fn triangulate(image: &Image, digest: &str) -> Result<Url> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
-#[allow(clippy::dbg_macro)]
+#[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 mod test {
     use docker_registry_client::Manifest as DockerManifest;
     use pretty_assertions::assert_eq;
@@ -353,7 +352,7 @@ mod test {
         const INPUT: &str = include_str!("resources/tests/cosign_manifest.json");
         let docker_manifest: DockerManifest = serde_json::from_str(INPUT).unwrap();
 
-        let got = signature_from_manifest(docker_manifest).unwrap();
+        let _got = signature_from_manifest(docker_manifest).unwrap();
 
         todo!();
 

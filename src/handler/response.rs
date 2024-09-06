@@ -168,8 +168,50 @@ async fn fetch_cosign_verify(
     }
 }
 
+impl DockerInformation {
+    pub(crate) fn fetch_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.fetch_time)
+    }
+
+    pub(crate) fn expires(&self) -> DateTime<Utc> {
+        self.fetch_time + Duration::seconds(REDIS_TTL)
+    }
+
+    pub(crate) fn expires_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.expires())
+    }
+}
+
+impl TrivyInformation {
+    pub(crate) fn fetch_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.fetch_time)
+    }
+
+    pub(crate) fn expires(&self) -> DateTime<Utc> {
+        self.fetch_time + Duration::seconds(REDIS_TTL)
+    }
+
+    pub(crate) fn expires_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.expires())
+    }
+}
+
+impl CosignInformation {
+    pub(crate) fn fetch_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.fetch_time)
+    }
+
+    pub(crate) fn expires(&self) -> DateTime<Utc> {
+        self.fetch_time + Duration::seconds(REDIS_TTL)
+    }
+
+    pub(crate) fn expires_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.expires())
+    }
+}
+
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 mod tests {
     use std::collections::BTreeSet;
 
@@ -219,47 +261,5 @@ mod tests {
         assert_eq!(information, information_from_redis);
 
         let _: () = connection.del(key).await.unwrap();
-    }
-}
-
-impl DockerInformation {
-    pub(crate) fn fetch_duration(&self) -> Duration {
-        Utc::now().signed_duration_since(self.fetch_time)
-    }
-
-    pub(crate) fn expires(&self) -> DateTime<Utc> {
-        self.fetch_time + Duration::seconds(REDIS_TTL)
-    }
-
-    pub(crate) fn expires_duration(&self) -> Duration {
-        Utc::now().signed_duration_since(self.expires())
-    }
-}
-
-impl TrivyInformation {
-    pub(crate) fn fetch_duration(&self) -> Duration {
-        Utc::now().signed_duration_since(self.fetch_time)
-    }
-
-    pub(crate) fn expires(&self) -> DateTime<Utc> {
-        self.fetch_time + Duration::seconds(REDIS_TTL)
-    }
-
-    pub(crate) fn expires_duration(&self) -> Duration {
-        Utc::now().signed_duration_since(self.expires())
-    }
-}
-
-impl CosignInformation {
-    pub(crate) fn fetch_duration(&self) -> Duration {
-        Utc::now().signed_duration_since(self.fetch_time)
-    }
-
-    pub(crate) fn expires(&self) -> DateTime<Utc> {
-        self.fetch_time + Duration::seconds(REDIS_TTL)
-    }
-
-    pub(crate) fn expires_duration(&self) -> Duration {
-        Utc::now().signed_duration_since(self.expires())
     }
 }
