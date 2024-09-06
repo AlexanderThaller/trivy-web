@@ -1,10 +1,15 @@
 //#![deny(missing_docs)]
+#![expect(
+    dependency_on_unit_never_type_fallback,
+    reason = "need a newer tracing crate version to fix this"
+)]
 #![forbid(unsafe_code)]
+#![warn(clippy::allow_attributes)]
+#![warn(clippy::allow_attributes_without_reason)]
+#![warn(clippy::dbg_macro)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::unwrap_used)]
 #![warn(rust_2018_idioms, unused_lifetimes, missing_debug_implementations)]
-#![warn(clippy::dbg_macro)]
-#![allow(dependency_on_unit_never_type_fallback)]
 
 use clap::Parser;
 use docker_registry_client::Client as DockerRegistryClient;

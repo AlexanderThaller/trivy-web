@@ -204,7 +204,7 @@ pub(super) async fn scan_image(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 mod test {
     use super::TrivyResult;
 
