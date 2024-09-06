@@ -1,7 +1,7 @@
 VERSION --global-cache 0.7
 IMPORT github.com/earthly/lib/rust:2.2.11 AS rust
 
-FROM rust:1.80.1
+FROM rust:1.81.0
 WORKDIR /app
 
 install:
@@ -23,6 +23,10 @@ build:
 debug:
   FROM +source
   DO rust+CARGO --args="build" --output="release/[^/\.]+"
+
+check:
+  FROM +source
+  DO rust+CARGO --args="check" --output="debug/[^/\.]+"
 
 test:
   FROM +source
