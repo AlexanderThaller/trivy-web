@@ -45,9 +45,15 @@ async fn main() -> Result<()> {
         })
         .transpose()?;
 
+    let mut registry = DockerRegistryClient::default();
+
+    if let Some(redis_client) = &redis_client {
+        registry.set_cache_redis(redis_client.clone());
+    }
+
     let state = handler::AppState {
         server: opt.server,
-        docker_registry_client: DockerRegistryClient::default(),
+        docker_registry_client: registry,
         redis_client,
 
         #[cfg(not(debug_assertions))]
