@@ -226,6 +226,7 @@ mod tests {
     };
 
     #[tokio::test]
+    #[cfg_attr(feature = "ci", ignore)]
     async fn redis() {
         const DATA: &str = include_str!("resources/tests/trivy_output.json");
 

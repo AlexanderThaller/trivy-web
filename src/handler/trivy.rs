@@ -232,6 +232,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[cfg_attr(feature = "ci", ignore)]
     async fn exists() {
         let _got = super::scan_image(
             &"ghcr.io/aquasecurity/trivy:0.52.0".parse().unwrap(),

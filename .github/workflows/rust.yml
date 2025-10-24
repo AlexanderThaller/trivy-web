@@ -10,12 +10,26 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  build_clippy:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
     - name: Run clippy
       run: cargo clippy --verbose
+
+  build_test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --verbose --features ci
+
+  build_fmt:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run fmt
+      run: rustup component add --toolchain nightly-x86_64-unknown-linux-gnu rustfmt && cargo +nightly fmt --verbose

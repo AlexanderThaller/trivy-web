@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
 
+[features]
+# Enable/Disable CI-specific tests
+ci = []
+
 [dependencies]
 askama = { version = "0.14" }
 axum-macros = "0.5"
