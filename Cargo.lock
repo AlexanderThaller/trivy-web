@@ -851,7 +851,7 @@ dependencies = [
 [[package]]
 name = "docker-registry-client"
 version = "0.1.0"
-source = "git+https://github.com/AlexanderThaller/docker-registry-client-rs.git#1cc1f595b9e53d74b18454c3f202644c200cea3b"
+source = "git+https://github.com/AlexanderThaller/docker-registry-client-rs.git#64688daeeb69df9b66cac191b6fb766171c98d6a"
 dependencies = [
  "async-trait",
  "chrono",
@@ -959,28 +959,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
-name = "futures"
-version = "0.3.31"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65bc07b1a8bc7c85c5f2e110c476c7389b4554ba72af57d8445ea63a576b0876"
-dependencies = [
- "futures-channel",
- "futures-core",
- "futures-executor",
- "futures-io",
- "futures-sink",
- "futures-task",
- "futures-util",
-]
-
-[[package]]
 name = "futures-channel"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dff15bf788c671c1934e366d07e30c1814a8ef514e1af724a602e8a2fbe1b10"
 dependencies = [
  "futures-core",
- "futures-sink",
 ]
 
 [[package]]
@@ -999,12 +983,6 @@ dependencies = [
  "futures-task",
  "futures-util",
 ]
-
-[[package]]
-name = "futures-io"
-version = "0.3.31"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e5c1b78ca4aae1ac06c48a526a655760685149f0d465d21f37abfe57ce075c6"
 
 [[package]]
 name = "futures-macro"
@@ -1035,13 +1013,10 @@ version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fa08315bb612088cc391249efdc3bc77536f16c91f6cf495e6fbe85b20a4a81"
 dependencies = [
- "futures-channel",
  "futures-core",
- "futures-io",
  "futures-macro",
  "futures-sink",
  "futures-task",
- "memchr",
  "pin-project-lite",
  "pin-utils",
  "slab",
@@ -1491,15 +1466,6 @@ name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -2743,25 +2709,24 @@ dependencies = [
 
 [[package]]
 name = "redis"
-version = "0.27.6"
+version = "0.32.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09d8f99a4090c89cc489a94833c901ead69bfbf3877b4867d5482e321ee875bc"
+checksum = "014cc767fefab6a3e798ca45112bccad9c6e0e218fbd49720042716c73cfef44"
 dependencies = [
  "arc-swap",
- "async-trait",
  "backon",
  "bytes",
+ "cfg-if",
  "combine",
- "futures",
+ "futures-channel",
  "futures-util",
- "itertools 0.13.0",
  "itoa",
  "num-bigint",
  "percent-encoding",
  "pin-project-lite",
  "ryu",
  "sha1_smol",
- "socket2 0.5.10",
+ "socket2 0.6.1",
  "tokio",
  "tokio-util",
  "url",
@@ -2769,9 +2734,9 @@ dependencies = [
 
 [[package]]
 name = "redis-macros"
-version = "0.4.3"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f102a93c3cd3f779677fe128cec47a963c9743f8d26fa338efd366f92e248bc"
+checksum = "5ac3609707f8c68aac6f3871c9a9596a7a9e30e3cc42ebba741d13b39e27c6d8"
 dependencies = [
  "redis",
  "redis-macros-derive",
@@ -2781,12 +2746,13 @@ dependencies = [
 
 [[package]]
 name = "redis-macros-derive"
-version = "0.4.3"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b24650913db0ad92c9c10e79f14e73f3169d64d7128d82f94bcb20c6a4e5b15"
+checksum = "923db076e23f014fd5c5504fba397d3dd06b29724a3dd8e21aa7a3423c00b129"
 dependencies = [
  "proc-macro2",
  "quote",
+ "redis",
  "syn 2.0.108",
 ]
 
