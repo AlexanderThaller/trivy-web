@@ -97,13 +97,13 @@ pub(crate) trait Fetch {
             let json =
                 serde_json::to_string(&response).context("failed to serialize output for redis")?;
 
-            connection
+            let _: () = connection
                 .set(&key, &json)
                 .instrument(info_span!("set output in redis"))
                 .await
                 .context("failed to set output in redis")?;
 
-            connection
+            let _: () = connection
                 .expire(&key, REDIS_TTL)
                 .instrument(info_span!("set output expiration in redis"))
                 .await
