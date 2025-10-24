@@ -4,6 +4,7 @@ use eyre::{
 };
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::{
+    Resource,
     runtime,
     trace::{
         BatchConfig,
@@ -11,21 +12,20 @@ use opentelemetry_sdk::{
         Sampler,
         Tracer,
     },
-    Resource,
 };
 use opentelemetry_semantic_conventions::{
+    SCHEMA_URL,
     resource::{
         DEPLOYMENT_ENVIRONMENT,
         SERVICE_NAME,
         SERVICE_VERSION,
     },
-    SCHEMA_URL,
 };
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{
+    Registry,
     layer::SubscriberExt,
     util::SubscriberInitExt,
-    Registry,
 };
 
 pub(super) fn setup(log_level: tracing::Level) -> Result<()> {

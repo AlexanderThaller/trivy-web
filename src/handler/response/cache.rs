@@ -15,16 +15,16 @@ use serde::{
     Serialize,
 };
 use tracing::{
-    info_span,
     Instrument,
+    info_span,
 };
 
 use crate::handler::{
     cosign,
     trivy::{
         self,
-        get_vulnerabilities_count,
         Vulnerability,
+        get_vulnerabilities_count,
     },
 };
 

@@ -20,8 +20,8 @@ use serde::{
 };
 use tokio::process::Command;
 use tracing::{
-    info_span,
     Instrument,
+    info_span,
 };
 use url::Url;
 use x509_parser::{

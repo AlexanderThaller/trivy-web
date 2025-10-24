@@ -31,9 +31,9 @@ use serde::{
 };
 use tokio::task;
 use tracing::{
+    Instrument,
     error,
     info_span,
-    Instrument,
 };
 
 pub(crate) mod cache;
@@ -51,9 +51,9 @@ use crate::{
 };
 
 use super::{
-    cosign::cosign_verify,
     AppState,
     SubmitFormImage,
+    cosign::cosign_verify,
 };
 
 #[derive(Debug, Template)]
@@ -218,9 +218,9 @@ mod tests {
     use redis::AsyncCommands;
 
     use crate::handler::trivy::{
-        get_vulnerabilities_count,
         TrivyResult,
         Vulnerability,
+        get_vulnerabilities_count,
     };
 
     #[tokio::test]
