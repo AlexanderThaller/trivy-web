@@ -21,6 +21,10 @@ use axum::{
         post,
     },
 };
+use axum_tracing_opentelemetry::middleware::{
+    OtelAxumLayer,
+    OtelInResponseLayer,
+};
 use docker_registry_client::Client as DockerRegistryClient;
 use eyre::Context;
 use maud::html;
@@ -91,6 +95,10 @@ pub(super) fn router(state: AppState) -> Router {
         .route("/healthz", get(healthz))
     // state
         .with_state(state)
+    // tracing
+        .layer(OtelInResponseLayer{})
+        .layer(OtelAxumLayer::default())
+    // compression
         .layer(tower_http::compression::CompressionLayer::new())
 }
 
