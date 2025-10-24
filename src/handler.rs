@@ -1,6 +1,8 @@
 use askama::Template;
 use axum::{
     self,
+    Form,
+    Router,
     body::Body,
     extract::{
         Query,
@@ -18,15 +20,13 @@ use axum::{
         get,
         post,
     },
-    Form,
-    Router,
 };
 use docker_registry_client::Client as DockerRegistryClient;
 use eyre::Context;
 use maud::html;
 use response::{
-    cache::Fetch,
     TrivyResponse,
+    cache::Fetch,
 };
 use serde::Deserialize;
 

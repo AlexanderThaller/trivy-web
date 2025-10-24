@@ -1,7 +1,7 @@
 use tokio::signal;
 use tracing::{
-    event,
     Level,
+    event,
 };
 
 pub(super) async fn shutdown_signal() {

@@ -18,8 +18,8 @@ use eyre::{
     Result,
 };
 use tracing::{
-    event,
     Level,
+    event,
 };
 
 mod args;
