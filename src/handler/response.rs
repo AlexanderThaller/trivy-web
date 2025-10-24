@@ -98,11 +98,13 @@ pub(crate) async fn image(
     let image: Image = form.image.trim().parse()?;
 
     let docker_and_cosign_manifest = {
+        let redis_client = state.redis_client.clone();
+
         task::spawn(
             fetch_docker_and_cosign_manifest(
                 state.docker_registry_client.clone(),
                 image.clone(),
-                state.redis_client.clone(),
+                redis_client,
             )
             .instrument(info_span!("fetch_docker_and_cosign_manifest")),
         )
@@ -136,7 +138,7 @@ async fn fetch_docker_and_cosign_manifest(
         docker_registry_client: &docker_registry_client,
         image: &image,
     }
-    .cache_or_fetch(&redis_client)
+    .cache_or_fetch(redis_client.as_ref())
     .await
     .context("failed to fetch docker manifest");
 
@@ -149,7 +151,7 @@ async fn fetch_docker_and_cosign_manifest(
         image: &image,
         docker_manifest: &docker_manifest,
     }
-    .cache_or_fetch(&redis_client)
+    .cache_or_fetch(redis_client.as_ref())
     .await
     .context("failed to get cosign manifest");
 

@@ -173,12 +173,12 @@ pub(super) async fn scan_image(
 
     command = command.arg(image.to_string());
 
-    if let Some(username) = username {
-        if let Some(password) = password {
-            command = command
-                .env("TRIVY_USERNAME", username)
-                .env("TRIVY_PASSWORD", password);
-        }
+    if let Some(username) = username
+        && let Some(password) = password
+    {
+        command = command
+            .env("TRIVY_USERNAME", username)
+            .env("TRIVY_PASSWORD", password);
     }
 
     let output = command

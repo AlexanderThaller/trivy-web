@@ -305,6 +305,7 @@ fn triangulate(image: &Image, digest: &str) -> Result<Url> {
 
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
+#[expect(clippy::todo, reason = "using todo in tests is fine")]
 mod test {
     use docker_registry_client::Manifest as DockerManifest;
     use pretty_assertions::assert_eq;

@@ -44,7 +44,7 @@ pub(crate) trait Fetch {
     async fn fetch(&self) -> Result<Self::Output>;
 
     #[tracing::instrument]
-    async fn cache_or_fetch(&self, redis_client: &Option<redis::Client>) -> Result<Self::Output>
+    async fn cache_or_fetch(&self, redis_client: Option<&redis::Client>) -> Result<Self::Output>
     where
         Self: std::fmt::Debug,
     {
@@ -120,7 +120,7 @@ pub(crate) struct DockerInformationFetcher<'a> {
     pub(crate) image: &'a Image,
 }
 
-impl<'a> Fetch for DockerInformationFetcher<'a> {
+impl Fetch for DockerInformationFetcher<'_> {
     type Output = DockerInformation;
 
     fn key(&self) -> String {
@@ -153,7 +153,7 @@ pub(crate) struct TrivyInformationFetcher<'a> {
     pub(crate) trivy_password: Option<&'a str>,
 }
 
-impl<'a> Fetch for TrivyInformationFetcher<'a> {
+impl Fetch for TrivyInformationFetcher<'_> {
     type Output = TrivyInformation;
 
     fn key(&self) -> String {
@@ -193,7 +193,7 @@ pub(crate) struct CosignInformationFetcher<'a> {
     pub(crate) docker_manifest: &'a Result<DockerInformation>,
 }
 
-impl<'a> Fetch for CosignInformationFetcher<'a> {
+impl Fetch for CosignInformationFetcher<'_> {
     type Output = CosignInformation;
 
     fn key(&self) -> String {
