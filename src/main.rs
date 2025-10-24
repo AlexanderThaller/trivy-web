@@ -13,13 +13,14 @@ mod args;
 mod filters;
 mod handler;
 mod signal;
-mod telemetry;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let opt = args::Args::parse();
 
-    telemetry::setup(opt.log_level).context("failed to setup telemetry")?;
+    tracing_subscriber::fmt()
+        .with_max_level(opt.log_level)
+        .init();
 
     if let Some(server) = &opt.server {
         event!(Level::INFO, server = server, "Using trivy server");
