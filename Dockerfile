@@ -27,8 +27,8 @@ RUN cargo build --profile deploy
 
 FROM ghcr.io/aquasecurity/trivy:0.67.2
 
-COPY --from=builder /app/target/release/trivy-web /usr/local/bin/trivy-web
+COPY --from=builder /app/target/deploy/trivy-web /app/trivy-web
 
 EXPOSE 16223
 
-ENTRYPOINT ["/usr/local/bin/trivy-web"]
+ENTRYPOINT ["/app/trivy-web"]
