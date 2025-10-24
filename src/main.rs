@@ -1,16 +1,3 @@
-//#![deny(missing_docs)]
-#![expect(
-    dependency_on_unit_never_type_fallback,
-    reason = "need a newer tracing crate version to fix this"
-)]
-#![forbid(unsafe_code)]
-#![warn(clippy::allow_attributes)]
-#![warn(clippy::allow_attributes_without_reason)]
-#![warn(clippy::dbg_macro)]
-#![warn(clippy::pedantic)]
-#![warn(clippy::unwrap_used)]
-#![warn(rust_2018_idioms, unused_lifetimes, missing_debug_implementations)]
-
 use clap::Parser;
 use docker_registry_client::Client as DockerRegistryClient;
 use eyre::{
@@ -18,21 +5,22 @@ use eyre::{
     Result,
 };
 use tracing::{
-    event,
     Level,
+    event,
 };
 
 mod args;
 mod filters;
 mod handler;
 mod signal;
-mod telemetry;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let opt = args::Args::parse();
 
-    telemetry::setup(opt.log_level).context("failed to setup telemetry")?;
+    tracing_subscriber::fmt()
+        .with_max_level(opt.log_level)
+        .init();
 
     if let Some(server) = &opt.server {
         event!(Level::INFO, server = server, "Using trivy server");

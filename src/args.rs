@@ -1,8 +1,8 @@
 use std::net::SocketAddr;
 
 use clap::{
-    value_parser,
     Parser,
+    value_parser,
 };
 use tracing::Level;
 

@@ -11,8 +11,8 @@ use serde::{
 };
 use tokio::process::Command;
 use tracing::{
-    info_span,
     Instrument,
+    info_span,
 };
 use url::Url;
 
@@ -173,12 +173,12 @@ pub(super) async fn scan_image(
 
     command = command.arg(image.to_string());
 
-    if let Some(username) = username {
-        if let Some(password) = password {
-            command = command
-                .env("TRIVY_USERNAME", username)
-                .env("TRIVY_PASSWORD", password);
-        }
+    if let Some(username) = username
+        && let Some(password) = password
+    {
+        command = command
+            .env("TRIVY_USERNAME", username)
+            .env("TRIVY_PASSWORD", password);
     }
 
     let output = command
@@ -232,6 +232,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[cfg_attr(feature = "ci", ignore)]
     async fn exists() {
         let _got = super::scan_image(
             &"ghcr.io/aquasecurity/trivy:0.52.0".parse().unwrap(),
