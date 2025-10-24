@@ -295,7 +295,7 @@ pub(super) async fn trivy(
             Some(&form.password.0)
         },
     }
-    .cache_or_fetch(&state.redis_client)
+    .cache_or_fetch(state.redis_client.as_ref())
     .await
     .context("failed to fetch trivy information");
 
