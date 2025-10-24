@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 askama = { version = "0.14" }
 axum-macros = "0.5"
-axum-tracing-opentelemetry = "0.32"
 axum = { version = "0.8", features = ["json", "macros", "tracing"] }
 chrono = "0.4"
 clap = { version = "4", features = ["derive", "env", "cargo"] }
