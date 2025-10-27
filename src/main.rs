@@ -51,9 +51,9 @@ async fn main() -> Result<()> {
 
         #[cfg(not(debug_assertions))]
         minify_config: minify_html::Cfg {
-            do_not_minify_doctype: true,
-            ensure_spec_compliant_unquoted_attribute_values: true,
-            keep_spaces_between_attributes: true,
+            minify_doctype: false,
+            allow_noncompliant_unquoted_attribute_values: false,
+            allow_removing_spaces_between_attributes: false,
             ..Default::default()
         },
     };
