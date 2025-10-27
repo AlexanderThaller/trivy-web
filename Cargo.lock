@@ -766,7 +766,8 @@ dependencies = [
 [[package]]
 name = "docker-registry-client"
 version = "0.1.0"
-source = "git+https://github.com/AlexanderThaller/docker-registry-client-rs.git#64688daeeb69df9b66cac191b6fb766171c98d6a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05ba7cfb95fbbe59baa8abe2b5947bdb7a0fa351a3592d67b393e3f86a7e9ee5"
 dependencies = [
  "async-trait",
  "chrono",
