@@ -82,6 +82,59 @@
     {% include "footer.html" %}
 
     <script>
+      function slugifyHeading(text) {
+        return text
+          .toLowerCase()
+          .trim()
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '');
+      }
+
+      function addHeadingAnchors(root = document) {
+        var headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        var usedIds = new Set(
+          Array.from(document.querySelectorAll('[id]')).map(function (element) {
+            return element.id;
+          })
+        );
+
+        headings.forEach(function (heading) {
+          if (heading.dataset.anchorified === 'true') {
+            return;
+          }
+
+          var baseId = heading.id || slugifyHeading(heading.textContent || '');
+          if (!baseId) {
+            return;
+          }
+
+          if (!heading.id) {
+            var uniqueId = baseId;
+            var suffix = 2;
+            while (usedIds.has(uniqueId)) {
+              uniqueId = baseId + '-' + suffix;
+              suffix += 1;
+            }
+            heading.id = uniqueId;
+          }
+
+          usedIds.add(heading.id);
+
+          var anchor = document.createElement('a');
+          anchor.className = 'heading-anchor';
+          anchor.href = '#' + heading.id;
+          anchor.setAttribute('aria-label', 'Link to ' + heading.textContent.trim());
+          anchor.textContent = '#';
+
+          heading.append(' ', anchor);
+          heading.dataset.anchorified = 'true';
+        });
+      }
+
       function updateDivs() {
         var form = document.getElementById('form');
         var formData = new FormData(form);
@@ -102,6 +155,8 @@
 
         document.getElementById('scan_information').innerHTML = `<h2>Trivy Information</h2>
         <img src="/img/bars.svg">`;
+        addHeadingAnchors(document.getElementById('image_information'));
+        addHeadingAnchors(document.getElementById('scan_information'));
 
         htmx.ajax('POST', '/image', {
           target: '#image_information',
@@ -132,7 +187,12 @@
       }
 
       window.addEventListener("load", () => {
+        addHeadingAnchors();
         submitCheck();
+      });
+
+      document.body.addEventListener('htmx:afterSwap', function (event) {
+        addHeadingAnchors(event.target);
       });
     </script>
   </body>
