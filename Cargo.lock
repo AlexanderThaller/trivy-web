@@ -827,7 +827,7 @@ dependencies = [
  "chrono",
  "dyn-clone",
  "either",
- "redis 1.0.3",
+ "redis",
  "reqwest",
  "serde",
  "serde_json",
@@ -2459,31 +2459,6 @@ dependencies = [
 
 [[package]]
 name = "redis"
-version = "0.32.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "014cc767fefab6a3e798ca45112bccad9c6e0e218fbd49720042716c73cfef44"
-dependencies = [
- "arc-swap",
- "backon",
- "bytes",
- "cfg-if",
- "combine",
- "futures-channel",
- "futures-util",
- "itoa",
- "num-bigint",
- "percent-encoding",
- "pin-project-lite",
- "ryu",
- "sha1_smol",
- "socket2",
- "tokio",
- "tokio-util",
- "url",
-]
-
-[[package]]
-name = "redis"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e969d1d702793536d5fda739a82b88ad7cbe7d04f8386ee8cd16ad3eff4854a5"
@@ -2511,11 +2486,11 @@ dependencies = [
 
 [[package]]
 name = "redis-macros"
-version = "0.5.6"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ac3609707f8c68aac6f3871c9a9596a7a9e30e3cc42ebba741d13b39e27c6d8"
+checksum = "82564bc57de627f98550cc701f11c7568b3129e3cb7ed872853907347d0742d4"
 dependencies = [
- "redis 0.32.7",
+ "redis",
  "redis-macros-derive",
  "serde",
  "serde_json",
@@ -2523,13 +2498,13 @@ dependencies = [
 
 [[package]]
 name = "redis-macros-derive"
-version = "0.5.6"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "923db076e23f014fd5c5504fba397d3dd06b29724a3dd8e21aa7a3423c00b129"
+checksum = "adace005895c5740ee8845c571e45d88922c77865697f3e7631b1d9561829278"
 dependencies = [
  "proc-macro2",
  "quote",
- "redis 0.32.7",
+ "redis",
  "syn 2.0.114",
 ]
 
@@ -3343,7 +3318,7 @@ dependencies = [
  "minify-html",
  "once_cell",
  "pretty_assertions",
- "redis 0.32.7",
+ "redis",
  "redis-macros",
  "serde",
  "serde_json",

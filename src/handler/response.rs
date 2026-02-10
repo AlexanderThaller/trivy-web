@@ -252,20 +252,20 @@ mod tests {
 
         let client = redis::Client::open("redis://127.0.0.1:6379").unwrap();
 
-        let mut connection = client.get_multiplexed_tokio_connection().await.unwrap();
+        let mut connection = client.get_multiplexed_async_connection().await.unwrap();
 
         let key = "test";
 
-        let _: () = connection.del(key).await.unwrap();
-        let _: () = connection.set(key, &information).await.unwrap();
+        connection.del::<_, ()>(key).await.unwrap();
+        connection.set::<_, _, ()>(key, &information).await.unwrap();
 
-        let information_from_redis: String = connection.get(key).await.unwrap();
+        let information_from_redis: String = connection.get::<_, String>(key).await.unwrap();
 
         let information_from_redis: super::TrivyInformation =
             serde_json::from_str(&information_from_redis).unwrap();
 
         assert_eq!(information, information_from_redis);
 
-        let _: () = connection.del(key).await.unwrap();
+        connection.del::<_, ()>(key).await.unwrap();
     }
 }
