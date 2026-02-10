@@ -226,7 +226,10 @@ mod tests {
     };
 
     #[tokio::test]
-    #[cfg_attr(feature = "ci", ignore)]
+    #[cfg_attr(
+        feature = "ci",
+        ignore = "requires a local redis server at 127.0.0.1:6379"
+    )]
     async fn redis() {
         const DATA: &str = include_str!("resources/tests/trivy_output.json");
 

@@ -232,7 +232,10 @@ mod test {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "ci", ignore)]
+    #[cfg_attr(
+        feature = "ci",
+        ignore = "requires network access and external image registry availability"
+    )]
     async fn exists() {
         let _got = super::scan_image(
             &"ghcr.io/aquasecurity/trivy:0.52.0".parse().unwrap(),

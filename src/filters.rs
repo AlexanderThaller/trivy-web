@@ -1,7 +1,11 @@
-#[expect(
+#![allow(
+    clippy::inline_always,
     clippy::unnecessary_wraps,
-    reason = "can not change this as this is what the askama crate expects"
+    clippy::unused_self,
+    reason = "generated helper code from askama::filter_fn intentionally triggers these lints"
 )]
+
+#[askama::filter_fn]
 pub fn ansi_to_html<T: std::fmt::Display>(
     s: T,
     _: &dyn askama::Values,
@@ -10,10 +14,7 @@ pub fn ansi_to_html<T: std::fmt::Display>(
     Ok(s.replace('\n', "<br />"))
 }
 
-#[expect(
-    clippy::unnecessary_wraps,
-    reason = "can not change this as this is what the askama crate expects"
-)]
+#[askama::filter_fn]
 pub fn format_error(err: &eyre::Error, _: &dyn askama::Values) -> ::askama::Result<String> {
     let s = format!("{err:?}");
     Ok(s)
