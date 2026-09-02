@@ -247,7 +247,13 @@ impl Vulnerability {
     }
 }
 
-#[tracing::instrument]
+// The password is skipped and re-recorded as a placeholder: instrument would
+// otherwise put it in the span through Debug, the way it reaches TRIVY_PASSWORD
+// below.
+#[tracing::instrument(
+    skip(password),
+    fields(password = password.map(|_| "REDACTED"))
+)]
 pub(super) async fn scan_image(
     image: &Image,
     server: Option<&str>,

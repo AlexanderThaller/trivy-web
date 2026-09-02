@@ -47,19 +47,26 @@ pub(crate) trait Fetch {
     fn key(&self) -> String;
     async fn fetch(&self) -> Result<Self::Output>;
 
+    /// Whether the output may be stored in the shared cache.
+    ///
+    /// Keys are derived from the image alone and every request can read every
+    /// key, so anything fetched with caller supplied credentials has to stay
+    /// out of the cache entirely.
+    fn cacheable(&self) -> bool {
+        true
+    }
+
     #[tracing::instrument]
     async fn cache_or_fetch(&self, redis_client: Option<&RedisClient>) -> Result<Self::Output>
     where
         Self: std::fmt::Debug,
     {
-        let Some(redis_client) = redis_client else {
+        let Some(redis_client) = redis_client.filter(|_| self.cacheable()) else {
             return self
                 .fetch()
-                .instrument(info_span!(
-                    "fetch output from source when redis is disabled"
-                ))
+                .instrument(info_span!("fetch output from source without the cache"))
                 .await
-                .context("failed to fetch output from source when redis is disabled");
+                .context("failed to fetch output from source without the cache");
         };
 
         let key = self.key();
@@ -125,12 +132,25 @@ impl Fetch for DockerInformationFetcher<'_> {
     }
 }
 
-#[derive(Debug)]
 pub(crate) struct TrivyInformationFetcher<'a> {
     pub(crate) image: &'a Image,
     pub(crate) trivy_server: Option<&'a str>,
     pub(crate) trivy_username: Option<&'a str>,
     pub(crate) trivy_password: Option<&'a str>,
+}
+
+/// Hand written so the password never reaches a log or a trace:
+/// `cache_or_fetch` is `#[tracing::instrument]`, which records `self` through
+/// `Debug`.
+impl std::fmt::Debug for TrivyInformationFetcher<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TrivyInformationFetcher")
+            .field("image", &self.image)
+            .field("trivy_server", &self.trivy_server)
+            .field("trivy_username", &self.trivy_username)
+            .field("trivy_password", &self.trivy_password.map(|_| "REDACTED"))
+            .finish()
+    }
 }
 
 impl Fetch for TrivyInformationFetcher<'_> {
@@ -140,6 +160,16 @@ impl Fetch for TrivyInformationFetcher<'_> {
         // The version is part of the key so cached entries of older versions
         // which do not contain all information are not used anymore.
         format!("{REDIS_KEY_PREFIX}:trivy:v2:{image}", image = self.image)
+    }
+
+    /// A scan run with caller supplied registry credentials can cover an image
+    /// the next caller is not allowed to pull, and the key is the image alone,
+    /// so such a scan must neither fill nor read the shared cache.
+    ///
+    /// Partitioning the key by username instead would not do: reading a
+    /// partition only takes knowing the username, not proving the password.
+    fn cacheable(&self) -> bool {
+        self.trivy_username.is_none() && self.trivy_password.is_none()
     }
 
     async fn fetch(&self) -> Result<Self::Output> {
@@ -213,5 +243,56 @@ impl Fetch for CosignInformationFetcher<'_> {
             cosign,
             fetch_time: Utc::now(),
         })
+    }
+}
+
+#[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
+mod tests {
+    use super::{
+        Fetch,
+        TrivyInformationFetcher,
+    };
+
+    fn fetcher<'a>(
+        image: &'a docker_registry_client::Image,
+        credentials: Option<(&'a str, &'a str)>,
+    ) -> TrivyInformationFetcher<'a> {
+        TrivyInformationFetcher {
+            image,
+            trivy_server: None,
+            trivy_username: credentials.map(|(username, _)| username),
+            trivy_password: credentials.map(|(_, password)| password),
+        }
+    }
+
+    /// The same image scanned anonymously and with credentials shares one cache
+    /// key, so the credentialed scan has to stay out of the cache: otherwise it
+    /// would answer the next anonymous request for an image that request cannot
+    /// pull.
+    #[test]
+    fn credentialed_scans_do_not_share_the_cache() {
+        let image = "docker.io/library/alpine:3.20".parse().unwrap();
+
+        let anonymous = fetcher(&image, None);
+        let credentialed = fetcher(&image, Some(("scanbot", "hunter2")));
+
+        assert_eq!(anonymous.key(), credentialed.key());
+
+        assert!(anonymous.cacheable());
+        assert!(!credentialed.cacheable());
+    }
+
+    #[test]
+    fn debug_redacts_the_trivy_password() {
+        let image = "docker.io/library/alpine:3.20".parse().unwrap();
+
+        let rendered = format!("{:?}", fetcher(&image, Some(("scanbot", "hunter2"))));
+
+        assert!(!rendered.contains("hunter2"), "{rendered}");
+        assert!(rendered.contains("REDACTED"), "{rendered}");
+
+        // The username is not a secret and is worth keeping for diagnostics.
+        assert!(rendered.contains("scanbot"), "{rendered}");
     }
 }
