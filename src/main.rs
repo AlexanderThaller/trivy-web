@@ -37,7 +37,11 @@ async fn main() -> Result<()> {
         .init();
 
     if let Some(server) = &opt.server {
-        event!(Level::INFO, server = server, "Using trivy server");
+        event!(
+            Level::INFO,
+            server = redact_credentials(server),
+            "Using trivy server"
+        );
     }
 
     let redis_client = if let Some(server) = &opt.redis_server {
