@@ -84,10 +84,25 @@ async fn main() -> Result<()> {
         registry.set_cache_redis(redis_client.clone());
     }
 
+    let limits = handler::Limits::new(
+        opt.max_concurrent_scans,
+        opt.scan_queue_timeout(),
+        opt.scan_timeout(),
+    );
+
+    event!(
+        Level::INFO,
+        max_concurrent_scans = opt.max_concurrent_scans.get(),
+        scan_queue_timeout = opt.scan_queue_timeout,
+        scan_timeout = opt.scan_timeout,
+        "Limiting scans"
+    );
+
     let state = handler::AppState {
         server: opt.server,
         docker_registry_client: registry,
-        redis_client,
+        cache: handler::Cache::new(redis_client),
+        limits,
 
         #[cfg(not(debug_assertions))]
         minify_config: minify_html::Cfg {

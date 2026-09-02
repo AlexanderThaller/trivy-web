@@ -17,6 +17,8 @@ use tracing::{
 };
 use url::Url;
 
+use super::process::Limits;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub(super) struct TrivyResult {
@@ -262,6 +264,7 @@ pub(super) async fn scan_image(
     server: Option<&str>,
     username: Option<&str>,
     password: Option<&str>,
+    limits: &Limits,
 ) -> Result<TrivyResult, eyre::Error> {
     // run following command trivy image --format json
     // linuxserver/code-server:latest
@@ -284,8 +287,11 @@ pub(super) async fn scan_image(
             .env("TRIVY_PASSWORD", password);
     }
 
-    let output = command
-        .output()
+    // Through the limits rather than `Command::output`: the scan runs only
+    // when the server has a slot for it, is killed if it overruns the deadline
+    // and cannot buffer an unbounded amount of output.
+    let output = limits
+        .run(command)
         .instrument(info_span!("run trivy command"))
         .await
         .context("Failed to run trivy")?;
@@ -309,7 +315,24 @@ pub(super) async fn scan_image(
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 mod test {
-    use super::TrivyResult;
+    use std::{
+        num::NonZeroUsize,
+        time::Duration,
+    };
+
+    use super::{
+        Limits,
+        TrivyResult,
+    };
+
+    /// Wide enough not to interfere with the scan the test is after.
+    fn limits() -> Limits {
+        Limits::new(
+            NonZeroUsize::new(4).unwrap(),
+            Duration::from_secs(30),
+            Duration::from_secs(600),
+        )
+    }
 
     #[test]
     fn deserialize() {
@@ -360,6 +383,7 @@ mod test {
             None,
             None,
             None,
+            &limits(),
         )
         .await
         .expect("should fail");
@@ -376,6 +400,7 @@ mod test {
             None,
             None,
             None,
+            &limits(),
         )
         .await
         .unwrap();

@@ -23,7 +23,6 @@ use axum::{
 };
 use docker_registry_client::Client as DockerRegistryClient;
 use eyre::Context;
-use fred::clients::Client as RedisClient;
 use maud::html;
 use response::{
     TrivyResponse,
@@ -35,8 +34,12 @@ use serde::Deserialize;
 use tokio::fs::read_to_string;
 
 mod cosign;
+mod process;
 mod response;
 mod trivy;
+
+pub(super) use process::Limits;
+pub(super) use response::cache::Cache;
 
 use crate::handler::response::cache::TrivyInformationFetcher;
 
@@ -44,7 +47,13 @@ use crate::handler::response::cache::TrivyInformationFetcher;
 pub(super) struct AppState {
     pub(super) server: Option<String>,
     pub(super) docker_registry_client: DockerRegistryClient,
-    pub(super) redis_client: Option<RedisClient>,
+    pub(super) cache: Cache,
+
+    /// The ceiling every trivy scan and cosign verification runs under. Both
+    /// endpoints start child processes for anyone who asks, so this is what
+    /// keeps a burst of requests from becoming a burst of scanners.
+    pub(super) limits: Limits,
+
     #[cfg(not(debug_assertions))]
     pub(super) minify_config: minify_html::Cfg,
 }
@@ -299,8 +308,10 @@ pub(super) async fn trivy(
         } else {
             Some(&form.password.0)
         },
+
+        limits: &state.limits,
     }
-    .cache_or_fetch(state.redis_client.as_ref())
+    .cache_or_fetch(&state.cache)
     .await
     .context("failed to fetch trivy information");
 

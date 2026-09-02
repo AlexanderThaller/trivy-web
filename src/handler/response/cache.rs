@@ -1,4 +1,14 @@
-use std::collections::BTreeSet;
+use std::{
+    collections::{
+        BTreeSet,
+        HashMap,
+    },
+    sync::{
+        Arc,
+        Mutex,
+        Weak,
+    },
+};
 
 use chrono::Utc;
 use docker_registry_client::{
@@ -25,6 +35,7 @@ use tracing::{
 
 use crate::handler::{
     cosign,
+    process::Limits,
     trivy::{
         self,
         Vulnerability,
@@ -40,6 +51,99 @@ use super::{
 
 const REDIS_KEY_PREFIX: &str = "trivy-web";
 pub(crate) const REDIS_TTL: i64 = 86400;
+
+/// Size the registry of running fetches has to reach before the entries of
+/// finished ones are swept out of it.
+///
+/// The sweep is only a cleanup: an entry whose fetch has finished holds nothing
+/// but a dead [`Weak`] and a key, and is replaced the next time that key is
+/// asked for either way.
+const IN_FLIGHT_PRUNE_AT: usize = 1024;
+
+/// What the fetchers cache through: the shared redis, plus the keys this
+/// process is fetching right now.
+#[derive(Clone, Default)]
+pub(crate) struct Cache {
+    redis: Option<RedisClient>,
+
+    /// One entry per key with a fetch in flight, so that concurrent misses of
+    /// the same key wait for the first fetch and then read what it cached
+    /// instead of each starting their own.
+    ///
+    /// The mutexes are held by whoever is fetching or waiting and are tracked
+    /// here weakly, so an entry costs nothing once its fetch is done.
+    ///
+    /// This is per process. Several replicas behind a load balancer still fetch
+    /// a cold key once each; the ceiling on what that can cost is
+    /// [`Limits`](crate::handler::process::Limits), not this.
+    in_flight: Arc<Mutex<HashMap<String, Weak<tokio::sync::Mutex<()>>>>>,
+}
+
+impl Cache {
+    pub(crate) fn new(redis: Option<RedisClient>) -> Self {
+        Self {
+            redis,
+            in_flight: Arc::default(),
+        }
+    }
+
+    /// Waits until no other fetch of `key` is running, and keeps the next one
+    /// waiting until the returned guard is dropped.
+    async fn lock_key(&self, key: &str) -> tokio::sync::OwnedMutexGuard<()> {
+        let fetching = {
+            let mut in_flight = match self.in_flight.lock() {
+                Ok(in_flight) => in_flight,
+
+                // Nothing here is left half written by a panic: the map is only
+                // ever read from and inserted into while the lock is held.
+                Err(poisoned) => poisoned.into_inner(),
+            };
+
+            if in_flight.len() >= IN_FLIGHT_PRUNE_AT {
+                in_flight.retain(|_key, fetching| fetching.strong_count() > 0);
+            }
+
+            if let Some(fetching) = in_flight.get(key).and_then(Weak::upgrade) {
+                fetching
+            } else {
+                let fetching = Arc::new(tokio::sync::Mutex::new(()));
+                in_flight.insert(key.to_owned(), Arc::downgrade(&fetching));
+
+                fetching
+            }
+        };
+
+        fetching.lock_owned().await
+    }
+}
+
+/// Hand written so the span of the instrumented `cache_or_fetch` does not carry
+/// a redis connection and the whole registry of running fetches.
+impl std::fmt::Debug for Cache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Cache")
+            .field("redis", &self.redis.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
+/// Reads the entry for `key`, if the cache has one.
+async fn cached<T>(redis: &RedisClient, key: &str) -> Result<Option<T>>
+where
+    T: for<'de> Deserialize<'de>,
+{
+    let cached: Option<String> = redis
+        .get(key)
+        .instrument(info_span!("get output from redis"))
+        .await
+        .context("failed to get output from redis")?;
+
+    cached
+        .map(|cached| {
+            serde_json::from_str(&cached).context("failed to deserialize output from redis data")
+        })
+        .transpose()
+}
 
 pub(crate) trait Fetch {
     type Output: Serialize + for<'de> Deserialize<'de>;
@@ -57,11 +161,11 @@ pub(crate) trait Fetch {
     }
 
     #[tracing::instrument]
-    async fn cache_or_fetch(&self, redis_client: Option<&RedisClient>) -> Result<Self::Output>
+    async fn cache_or_fetch(&self, cache: &Cache) -> Result<Self::Output>
     where
         Self: std::fmt::Debug,
     {
-        let Some(redis_client) = redis_client.filter(|_| self.cacheable()) else {
+        let Some(redis_client) = cache.redis.as_ref().filter(|_| self.cacheable()) else {
             return self
                 .fetch()
                 .instrument(info_span!("fetch output from source without the cache"))
@@ -71,15 +175,21 @@ pub(crate) trait Fetch {
 
         let key = self.key();
 
-        let cached: Option<String> = redis_client
-            .get(&key)
-            .instrument(info_span!("get output from redis"))
-            .await
-            .context("failed to get output from redis")?;
+        if let Some(cached) = cached(redis_client, &key).await? {
+            return Ok(cached);
+        }
 
-        if let Some(cached) = cached {
-            return serde_json::from_str(&cached)
-                .context("failed to deserialize output from redis data");
+        // Concurrent misses of the same key would otherwise each start their
+        // own fetch, and a fetch here is a trivy scan: the first caller through
+        // runs it and the ones behind it read what it cached.
+        let _fetching = cache
+            .lock_key(&key)
+            .instrument(info_span!("wait for a running fetch of the same key"))
+            .await;
+
+        // Whoever held the lock has cached its result by now, if it got one.
+        if let Some(cached) = cached(redis_client, &key).await? {
+            return Ok(cached);
         }
 
         let response = self
@@ -137,6 +247,7 @@ pub(crate) struct TrivyInformationFetcher<'a> {
     pub(crate) trivy_server: Option<&'a str>,
     pub(crate) trivy_username: Option<&'a str>,
     pub(crate) trivy_password: Option<&'a str>,
+    pub(crate) limits: &'a Limits,
 }
 
 /// Hand written so the submitted credentials never reach a log or a trace:
@@ -149,7 +260,7 @@ impl std::fmt::Debug for TrivyInformationFetcher<'_> {
             .field("trivy_server", &self.trivy_server)
             .field("trivy_username", &self.trivy_username.map(|_| "REDACTED"))
             .field("trivy_password", &self.trivy_password.map(|_| "REDACTED"))
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -178,6 +289,7 @@ impl Fetch for TrivyInformationFetcher<'_> {
             self.trivy_server,
             self.trivy_username,
             self.trivy_password,
+            self.limits,
         )
         .await?;
 
@@ -249,10 +361,26 @@ impl Fetch for CosignInformationFetcher<'_> {
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 mod tests {
+    use std::{
+        num::NonZeroUsize,
+        sync::LazyLock,
+        time::Duration,
+    };
+
+    use crate::handler::process::Limits;
+
     use super::{
         Fetch,
         TrivyInformationFetcher,
     };
+
+    static LIMITS: LazyLock<Limits> = LazyLock::new(|| {
+        Limits::new(
+            NonZeroUsize::new(4).unwrap(),
+            Duration::from_secs(30),
+            Duration::from_secs(600),
+        )
+    });
 
     fn fetcher<'a>(
         image: &'a docker_registry_client::Image,
@@ -263,6 +391,7 @@ mod tests {
             trivy_server: None,
             trivy_username: credentials.map(|(username, _)| username),
             trivy_password: credentials.map(|(_, password)| password),
+            limits: &LIMITS,
         }
     }
 
