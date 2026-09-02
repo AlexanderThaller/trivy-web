@@ -58,7 +58,7 @@ pub(super) struct SubmitFormImage {
 #[derive(Debug, Deserialize)]
 pub(super) struct SubmitFormTrivy {
     image: String,
-    username: String,
+    username: Username,
     password: Password,
 }
 
@@ -75,6 +75,9 @@ pub(super) struct Index {
     commit_hash: String,
     crate_version: String,
 }
+
+#[derive(Deserialize)]
+struct Username(String);
 
 #[derive(Deserialize)]
 struct Password(String);
@@ -285,10 +288,10 @@ pub(super) async fn trivy(
         image: &image,
         trivy_server: state.server.as_deref(),
 
-        trivy_username: if form.username.is_empty() {
+        trivy_username: if form.username.0.is_empty() {
             None
         } else {
-            Some(&form.username)
+            Some(&form.username.0)
         },
 
         trivy_password: if form.password.0.is_empty() {
@@ -333,6 +336,12 @@ impl std::fmt::Debug for AppState {
             .field("server", &self.server)
             .field("docker_registry_client", &self.docker_registry_client)
             .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for Username {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("REDACTED")
     }
 }
 

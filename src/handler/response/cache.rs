@@ -139,15 +139,15 @@ pub(crate) struct TrivyInformationFetcher<'a> {
     pub(crate) trivy_password: Option<&'a str>,
 }
 
-/// Hand written so the password never reaches a log or a trace:
+/// Hand written so the submitted credentials never reach a log or a trace:
 /// `cache_or_fetch` is `#[tracing::instrument]`, which records `self` through
-/// `Debug`.
+/// `Debug`. Only whether each was supplied survives.
 impl std::fmt::Debug for TrivyInformationFetcher<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TrivyInformationFetcher")
             .field("image", &self.image)
             .field("trivy_server", &self.trivy_server)
-            .field("trivy_username", &self.trivy_username)
+            .field("trivy_username", &self.trivy_username.map(|_| "REDACTED"))
             .field("trivy_password", &self.trivy_password.map(|_| "REDACTED"))
             .finish()
     }
@@ -284,15 +284,32 @@ mod tests {
     }
 
     #[test]
-    fn debug_redacts_the_trivy_password() {
+    fn debug_redacts_the_trivy_credentials() {
         let image = "docker.io/library/alpine:3.20".parse().unwrap();
 
         let rendered = format!("{:?}", fetcher(&image, Some(("scanbot", "hunter2"))));
 
         assert!(!rendered.contains("hunter2"), "{rendered}");
-        assert!(rendered.contains("REDACTED"), "{rendered}");
+        assert!(!rendered.contains("scanbot"), "{rendered}");
 
-        // The username is not a secret and is worth keeping for diagnostics.
-        assert!(rendered.contains("scanbot"), "{rendered}");
+        // Whether each was supplied is still worth having for diagnostics.
+        assert!(
+            rendered.contains(r#"trivy_username: Some("REDACTED")"#),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains(r#"trivy_password: Some("REDACTED")"#),
+            "{rendered}"
+        );
+    }
+
+    #[test]
+    fn debug_keeps_absent_trivy_credentials_distinguishable() {
+        let image = "docker.io/library/alpine:3.20".parse().unwrap();
+
+        let rendered = format!("{:?}", fetcher(&image, None));
+
+        assert!(rendered.contains("trivy_username: None"), "{rendered}");
+        assert!(rendered.contains("trivy_password: None"), "{rendered}");
     }
 }
