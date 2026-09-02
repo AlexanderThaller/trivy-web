@@ -1,0 +1,108 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps", "edition", "lint_config")
+load("@rules_rs//rs:cargo_build_script.bzl", "cargo_build_script")
+load("@rules_rs//rs:rust_binary.bzl", "rust_binary")
+load("@rules_rs//rs:rust_test.bzl", "rust_test")
+load("@rules_rust//rust:defs.bzl", "rust_clippy", "rustfmt_test")
+
+# Cargo.toml is the source of truth for dependencies, edition and lints;
+# MODULE.bazel's crate.from_cargo reads it through these labels. .rustfmt.toml
+# is pointed at by the label_flag in .bazelrc.
+exports_files([
+    "Cargo.toml",
+    "Cargo.lock",
+    ".rustfmt.toml",
+])
+
+# Files rustc has to be able to open while compiling, as opposed to link:
+#
+#   - templates/ is read by askama's derive at macro-expansion time, resolved
+#     against CARGO_MANIFEST_DIR (which rules_rust points at this package).
+#   - resources/ is pulled in by the include_str!/include_bytes! calls in
+#     src/handler.rs that serve the stylesheet, htmx and the spinner.
+COMPILE_DATA = glob([
+    "templates/**",
+    "resources/**",
+])
+
+# Only the #[cfg(test)] modules reach for these: recorded trivy and cosign
+# output, parsed and rendered by the unit tests.
+TEST_COMPILE_DATA = glob(["src/handler/resources/**"])
+
+# GIT_COMMIT, BUILD_TIME and CRATE_VERSION for the /info page, from the same
+# build.rs Cargo runs.
+#
+# `git rev-parse` does not resolve under Bazel -- .git is not an action input,
+# and putting it there would make every commit invalidate the build -- so
+# build.rs falls back to "unknown" for the hash. The Bazel build is for
+# checking (test, clippy, rustfmt); release binaries still come from Cargo,
+# where the hash is real. See the note in build.rs.
+#
+# `version` is what Cargo would pass as CARGO_PKG_VERSION. It is the one value
+# here that is not read out of Cargo.toml, so keep it in step with [package].
+cargo_build_script(
+    name = "build_script",
+    srcs = ["build.rs"],
+    edition = edition(),
+    version = "0.1.0",
+    deps = all_crate_deps(build = True),
+)
+
+DEPS = all_crate_deps(normal = True) + [":build_script"]
+
+# A binary-only crate: src/main.rs declares the modules directly, so there is
+# no library target to split off and no separate tests/ directory.
+rust_binary(
+    name = "trivy-web",
+    srcs = glob(["src/**/*.rs"]),
+    aliases = aliases(),
+    compile_data = COMPILE_DATA,
+    crate_name = "trivy_web",
+    edition = edition(),
+    lint_config = lint_config(),
+    visibility = ["//visibility:public"],
+    deps = DEPS,
+)
+
+# The unit tests living inside the binary crate.
+#
+# `ci` is on because it is the feature that marks the tests needing a local
+# redis or a reachable image registry as #[ignore]; neither exists in the
+# sandbox. This is `cargo test --features ci` from the old workflow.
+rust_test(
+    name = "trivy_web_test",
+    size = "small",
+    aliases = aliases(),
+    compile_data = TEST_COMPILE_DATA,
+    crate = ":trivy-web",
+    crate_features = ["ci"],
+    edition = edition(),
+    lint_config = lint_config(),
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ),
+)
+
+# Clippy and rustfmt as ordinary targets rather than aspects behind a
+# --config, so one `bazel test //...` covers build, test, lint and format
+# without any invocation discarding another's analysis cache.
+#
+# The list includes the test target on purpose: `cargo clippy --all-targets`
+# checks it, and test code is where sloppy lints tend to hide.
+ALL_TARGETS = [
+    ":trivy-web",
+    ":trivy_web_test",
+]
+
+# testonly because it depends on the test target.
+rust_clippy(
+    name = "clippy",
+    testonly = True,
+    deps = ALL_TARGETS,
+)
+
+rustfmt_test(
+    name = "rustfmt",
+    size = "small",
+    targets = ALL_TARGETS,
+)

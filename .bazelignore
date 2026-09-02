@@ -1,0 +1,12 @@
+# Directories Bazel must not descend into when expanding //....
+#
+# Bazel ignores its own bazel-* convenience symlinks at the workspace root but
+# not ones further down, and .gitignore is not consulted during package
+# loading, so anything large or foreign has to be named here.
+
+# The Cargo build directory. No BUILD files, just a lot of bytes to glob.
+target
+
+# Claude Code's scratch space. It holds git worktrees of this same repository,
+# each with its own BUILD.bazel, which //... would otherwise load a second time.
+.claude

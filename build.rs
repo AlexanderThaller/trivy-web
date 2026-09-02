@@ -1,11 +1,19 @@
 fn main() {
-    // Get the current Git commit hash
-    let output = std::process::Command::new("git")
+    // Get the current Git commit hash.
+    //
+    // Both failure modes are tolerated rather than fatal, because the Bazel
+    // build hits them: the sandbox has no .git (and no guarantee of a git
+    // binary), so `git` either fails to spawn or exits non-zero with empty
+    // stdout. Panicking there would make `bazel test //...` unbuildable for a
+    // string that only decorates the /info page. Cargo builds still see a real
+    // hash; see the note on //:build_script in BUILD.bazel.
+    let git_commit = std::process::Command::new("git")
         .args(["rev-parse", "HEAD"])
         .output()
-        .expect("Failed to execute Git command");
-
-    let git_commit = String::from_utf8(output.stdout).expect("Invalid UTF-8 in Git output");
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map_or_else(|| "unknown".to_owned(), |hash| hash.trim().to_owned());
 
     // Get the current build time
     let build_time = chrono::Utc::now().to_rfc3339();

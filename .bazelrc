@@ -1,0 +1,51 @@
+# Lint and format configuration, set unconditionally rather than behind a
+# --config.
+#
+# This is the point of the arrangement. If clippy and rustfmt lived under their
+# own --config, checking them would mean a separate bazel invocation, and every
+# flip of a build setting discards Bazel's analysis cache -- so each run would
+# re-analyse the whole graph to re-check work the previous one had already
+# done. A build setting that never changes never invalidates anything, so
+# clippy and rustfmt are ordinary targets (see rust_clippy / rustfmt_test in
+# BUILD.bazel) covered by the same `bazel test //...` as everything else.
+build --@rules_rust//rust/settings:clippy_flag=-Dwarnings
+
+# There is deliberately no clippy.toml label_flag: this repo has no such file,
+# so both builds lint with stock clippy defaults and cannot disagree. In
+# particular, do not reach for `allow-unwrap-in-tests` to quiet the unwraps in
+# the #[cfg(test)] modules -- they are already covered by
+# #[expect(clippy::unwrap_used, ...)], and suppressing the lint would leave
+# those expectations unfulfilled, which is itself an error under -Dwarnings.
+#
+# The lint list is not restated here either. crate.from_cargo's
+# generate_lint_config reads [lints.rust] and [lints.clippy] out of Cargo.toml
+# and lint_config() feeds them to each target, so there is no second copy to
+# drift. To see what clippy is actually handed:
+#   bazel aquery 'mnemonic("Clippy", //:trivy-web)' --output=text
+
+# The same .rustfmt.toml cargo reads. Every option in it is nightly-only, which
+# is why MODULE.bazel pins a nightly rustfmt alongside the stable rustc: stable
+# rustfmt warns and ignores them, and //:rustfmt would then check the tree
+# against default formatting and fail on every file.
+build --@rules_rust//rust/settings:rustfmt.toml=//:.rustfmt.toml
+
+# Cargo profile equivalents.
+#
+# Bazel has no notion of a named Cargo profile -- it has -c fastbuild/dbg/opt --
+# so [profile.deploy] in Cargo.toml is reproduced here as a --config shorthand.
+# Keep the two in step.
+#
+# `extra_rustc_flag` (singular) is the repeatable form and accumulates; the
+# plural `extra_rustc_flags` would clobber on each use.
+#
+# Name the binary, not `//...`: rustc requires one panic strategy across the
+# whole crate graph and libtest needs unwind, so the test targets cannot build
+# under this. `cargo test --profile deploy` fails for the same reason. Use
+#   bazel build --config=deploy //:trivy-web
+build:deploy --compilation_mode=opt
+build:deploy --@rules_rust//rust/settings:lto=fat
+build:deploy --@rules_rust//rust/settings:codegen_units=1
+build:deploy --@rules_rust//rust/settings:extra_rustc_flag=-Cpanic=abort
+
+build --verbose_failures
+test --test_output=errors
