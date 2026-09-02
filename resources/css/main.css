@@ -92,6 +92,21 @@ table tr {
   line-height: 2em;
 }
 
+#report_summary th,
+#report_summary td {
+  padding-right: 1em;
+  vertical-align: middle;
+}
+
+#report_summary td.target {
+  font-family: monospace;
+  word-break: break-all;
+}
+
+#report_summary .severity_count li {
+  padding: 0 5px;
+}
+
 #cves th:not(:first-child) {
   padding-left: 0.5em;
   padding-right: 0.5em;

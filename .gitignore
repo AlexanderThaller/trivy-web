@@ -1,4 +1,5 @@
 /target
+/.claude
 
 # Bazel's convenience symlinks into the output base.
 /bazel-*

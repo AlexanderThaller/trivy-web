@@ -157,7 +157,9 @@ impl Fetch for TrivyInformationFetcher<'_> {
     type Output = TrivyInformation;
 
     fn key(&self) -> String {
-        format!("{REDIS_KEY_PREFIX}:trivy:{image}", image = self.image)
+        // The version is part of the key so cached entries of older versions
+        // which do not contain all information are not used anymore.
+        format!("{REDIS_KEY_PREFIX}:trivy:v2:{image}", image = self.image)
     }
 
     async fn fetch(&self) -> Result<Self::Output> {
@@ -169,18 +171,20 @@ impl Fetch for TrivyInformationFetcher<'_> {
         )
         .await?;
 
-        let vulnerabilities = trivy_result
-            .results
-            .into_iter()
-            .filter_map(|result| result.vulnerabilities)
-            .flatten()
-            .collect::<BTreeSet<Vulnerability>>();
+        let mut vulnerabilities = BTreeSet::<Vulnerability>::new();
+        let mut report_summary = Vec::with_capacity(trivy_result.results.len());
 
-        let severity_count = get_vulnerabilities_count(vulnerabilities.clone());
+        for result in trivy_result.results {
+            report_summary.push(result.summary());
+            vulnerabilities.extend(result.vulnerabilities.unwrap_or_default());
+        }
+
+        let severity_count = get_vulnerabilities_count(&vulnerabilities);
 
         Ok(TrivyInformation {
             vulnerabilities,
             severity_count,
+            report_summary,
             fetch_time: Utc::now(),
         })
     }
