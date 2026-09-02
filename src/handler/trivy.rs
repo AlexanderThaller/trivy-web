@@ -8,6 +8,7 @@ use eyre::WrapErr;
 use serde::{
     Deserialize,
     Serialize,
+    de::IgnoredAny,
 };
 use tokio::process::Command;
 use tracing::{
@@ -23,10 +24,32 @@ pub(super) struct TrivyResult {
     pub(super) results: Vec<Results>,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub(super) struct Results {
+    #[serde(default)]
+    pub(super) target: String,
+
+    #[serde(rename = "Type")]
+    pub(super) target_type: Option<String>,
+
+    pub(super) class: Option<String>,
     pub(super) vulnerabilities: Option<Vec<Vulnerability>>,
+
+    /// Only the amount of secrets is reported so the contents of the secrets
+    /// never have to be kept around.
+    pub(super) secrets: Option<Vec<IgnoredAny>>,
+}
+
+/// Summary of a single scan target as shown in the trivy report summary table.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub(super) struct ReportSummary {
+    pub(super) target: String,
+    pub(super) target_type: Option<String>,
+    pub(super) class: Option<String>,
+    pub(super) vulnerabilities: usize,
+    pub(super) secrets: usize,
+    pub(super) severity_count: SeverityCount,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -105,7 +128,7 @@ pub(super) enum Severity {
     Unknown,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub(super) struct SeverityCount {
     pub(super) critical: usize,
     pub(super) high: usize,
@@ -126,7 +149,9 @@ impl std::fmt::Display for Severity {
     }
 }
 
-pub(super) fn get_vulnerabilities_count(vulnerabilities: BTreeSet<Vulnerability>) -> SeverityCount {
+pub(super) fn get_vulnerabilities_count<'a>(
+    vulnerabilities: impl IntoIterator<Item = &'a Vulnerability>,
+) -> SeverityCount {
     let mut vulnerabilities_count = SeverityCount::default();
 
     for vulnerability in vulnerabilities {
@@ -140,6 +165,20 @@ pub(super) fn get_vulnerabilities_count(vulnerabilities: BTreeSet<Vulnerability>
     }
 
     vulnerabilities_count
+}
+
+impl Results {
+    /// Summary of this target as shown in the trivy report summary table.
+    pub(super) fn summary(&self) -> ReportSummary {
+        ReportSummary {
+            target: self.target.clone(),
+            target_type: self.target_type.clone(),
+            class: self.class.clone(),
+            vulnerabilities: self.vulnerabilities.as_ref().map_or(0, Vec::len),
+            secrets: self.secrets.as_ref().map_or(0, Vec::len),
+            severity_count: get_vulnerabilities_count(self.vulnerabilities.iter().flatten()),
+        }
+    }
 }
 
 impl Vulnerability {

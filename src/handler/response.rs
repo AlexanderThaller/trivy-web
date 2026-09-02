@@ -44,6 +44,7 @@ use crate::{
         cosign,
         response::cache::REDIS_TTL,
         trivy::{
+            ReportSummary,
             SeverityCount,
             Vulnerability,
         },
@@ -75,6 +76,10 @@ pub(crate) struct TrivyResponse {
 pub(crate) struct TrivyInformation {
     vulnerabilities: BTreeSet<Vulnerability>,
     severity_count: SeverityCount,
+
+    #[serde(default)]
+    report_summary: Vec<ReportSummary>,
+
     fetch_time: DateTime<Utc>,
 }
 
@@ -220,6 +225,7 @@ mod tests {
     use redis::AsyncCommands;
 
     use crate::handler::trivy::{
+        Results,
         TrivyResult,
         Vulnerability,
         get_vulnerabilities_count,
@@ -235,6 +241,8 @@ mod tests {
 
         let trivy_result = serde_json::from_str::<TrivyResult>(DATA).unwrap();
 
+        let report_summary = trivy_result.results.iter().map(Results::summary).collect();
+
         let vulnerabilities = trivy_result
             .results
             .into_iter()
@@ -242,11 +250,12 @@ mod tests {
             .flatten()
             .collect::<BTreeSet<Vulnerability>>();
 
-        let severity_count = get_vulnerabilities_count(vulnerabilities.clone());
+        let severity_count = get_vulnerabilities_count(&vulnerabilities);
 
         let information = super::TrivyInformation {
             vulnerabilities,
             severity_count,
+            report_summary,
             fetch_time: chrono::Utc::now(),
         };
 
