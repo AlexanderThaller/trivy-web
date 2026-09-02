@@ -1,0 +1,93 @@
+"""trivy-web -- a web frontend for trivy container image scans."""
+
+module(
+    name = "trivy_web",
+    version = "0.1.0",
+)
+
+# 0.0.108 or newer, not 0.0.107. The Linux rustc it downloads bundles a
+# libLLVM linked against libz.so.1, so the toolchain repository fetches a
+# zlib1g .deb to go with it. Up to 0.0.107 that came from
+# archive.ubuntu.com/ubuntu/pool, which only ever carries the *current* build
+# of a package: the moment Ubuntu published a newer point release the pinned
+# filename 404'd and every fresh fetch broke, while machines that already had
+# it in their repository cache kept working. 0.0.108 pins the same file at an
+# immutable snapshot.ubuntu.com timestamp instead.
+bazel_dep(name = "rules_rs", version = "0.0.108")
+
+toolchains = use_extension("@rules_rs//rs/toolchains:module_extension.bzl", "toolchains")
+
+# rustfmt is pinned to a nightly separately from rustc.
+#
+# Every option in .rustfmt.toml -- imports_granularity, imports_layout,
+# format_strings and the rest -- is unstable, so stable rustfmt prints "can't
+# set X, unstable features are only available in nightly channel" for each and
+# then formats with the defaults. //:rustfmt would compare the tree against
+# that and fail on nearly every file. The nightly is only ever used to run
+# rustfmt; the crates are still compiled by the pinned stable rustc.
+toolchains.toolchain(
+    edition = "2024",
+    rustfmt_version = "nightly/2026-07-14",
+    version = "1.98.0",
+)
+use_repo(toolchains, "default_rust_toolchains")
+
+register_toolchains("@default_rust_toolchains//...")
+
+# Exposes rules_rs' patched rules_rust as @rules_rust, so the
+# @rules_rust//rust/settings:* flags used in .bazelrc can be named from the
+# command line.
+rules_rust = use_extension("@rules_rs//rs:rules_rust.bzl", "rules_rust")
+use_repo(rules_rust, "rules_rust")
+
+# Build AWS-LC with Bazel instead of through aws-lc-sys' build script.
+#
+# aws-lc-sys is not a direct dependency; it arrives underneath rustls, via
+# reqwest inside docker-registry-client. rules_rs prints a warning recommending
+# this arrangement, and it is worth taking: the build script drives cc-rs,
+# which compiles a few thousand C files in the sandbox and bakes the sandbox
+# path into the DWARF it emits. That path contains a generation counter that
+# changes on every execution, so the outputs are not reproducible between
+# machines -- or between two checkouts on one machine -- and a shared cache
+# cannot be hit. Under Bazel's own cc rules the same sources become ordinary
+# cached actions.
+#
+# `rustc_flags` and the additive BUILD file come from
+# @rules_rs//3rd_party/aws-lc-sys:include.MODULE.bazel verbatim; only the hub
+# repository in `deps` is ours (the snippet writes it as a placeholder).
+bazel_dep(name = "aws-lc", version = "5.1.0.bcr.2")
+
+rules_rust_bindgen = use_extension("@rules_rs//rs:rules_rust_bindgen.bzl", "rules_rust_bindgen")
+use_repo(rules_rust_bindgen, "rules_rust_bindgen")
+
+register_toolchains("@rules_rust_bindgen//:all")
+
+crate = use_extension("@rules_rs//rs:extensions.bzl", "crate")
+crate.annotation(
+    crate = "aws-lc-rs",
+    gen_build_script = "off",
+)
+crate.annotation(
+    additive_build_file = "@rules_rs//3rd_party/aws-lc-sys:additive.BUILD.bazel",
+    crate = "aws-lc-sys",
+    extra_aliased_targets = {"aws_lc_sys_build_info": "aws_lc_sys_build_info"},
+    gen_build_script = "off",
+    rustc_flags = ["--cfg=use_bindgen_pregenerated"],
+    deps = ["@crates//:aws_lc_sys_build_info"],
+)
+
+inject_repo(crate, "aws-lc")
+
+# Dependencies, edition and lint configuration come from Cargo.toml, so adding
+# a crate needs no BUILD.bazel change. Cargo.lock stays the source of truth for
+# versions; MODULE.bazel.lock records the resolved set.
+crate.from_cargo(
+    name = "crates",
+    cargo_lock = "//:Cargo.lock",
+    cargo_toml = "//:Cargo.toml",
+    generate_lint_config = True,
+    platform_triples = [
+        "x86_64-unknown-linux-gnu",
+    ],
+)
+use_repo(crate, "crates")

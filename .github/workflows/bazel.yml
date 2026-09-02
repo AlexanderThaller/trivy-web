@@ -1,0 +1,60 @@
+name: Bazel
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  bazel:
+    runs-on: ubuntu-latest
+
+    steps:
+      # persist-credentials: false because nothing downstream authenticates to
+      # git. setup-bazel pulls from releases and the caches, every external
+      # repo in MODULE.bazel is an https archive, and there is no push step.
+      # The default would leave GITHUB_TOKEN in .git/config as an
+      # http.extraheader for the rest of the job -- readable by the several
+      # hundred third-party build scripts this job goes on to run.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Restores four caches through actions/cache: the Bazel binary itself
+      # (keyed on .bazelversion), the repository cache of downloaded external
+      # archives, the disk cache of action outputs, and the materialised
+      # external repositories.
+      #
+      # external-cache is the one that is easy to skip and shouldn't be.
+      # repository-cache only avoids re-downloading the archives; Bazel still
+      # re-runs the repository rules and re-extracts every external repo on a
+      # fresh output base, and that includes the Rust toolchain and the
+      # aws-lc-sys C sources.
+      #
+      # cache-save is limited to pushes so pull requests read the main-branch
+      # cache without each PR writing its own copy. GitHub evicts least-recently
+      # used entries once a repository exceeds 10 GB in total.
+      # https://github.com/bazel-contrib/setup-bazel
+      - name: Set up Bazel with caching
+        uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+          external-cache: true
+          disk-cache: ${{ github.workflow }}
+          cache-save: ${{ github.event_name != 'pull_request' }}
+
+      # One invocation covers build, test, clippy and rustfmt: the latter two
+      # are ordinary targets in BUILD.bazel rather than aspects behind a
+      # --config, so nothing here discards another step's analysis cache.
+      #
+      # --lockfile_mode=error fails the build if MODULE.bazel.lock does not
+      # match MODULE.bazel, rather than silently regenerating it, so a stale
+      # committed lockfile is caught here instead of drifting.
+      - name: Build, test, clippy and rustfmt
+        run: bazel test --lockfile_mode=error //...
