@@ -271,13 +271,15 @@ mod tests {
 
         client.init().await.unwrap();
 
-        let key = "test";
+        // Namespaced and unique per run so cleanup can never touch a key this
+        // test did not create.
+        let key = format!("trivy-web:test:trivy_information:{}", std::process::id());
 
-        client.del::<(), _>(key).await.unwrap();
+        client.del::<(), _>(&key).await.unwrap();
 
         client
             .set::<(), _, _>(
-                key,
+                &key,
                 serde_json::to_string(&information).unwrap(),
                 None,
                 None,
@@ -286,13 +288,13 @@ mod tests {
             .await
             .unwrap();
 
-        let information_from_redis: String = client.get(key).await.unwrap();
+        let information_from_redis: String = client.get(&key).await.unwrap();
 
         let information_from_redis: super::TrivyInformation =
             serde_json::from_str(&information_from_redis).unwrap();
 
         assert_eq!(information, information_from_redis);
 
-        client.del::<(), _>(key).await.unwrap();
+        client.del::<(), _>(&key).await.unwrap();
     }
 }
