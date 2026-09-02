@@ -23,6 +23,7 @@ use axum::{
 };
 use docker_registry_client::Client as DockerRegistryClient;
 use eyre::Context;
+use fred::clients::Client as RedisClient;
 use maud::html;
 use response::{
     TrivyResponse,
@@ -43,7 +44,7 @@ use crate::handler::response::cache::TrivyInformationFetcher;
 pub(super) struct AppState {
     pub(super) server: Option<String>,
     pub(super) docker_registry_client: DockerRegistryClient,
-    pub(super) redis_client: Option<redis::Client>,
+    pub(super) redis_client: Option<RedisClient>,
     #[cfg(not(debug_assertions))]
     pub(super) minify_config: minify_html::Cfg,
 }

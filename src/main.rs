@@ -4,6 +4,19 @@ use eyre::{
     Context,
     Result,
 };
+use fred::{
+    interfaces::{
+        ClientLike,
+        EventInterface,
+    },
+    types::{
+        Builder,
+        config::{
+            Config as RedisConfig,
+            ReconnectPolicy,
+        },
+    },
+};
 use tracing::{
     Level,
     event,
@@ -26,17 +39,35 @@ async fn main() -> Result<()> {
         event!(Level::INFO, server = server, "Using trivy server");
     }
 
-    let redis_client = opt
-        .redis_server
-        .map(|server| -> Result<redis::Client> {
-            event!(Level::INFO, server = server, "Using redis server");
+    let redis_client = if let Some(server) = &opt.redis_server {
+        event!(Level::INFO, server = server, "Using redis server");
 
-            let client =
-                redis::Client::open(server).context("failed to connect to redis server")?;
+        let config = RedisConfig::from_url(server).context("failed to parse redis server url")?;
 
-            Ok(client)
-        })
-        .transpose()?;
+        let client = Builder::from_config(config)
+            .set_policy(ReconnectPolicy::new_exponential(0, 100, 30_000, 2))
+            .build()
+            .context("failed to build redis client")?;
+
+        client.on_error(|(error, server)| async move {
+            event!(
+                Level::ERROR,
+                server = server.map(|server| server.to_string()),
+                "redis connection error: {error}"
+            );
+
+            Ok(())
+        });
+
+        client
+            .init()
+            .await
+            .context("failed to connect to redis server")?;
+
+        Some(client)
+    } else {
+        None
+    };
 
     let mut registry = DockerRegistryClient::default();
 

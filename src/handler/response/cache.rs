@@ -9,7 +9,11 @@ use eyre::{
     Context,
     Result,
 };
-use redis::AsyncCommands;
+use fred::{
+    clients::Client as RedisClient,
+    interfaces::KeysInterface,
+    types::Expiration,
+};
 use serde::{
     Deserialize,
     Serialize,
@@ -44,11 +48,11 @@ pub(crate) trait Fetch {
     async fn fetch(&self) -> Result<Self::Output>;
 
     #[tracing::instrument]
-    async fn cache_or_fetch(&self, redis_client: Option<&redis::Client>) -> Result<Self::Output>
+    async fn cache_or_fetch(&self, redis_client: Option<&RedisClient>) -> Result<Self::Output>
     where
         Self: std::fmt::Debug,
     {
-        if redis_client.is_none() {
+        let Some(redis_client) = redis_client else {
             return self
                 .fetch()
                 .instrument(info_span!(
@@ -56,61 +60,37 @@ pub(crate) trait Fetch {
                 ))
                 .await
                 .context("failed to fetch output from source when redis is disabled");
-        }
-
-        let redis_client = redis_client
-            .as_ref()
-            .expect("already checked if redis is none");
-
-        let mut connection = redis_client
-            .get_multiplexed_async_connection()
-            .instrument(info_span!("get redis connection"))
-            .await
-            .context("failed to get redis connection")?;
+        };
 
         let key = self.key();
 
-        let exists: bool = connection
-            .exists(&key)
-            .instrument(info_span!("check if key exists in redis"))
+        let cached: Option<String> = redis_client
+            .get(&key)
+            .instrument(info_span!("get output from redis"))
             .await
-            .context("failed to check key exists in redis")?;
+            .context("failed to get output from redis")?;
 
-        if exists {
-            let information: String = connection
-                .get(&key)
-                .instrument(info_span!("get output from redis"))
-                .await
-                .context("failed to get output from redis")?;
-
-            let information = serde_json::from_str(&information)
-                .context("failed to deserialize output from redis data")?;
-
-            Ok(information)
-        } else {
-            let response = self
-                .fetch()
-                .instrument(info_span!("fetch output from source"))
-                .await
-                .context("failed to fetch output from source")?;
-
-            let json =
-                serde_json::to_string(&response).context("failed to serialize output for redis")?;
-
-            let _: () = connection
-                .set(&key, &json)
-                .instrument(info_span!("set output in redis"))
-                .await
-                .context("failed to set output in redis")?;
-
-            let _: () = connection
-                .expire(&key, REDIS_TTL)
-                .instrument(info_span!("set output expiration in redis"))
-                .await
-                .context("failed to set output expiration in redis")?;
-
-            Ok(response)
+        if let Some(cached) = cached {
+            return serde_json::from_str(&cached)
+                .context("failed to deserialize output from redis data");
         }
+
+        let response = self
+            .fetch()
+            .instrument(info_span!("fetch output from source"))
+            .await
+            .context("failed to fetch output from source")?;
+
+        let json =
+            serde_json::to_string(&response).context("failed to serialize output for redis")?;
+
+        let () = redis_client
+            .set(&key, json, Some(Expiration::EX(REDIS_TTL)), None, false)
+            .instrument(info_span!("set output in redis"))
+            .await
+            .context("failed to set output in redis")?;
+
+        Ok(response)
     }
 }
 
