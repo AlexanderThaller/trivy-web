@@ -9,7 +9,11 @@ use eyre::{
     Context,
     Result,
 };
-use redis::AsyncCommands;
+use fred::{
+    clients::Client as RedisClient,
+    interfaces::KeysInterface,
+    types::Expiration,
+};
 use serde::{
     Deserialize,
     Serialize,
@@ -43,74 +47,57 @@ pub(crate) trait Fetch {
     fn key(&self) -> String;
     async fn fetch(&self) -> Result<Self::Output>;
 
+    /// Whether the output may be stored in the shared cache.
+    ///
+    /// Keys are derived from the image alone and every request can read every
+    /// key, so anything fetched with caller supplied credentials has to stay
+    /// out of the cache entirely.
+    fn cacheable(&self) -> bool {
+        true
+    }
+
     #[tracing::instrument]
-    async fn cache_or_fetch(&self, redis_client: Option<&redis::Client>) -> Result<Self::Output>
+    async fn cache_or_fetch(&self, redis_client: Option<&RedisClient>) -> Result<Self::Output>
     where
         Self: std::fmt::Debug,
     {
-        if redis_client.is_none() {
+        let Some(redis_client) = redis_client.filter(|_| self.cacheable()) else {
             return self
                 .fetch()
-                .instrument(info_span!(
-                    "fetch output from source when redis is disabled"
-                ))
+                .instrument(info_span!("fetch output from source without the cache"))
                 .await
-                .context("failed to fetch output from source when redis is disabled");
-        }
-
-        let redis_client = redis_client
-            .as_ref()
-            .expect("already checked if redis is none");
-
-        let mut connection = redis_client
-            .get_multiplexed_async_connection()
-            .instrument(info_span!("get redis connection"))
-            .await
-            .context("failed to get redis connection")?;
+                .context("failed to fetch output from source without the cache");
+        };
 
         let key = self.key();
 
-        let exists: bool = connection
-            .exists(&key)
-            .instrument(info_span!("check if key exists in redis"))
+        let cached: Option<String> = redis_client
+            .get(&key)
+            .instrument(info_span!("get output from redis"))
             .await
-            .context("failed to check key exists in redis")?;
+            .context("failed to get output from redis")?;
 
-        if exists {
-            let information: String = connection
-                .get(&key)
-                .instrument(info_span!("get output from redis"))
-                .await
-                .context("failed to get output from redis")?;
-
-            let information = serde_json::from_str(&information)
-                .context("failed to deserialize output from redis data")?;
-
-            Ok(information)
-        } else {
-            let response = self
-                .fetch()
-                .instrument(info_span!("fetch output from source"))
-                .await
-                .context("failed to fetch output from source")?;
-
-            let json =
-                serde_json::to_string(&response).context("failed to serialize output for redis")?;
-
-            let _: () = connection
-                .set(&key, &json)
-                .instrument(info_span!("set output in redis"))
-                .await
-                .context("failed to set output in redis")?;
-
-            let _: () = connection
-                .expire(&key, REDIS_TTL)
-                .instrument(info_span!("set output expiration in redis"))
-                .await
-                .context("failed to set output expiration in redis")?;
-
-            Ok(response)
+        if let Some(cached) = cached {
+            return serde_json::from_str(&cached)
+                .context("failed to deserialize output from redis data");
         }
+
+        let response = self
+            .fetch()
+            .instrument(info_span!("fetch output from source"))
+            .await
+            .context("failed to fetch output from source")?;
+
+        let json =
+            serde_json::to_string(&response).context("failed to serialize output for redis")?;
+
+        let () = redis_client
+            .set(&key, json, Some(Expiration::EX(REDIS_TTL)), None, false)
+            .instrument(info_span!("set output in redis"))
+            .await
+            .context("failed to set output in redis")?;
+
+        Ok(response)
     }
 }
 
@@ -145,12 +132,25 @@ impl Fetch for DockerInformationFetcher<'_> {
     }
 }
 
-#[derive(Debug)]
 pub(crate) struct TrivyInformationFetcher<'a> {
     pub(crate) image: &'a Image,
     pub(crate) trivy_server: Option<&'a str>,
     pub(crate) trivy_username: Option<&'a str>,
     pub(crate) trivy_password: Option<&'a str>,
+}
+
+/// Hand written so the submitted credentials never reach a log or a trace:
+/// `cache_or_fetch` is `#[tracing::instrument]`, which records `self` through
+/// `Debug`. Only whether each was supplied survives.
+impl std::fmt::Debug for TrivyInformationFetcher<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TrivyInformationFetcher")
+            .field("image", &self.image)
+            .field("trivy_server", &self.trivy_server)
+            .field("trivy_username", &self.trivy_username.map(|_| "REDACTED"))
+            .field("trivy_password", &self.trivy_password.map(|_| "REDACTED"))
+            .finish()
+    }
 }
 
 impl Fetch for TrivyInformationFetcher<'_> {
@@ -160,6 +160,16 @@ impl Fetch for TrivyInformationFetcher<'_> {
         // The version is part of the key so cached entries of older versions
         // which do not contain all information are not used anymore.
         format!("{REDIS_KEY_PREFIX}:trivy:v2:{image}", image = self.image)
+    }
+
+    /// A scan run with caller supplied registry credentials can cover an image
+    /// the next caller is not allowed to pull, and the key is the image alone,
+    /// so such a scan must neither fill nor read the shared cache.
+    ///
+    /// Partitioning the key by username instead would not do: reading a
+    /// partition only takes knowing the username, not proving the password.
+    fn cacheable(&self) -> bool {
+        self.trivy_username.is_none() && self.trivy_password.is_none()
     }
 
     async fn fetch(&self) -> Result<Self::Output> {
@@ -233,5 +243,73 @@ impl Fetch for CosignInformationFetcher<'_> {
             cosign,
             fetch_time: Utc::now(),
         })
+    }
+}
+
+#[cfg(test)]
+#[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
+mod tests {
+    use super::{
+        Fetch,
+        TrivyInformationFetcher,
+    };
+
+    fn fetcher<'a>(
+        image: &'a docker_registry_client::Image,
+        credentials: Option<(&'a str, &'a str)>,
+    ) -> TrivyInformationFetcher<'a> {
+        TrivyInformationFetcher {
+            image,
+            trivy_server: None,
+            trivy_username: credentials.map(|(username, _)| username),
+            trivy_password: credentials.map(|(_, password)| password),
+        }
+    }
+
+    /// The same image scanned anonymously and with credentials shares one cache
+    /// key, so the credentialed scan has to stay out of the cache: otherwise it
+    /// would answer the next anonymous request for an image that request cannot
+    /// pull.
+    #[test]
+    fn credentialed_scans_do_not_share_the_cache() {
+        let image = "docker.io/library/alpine:3.20".parse().unwrap();
+
+        let anonymous = fetcher(&image, None);
+        let credentialed = fetcher(&image, Some(("scanbot", "hunter2")));
+
+        assert_eq!(anonymous.key(), credentialed.key());
+
+        assert!(anonymous.cacheable());
+        assert!(!credentialed.cacheable());
+    }
+
+    #[test]
+    fn debug_redacts_the_trivy_credentials() {
+        let image = "docker.io/library/alpine:3.20".parse().unwrap();
+
+        let rendered = format!("{:?}", fetcher(&image, Some(("scanbot", "hunter2"))));
+
+        assert!(!rendered.contains("hunter2"), "{rendered}");
+        assert!(!rendered.contains("scanbot"), "{rendered}");
+
+        // Whether each was supplied is still worth having for diagnostics.
+        assert!(
+            rendered.contains(r#"trivy_username: Some("REDACTED")"#),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains(r#"trivy_password: Some("REDACTED")"#),
+            "{rendered}"
+        );
+    }
+
+    #[test]
+    fn debug_keeps_absent_trivy_credentials_distinguishable() {
+        let image = "docker.io/library/alpine:3.20".parse().unwrap();
+
+        let rendered = format!("{:?}", fetcher(&image, None));
+
+        assert!(rendered.contains("trivy_username: None"), "{rendered}");
+        assert!(rendered.contains("trivy_password: None"), "{rendered}");
     }
 }

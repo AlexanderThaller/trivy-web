@@ -21,10 +21,7 @@ use eyre::{
     Result,
     WrapErr,
 };
-use redis_macros::{
-    FromRedisValue,
-    ToRedisArgs,
-};
+use fred::clients::Client as RedisClient;
 use serde::{
     Deserialize,
     Serialize,
@@ -72,7 +69,7 @@ pub(crate) struct TrivyResponse {
     pub(crate) information: Result<TrivyInformation>,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRedisValue, ToRedisArgs, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub(crate) struct TrivyInformation {
     vulnerabilities: BTreeSet<Vulnerability>,
     severity_count: SeverityCount,
@@ -83,7 +80,7 @@ pub(crate) struct TrivyInformation {
     fetch_time: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRedisValue, ToRedisArgs, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub(crate) struct CosignInformation {
     cosign: Option<cosign::Cosign>,
     fetch_time: DateTime<Utc>,
@@ -137,7 +134,7 @@ pub(crate) async fn image(
 async fn fetch_docker_and_cosign_manifest(
     docker_registry_client: DockerRegistryClient,
     image: Image,
-    redis_client: Option<redis::Client>,
+    redis_client: Option<RedisClient>,
 ) -> (Result<DockerInformation>, Result<CosignInformation>) {
     let docker_manifest = DockerInformationFetcher {
         docker_registry_client: &docker_registry_client,
@@ -222,7 +219,16 @@ impl CosignInformation {
 mod tests {
     use std::collections::BTreeSet;
 
-    use redis::AsyncCommands;
+    use fred::{
+        interfaces::{
+            ClientLike,
+            KeysInterface,
+        },
+        types::{
+            Builder,
+            config::Config as RedisConfig,
+        },
+    };
 
     use crate::handler::trivy::{
         Results,
@@ -259,22 +265,36 @@ mod tests {
             fetch_time: chrono::Utc::now(),
         };
 
-        let client = redis::Client::open("redis://127.0.0.1:6379").unwrap();
+        let config = RedisConfig::from_url("redis://127.0.0.1:6379").unwrap();
 
-        let mut connection = client.get_multiplexed_async_connection().await.unwrap();
+        let client = Builder::from_config(config).build().unwrap();
 
-        let key = "test";
+        client.init().await.unwrap();
 
-        connection.del::<_, ()>(key).await.unwrap();
-        connection.set::<_, _, ()>(key, &information).await.unwrap();
+        // Namespaced and unique per run so cleanup can never touch a key this
+        // test did not create.
+        let key = format!("trivy-web:test:trivy_information:{}", std::process::id());
 
-        let information_from_redis: String = connection.get::<_, String>(key).await.unwrap();
+        client.del::<(), _>(&key).await.unwrap();
+
+        client
+            .set::<(), _, _>(
+                &key,
+                serde_json::to_string(&information).unwrap(),
+                None,
+                None,
+                false,
+            )
+            .await
+            .unwrap();
+
+        let information_from_redis: String = client.get(&key).await.unwrap();
 
         let information_from_redis: super::TrivyInformation =
             serde_json::from_str(&information_from_redis).unwrap();
 
         assert_eq!(information, information_from_redis);
 
-        connection.del::<_, ()>(key).await.unwrap();
+        client.del::<(), _>(&key).await.unwrap();
     }
 }

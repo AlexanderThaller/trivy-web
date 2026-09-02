@@ -23,6 +23,7 @@ use axum::{
 };
 use docker_registry_client::Client as DockerRegistryClient;
 use eyre::Context;
+use fred::clients::Client as RedisClient;
 use maud::html;
 use response::{
     TrivyResponse,
@@ -43,7 +44,7 @@ use crate::handler::response::cache::TrivyInformationFetcher;
 pub(super) struct AppState {
     pub(super) server: Option<String>,
     pub(super) docker_registry_client: DockerRegistryClient,
-    pub(super) redis_client: Option<redis::Client>,
+    pub(super) redis_client: Option<RedisClient>,
     #[cfg(not(debug_assertions))]
     pub(super) minify_config: minify_html::Cfg,
 }
@@ -57,7 +58,7 @@ pub(super) struct SubmitFormImage {
 #[derive(Debug, Deserialize)]
 pub(super) struct SubmitFormTrivy {
     image: String,
-    username: String,
+    username: Username,
     password: Password,
 }
 
@@ -74,6 +75,9 @@ pub(super) struct Index {
     commit_hash: String,
     crate_version: String,
 }
+
+#[derive(Deserialize)]
+struct Username(String);
 
 #[derive(Deserialize)]
 struct Password(String);
@@ -284,10 +288,10 @@ pub(super) async fn trivy(
         image: &image,
         trivy_server: state.server.as_deref(),
 
-        trivy_username: if form.username.is_empty() {
+        trivy_username: if form.username.0.is_empty() {
             None
         } else {
-            Some(&form.username)
+            Some(&form.username.0)
         },
 
         trivy_password: if form.password.0.is_empty() {
@@ -332,6 +336,12 @@ impl std::fmt::Debug for AppState {
             .field("server", &self.server)
             .field("docker_registry_client", &self.docker_registry_client)
             .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for Username {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("REDACTED")
     }
 }
 

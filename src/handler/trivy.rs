@@ -247,7 +247,16 @@ impl Vulnerability {
     }
 }
 
-#[tracing::instrument]
+// The credentials are skipped and re-recorded as placeholders: instrument would
+// otherwise put them in the span through Debug, the way they reach
+// TRIVY_USERNAME and TRIVY_PASSWORD below. Only presence survives.
+#[tracing::instrument(
+    skip(username, password),
+    fields(
+        username = username.map(|_| "REDACTED"),
+        password = password.map(|_| "REDACTED")
+    )
+)]
 pub(super) async fn scan_image(
     image: &Image,
     server: Option<&str>,

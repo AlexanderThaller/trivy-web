@@ -4,10 +4,24 @@ use eyre::{
     Context,
     Result,
 };
+use fred::{
+    interfaces::{
+        ClientLike,
+        EventInterface,
+    },
+    types::{
+        Builder,
+        config::{
+            Config as RedisConfig,
+            ReconnectPolicy,
+        },
+    },
+};
 use tracing::{
     Level,
     event,
 };
+use url::Url;
 
 mod args;
 mod filters;
@@ -23,20 +37,46 @@ async fn main() -> Result<()> {
         .init();
 
     if let Some(server) = &opt.server {
-        event!(Level::INFO, server = server, "Using trivy server");
+        event!(
+            Level::INFO,
+            server = redact_credentials(server),
+            "Using trivy server"
+        );
     }
 
-    let redis_client = opt
-        .redis_server
-        .map(|server| -> Result<redis::Client> {
-            event!(Level::INFO, server = server, "Using redis server");
+    let redis_client = if let Some(server) = &opt.redis_server {
+        event!(
+            Level::INFO,
+            server = redact_credentials(server),
+            "Using redis server"
+        );
 
-            let client =
-                redis::Client::open(server).context("failed to connect to redis server")?;
+        let config = RedisConfig::from_url(server).context("failed to parse redis server url")?;
 
-            Ok(client)
-        })
-        .transpose()?;
+        let client = Builder::from_config(config)
+            .set_policy(ReconnectPolicy::new_exponential(0, 100, 30_000, 2))
+            .build()
+            .context("failed to build redis client")?;
+
+        client.on_error(|(error, server)| async move {
+            event!(
+                Level::ERROR,
+                server = server.map(|server| server.to_string()),
+                "redis connection error: {error}"
+            );
+
+            Ok(())
+        });
+
+        client
+            .init()
+            .await
+            .context("failed to connect to redis server")?;
+
+        Some(client)
+    } else {
+        None
+    };
 
     let mut registry = DockerRegistryClient::default();
 
@@ -76,4 +116,41 @@ async fn main() -> Result<()> {
         .context("failed to start server")?;
 
     Ok(())
+}
+
+/// Formats a url for logging with any embedded credentials removed.
+fn redact_credentials(url: &str) -> String {
+    let Ok(mut url) = Url::parse(url) else {
+        return "<unparsable url>".to_string();
+    };
+
+    let _ = url.set_username("");
+    let _ = url.set_password(None);
+
+    url.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::redact_credentials;
+
+    #[test]
+    fn redact_credentials_strips_userinfo() {
+        assert_eq!(
+            redact_credentials("redis://127.0.0.1:6379"),
+            "redis://127.0.0.1:6379"
+        );
+
+        assert_eq!(
+            redact_credentials("redis://user:hunter2@redis-web.svc:6379"),
+            "redis://redis-web.svc:6379"
+        );
+
+        assert_eq!(
+            redact_credentials("redis://:hunter2@host:6379/1"),
+            "redis://host:6379/1"
+        );
+
+        assert_eq!(redact_credentials("not a url"), "<unparsable url>");
+    }
 }
