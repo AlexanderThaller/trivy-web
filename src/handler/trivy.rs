@@ -8,6 +8,7 @@ use eyre::WrapErr;
 use serde::{
     Deserialize,
     Serialize,
+    de::IgnoredAny,
 };
 use tokio::process::Command;
 use tracing::{
@@ -23,10 +24,87 @@ pub(super) struct TrivyResult {
     pub(super) results: Vec<Results>,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub(super) struct Results {
+    #[serde(default)]
+    pub(super) target: String,
+
+    #[serde(rename = "Type")]
+    pub(super) target_type: Option<String>,
+
+    pub(super) class: Option<String>,
     pub(super) vulnerabilities: Option<Vec<Vulnerability>>,
+
+    /// Only the amount of secrets is reported so the contents of the secrets
+    /// are counted while deserializing instead of being kept around.
+    #[serde(default, deserialize_with = "deserialize_count")]
+    pub(super) secrets: usize,
+}
+
+/// Deserializes the length of a sequence without collecting its elements.
+///
+/// A missing or null sequence is counted as zero.
+fn deserialize_count<'de, D>(deserializer: D) -> Result<usize, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct CountVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for CountVisitor {
+        type Value = usize;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("a sequence")
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(0)
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(0)
+        }
+
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            deserializer.deserialize_seq(self)
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+        {
+            let mut count = 0;
+
+            while seq.next_element::<IgnoredAny>()?.is_some() {
+                count += 1;
+            }
+
+            Ok(count)
+        }
+    }
+
+    deserializer.deserialize_option(CountVisitor)
+}
+
+/// Summary of a single scan target as shown in the trivy report summary table.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub(super) struct ReportSummary {
+    pub(super) target: String,
+    pub(super) target_type: Option<String>,
+    pub(super) class: Option<String>,
+    pub(super) vulnerabilities: usize,
+    pub(super) secrets: usize,
+    pub(super) severity_count: SeverityCount,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -105,7 +183,7 @@ pub(super) enum Severity {
     Unknown,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub(super) struct SeverityCount {
     pub(super) critical: usize,
     pub(super) high: usize,
@@ -126,7 +204,9 @@ impl std::fmt::Display for Severity {
     }
 }
 
-pub(super) fn get_vulnerabilities_count(vulnerabilities: BTreeSet<Vulnerability>) -> SeverityCount {
+pub(super) fn get_vulnerabilities_count<'a>(
+    vulnerabilities: impl IntoIterator<Item = &'a Vulnerability>,
+) -> SeverityCount {
     let mut vulnerabilities_count = SeverityCount::default();
 
     for vulnerability in vulnerabilities {
@@ -140,6 +220,20 @@ pub(super) fn get_vulnerabilities_count(vulnerabilities: BTreeSet<Vulnerability>
     }
 
     vulnerabilities_count
+}
+
+impl Results {
+    /// Summary of this target as shown in the trivy report summary table.
+    pub(super) fn summary(&self) -> ReportSummary {
+        ReportSummary {
+            target: self.target.clone(),
+            target_type: self.target_type.clone(),
+            class: self.class.clone(),
+            vulnerabilities: self.vulnerabilities.as_ref().map_or(0, Vec::len),
+            secrets: self.secrets,
+            severity_count: get_vulnerabilities_count(self.vulnerabilities.iter().flatten()),
+        }
+    }
 }
 
 impl Vulnerability {
@@ -216,6 +310,37 @@ mod test {
             serde_json::from_str(include_str!("resources/tests/trivy_output2.json")).unwrap();
         let _out: TrivyResult =
             serde_json::from_str(include_str!("resources/tests/trivy_output3.json")).unwrap();
+    }
+
+    #[test]
+    fn deserialize_secrets_count() {
+        const DATA: &str = r#"{
+            "Results": [
+                {
+                    "Target": "with secrets",
+                    "Secrets": [{ "RuleID": "github-pat" }, { "RuleID": "aws-secret-key" }]
+                },
+                { "Target": "null secrets", "Secrets": null },
+                { "Target": "without secrets" }
+            ]
+        }"#;
+
+        let got: TrivyResult = serde_json::from_str(DATA).unwrap();
+
+        let got = got
+            .results
+            .iter()
+            .map(|result| (result.target.as_str(), result.secrets))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            vec![
+                ("with secrets", 2),
+                ("null secrets", 0),
+                ("without secrets", 0)
+            ],
+            got
+        );
     }
 
     #[tokio::test]
