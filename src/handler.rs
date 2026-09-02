@@ -83,7 +83,7 @@ pub(super) fn router(state: AppState) -> Router {
     // assets
         .route("/css/main.css", get(css_main))
         .route("/img/bars.svg", get(img_bars))
-        .route("/js/htmx/2.0.0/htmx.min.js", get(js_htmx_2_0_0))
+        .route("/js/htmx/4.0.0/htmx.min.js", get(js_htmx_4_0_0))
     // handlers
         .route("/", get(root))
         .route("/image", post(image))
@@ -193,13 +193,13 @@ pub(super) async fn css_main() -> impl IntoResponse {
 }
 
 #[tracing::instrument]
-pub(super) async fn js_htmx_2_0_0() -> impl IntoResponse {
+pub(super) async fn js_htmx_4_0_0() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "application/javascript")
         .header("Cache-Control", "max-age=31536000, immutable")
         .body(Body::from(
-            include_bytes!("../resources/js/htmx/2.0.0/htmx.min.js").to_vec(),
+            include_bytes!("../resources/js/htmx/4.0.0/htmx.min.js").to_vec(),
         ))
         .expect("should never fail")
 }
