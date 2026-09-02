@@ -14,8 +14,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # persist-credentials: false because nothing downstream authenticates to
+      # git. setup-bazel pulls from releases and the caches, every external
+      # repo in MODULE.bazel is an https archive, and there is no push step.
+      # The default would leave GITHUB_TOKEN in .git/config as an
+      # http.extraheader for the rest of the job -- readable by the several
+      # hundred third-party build scripts this job goes on to run.
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Restores four caches through actions/cache: the Bazel binary itself
       # (keyed on .bazelversion), the repository cache of downloaded external
