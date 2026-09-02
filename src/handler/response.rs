@@ -50,6 +50,7 @@ use crate::{
 use super::{
     AppState,
     Limits,
+    RateLimit,
     SubmitFormImage,
     cosign::cosign_verify,
 };
@@ -109,10 +110,16 @@ pub(crate) async fn image(
             state.docker_registry_client.clone(),
             image.clone(),
             state.cache.clone(),
+            state.registry_rate_limit.clone(),
         )
         .instrument(info_span!("fetch_docker_and_cosign_manifest")),
-        fetch_cosign_verify(form.cosign_key, image.clone(), state.limits.clone())
-            .instrument(info_span!("fetch_cosign_verify")),
+        fetch_cosign_verify(
+            form.cosign_key,
+            image.clone(),
+            state.limits.clone(),
+            state.registry_rate_limit.clone(),
+        )
+        .instrument(info_span!("fetch_cosign_verify")),
     );
 
     let (docker_information, cosign_information) = docker_and_cosign_manifest;
@@ -132,12 +139,13 @@ async fn fetch_docker_and_cosign_manifest(
     docker_registry_client: DockerRegistryClient,
     image: Image,
     cache: Cache,
+    registry_rate_limit: RateLimit,
 ) -> (Result<DockerInformation>, Result<CosignInformation>) {
     let docker_manifest = DockerInformationFetcher {
         docker_registry_client: &docker_registry_client,
         image: &image,
     }
-    .cache_or_fetch(&cache)
+    .cache_or_fetch(&cache, &registry_rate_limit)
     .await
     .context("failed to fetch docker manifest");
 
@@ -150,7 +158,7 @@ async fn fetch_docker_and_cosign_manifest(
         image: &image,
         docker_manifest: &docker_manifest,
     }
-    .cache_or_fetch(&cache)
+    .cache_or_fetch(&cache, &registry_rate_limit)
     .await
     .context("failed to get cosign manifest");
 
@@ -162,11 +170,12 @@ async fn fetch_cosign_verify(
     cosign_key: String,
     image: Image,
     limits: Limits,
+    registry_rate_limit: RateLimit,
 ) -> Option<Result<cosign::CosignVerify, eyre::Error>> {
     if cosign_key.is_empty() {
         None
     } else {
-        Some(cosign_verify(&cosign_key, &image, &limits).await)
+        Some(cosign_verify(&cosign_key, &image, &limits, &registry_rate_limit).await)
     }
 }
 

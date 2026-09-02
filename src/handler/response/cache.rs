@@ -37,6 +37,7 @@ use tracing::{
 use crate::handler::{
     cosign,
     process::Limits,
+    registry::RateLimit,
     trivy::{
         self,
         Vulnerability,
@@ -50,7 +51,7 @@ use super::{
     TrivyInformation,
 };
 
-const REDIS_KEY_PREFIX: &str = "trivy-web";
+pub(crate) const REDIS_KEY_PREFIX: &str = "trivy-web";
 pub(crate) const REDIS_TTL: i64 = 86400;
 
 /// Size the registry of running fetches has to reach before the entries of
@@ -173,6 +174,31 @@ pub(crate) trait Fetch {
     fn key(&self) -> String;
     async fn fetch(&self) -> Result<Self::Output>;
 
+    /// The registry a fetch reaches out to, which is what the fetch is counted
+    /// against before it is allowed to happen.
+    ///
+    /// Without a default on purpose: a fetch that touches a registry without
+    /// saying so is one the rate limit does not cover, and that should take
+    /// writing `None` rather than forgetting.
+    fn registry(&self) -> Option<&str>;
+
+    /// Counts the fetch against the rate limit of the registry it reaches out
+    /// to, and only then runs it.
+    ///
+    /// A fetch that is answered from the cache never gets here, and neither
+    /// does one that waited behind another fetch of the same key: what is
+    /// counted is what actually reaches a registry.
+    async fn rate_limited_fetch(&self, rate_limit: &RateLimit) -> Result<Self::Output> {
+        if let Some(registry) = self.registry() {
+            rate_limit
+                .claim(registry)
+                .await
+                .context("not allowed to reach out to the registry")?;
+        }
+
+        self.fetch().await
+    }
+
     /// Whether the output may be stored in the shared cache.
     ///
     /// Keys are derived from the image alone and every request can read every
@@ -183,13 +209,13 @@ pub(crate) trait Fetch {
     }
 
     #[tracing::instrument]
-    async fn cache_or_fetch(&self, cache: &Cache) -> Result<Self::Output>
+    async fn cache_or_fetch(&self, cache: &Cache, rate_limit: &RateLimit) -> Result<Self::Output>
     where
         Self: std::fmt::Debug,
     {
         let Some(redis_client) = cache.redis.as_ref().filter(|_| self.cacheable()) else {
             return self
-                .fetch()
+                .rate_limited_fetch(rate_limit)
                 .instrument(info_span!("fetch output from source without the cache"))
                 .await
                 .context("failed to fetch output from source without the cache");
@@ -215,7 +241,7 @@ pub(crate) trait Fetch {
         }
 
         let response = self
-            .fetch()
+            .rate_limited_fetch(rate_limit)
             .instrument(info_span!("fetch output from source"))
             .await
             .context("failed to fetch output from source")?;
@@ -241,6 +267,10 @@ pub(crate) struct DockerInformationFetcher<'a> {
 
 impl Fetch for DockerInformationFetcher<'_> {
     type Output = DockerInformation;
+
+    fn registry(&self) -> Option<&str> {
+        Some(self.image.registry.registry_domain())
+    }
 
     fn key(&self) -> String {
         format!(
@@ -288,6 +318,14 @@ impl std::fmt::Debug for TrivyInformationFetcher<'_> {
 
 impl Fetch for TrivyInformationFetcher<'_> {
     type Output = TrivyInformation;
+
+    /// Trivy pulls the image itself, and does so from this instance even when
+    /// the scanning is handed to a trivy server: it is the client that reads
+    /// the image and the server that matches what it finds against the
+    /// vulnerability database.
+    fn registry(&self) -> Option<&str> {
+        Some(self.image.registry.registry_domain())
+    }
 
     fn key(&self) -> String {
         // The version is part of the key so cached entries of older versions
@@ -343,6 +381,10 @@ pub(crate) struct CosignInformationFetcher<'a> {
 
 impl Fetch for CosignInformationFetcher<'_> {
     type Output = CosignInformation;
+
+    fn registry(&self) -> Option<&str> {
+        Some(self.image.registry.registry_domain())
+    }
 
     fn key(&self) -> String {
         format!("{{ REDIS_KEY_PREFIX }}:cosign:{}", self.image)

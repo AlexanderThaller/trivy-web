@@ -35,10 +35,12 @@ use tokio::fs::read_to_string;
 
 mod cosign;
 mod process;
+mod registry;
 mod response;
 mod trivy;
 
 pub(super) use process::Limits;
+pub(super) use registry::RateLimit;
 pub(super) use response::cache::Cache;
 
 use crate::handler::response::cache::TrivyInformationFetcher;
@@ -53,6 +55,10 @@ pub(super) struct AppState {
     /// endpoints start child processes for anyone who asks, so this is what
     /// keeps a burst of requests from becoming a burst of scanners.
     pub(super) limits: Limits,
+
+    /// How often the registries hear from this deployment. Counted per registry
+    /// in redis, so every instance draws from the same budget.
+    pub(super) registry_rate_limit: RateLimit,
 
     #[cfg(not(debug_assertions))]
     pub(super) minify_config: minify_html::Cfg,
@@ -311,7 +317,7 @@ pub(super) async fn trivy(
 
         limits: &state.limits,
     }
-    .cache_or_fetch(&state.cache)
+    .cache_or_fetch(&state.cache, &state.registry_rate_limit)
     .await
     .context("failed to fetch trivy information");
 

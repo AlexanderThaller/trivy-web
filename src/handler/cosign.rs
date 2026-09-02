@@ -31,7 +31,10 @@ use x509_parser::{
     pem::parse_x509_pem,
 };
 
-use super::process::Limits;
+use super::{
+    process::Limits,
+    registry::RateLimit,
+};
 
 #[derive(Debug)]
 pub(crate) enum CertificateError {
@@ -255,7 +258,15 @@ pub(crate) async fn cosign_verify(
     cosign_key: &str,
     image: &Image,
     limits: &Limits,
+    registry_rate_limit: &RateLimit,
 ) -> Result<CosignVerify, eyre::Error> {
+    // Cosign pulls the signature from the registry, so it is counted like
+    // every other request this service points at one.
+    registry_rate_limit
+        .claim(image.registry.registry_domain())
+        .await
+        .context("not allowed to reach out to the registry")?;
+
     // Through the same limits as the trivy scans: this is the other child
     // process an unauthenticated request can start, and what has to be bounded
     // is how many of them the host runs in total.

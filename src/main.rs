@@ -98,6 +98,16 @@ async fn main() -> Result<()> {
         "Limiting scans"
     );
 
+    event!(
+        Level::INFO,
+        registry_requests_per_minute = opt.registry_requests_per_minute.get(),
+        shared = redis_client.is_some(),
+        "Limiting what the registries are sent"
+    );
+
+    let registry_rate_limit =
+        handler::RateLimit::new(redis_client.clone(), opt.registry_requests_per_minute);
+
     let state = handler::AppState {
         server: opt.server,
         docker_registry_client: registry,
@@ -105,6 +115,7 @@ async fn main() -> Result<()> {
         // that fetch can take, which is what the scan limits say.
         cache: handler::Cache::new(redis_client, limits.max_duration()),
         limits,
+        registry_rate_limit,
 
         #[cfg(not(debug_assertions))]
         minify_config: minify_html::Cfg {
