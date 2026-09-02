@@ -5,7 +5,15 @@ module(
     version = "0.1.0",
 )
 
-bazel_dep(name = "rules_rs", version = "0.0.107")
+# 0.0.108 or newer, not 0.0.107. The Linux rustc it downloads bundles a
+# libLLVM linked against libz.so.1, so the toolchain repository fetches a
+# zlib1g .deb to go with it. Up to 0.0.107 that came from
+# archive.ubuntu.com/ubuntu/pool, which only ever carries the *current* build
+# of a package: the moment Ubuntu published a newer point release the pinned
+# filename 404'd and every fresh fetch broke, while machines that already had
+# it in their repository cache kept working. 0.0.108 pins the same file at an
+# immutable snapshot.ubuntu.com timestamp instead.
+bazel_dep(name = "rules_rs", version = "0.0.108")
 
 toolchains = use_extension("@rules_rs//rs/toolchains:module_extension.bzl", "toolchains")
 
