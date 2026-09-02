@@ -26,7 +26,6 @@ use serde::{
     Deserialize,
     Serialize,
 };
-use tokio::task;
 use tracing::{
     Instrument,
     error,
@@ -100,26 +99,23 @@ pub(crate) async fn image(
 ) -> Result<ImageResponse, eyre::Error> {
     let image: Image = form.image.trim().parse()?;
 
-    let docker_and_cosign_manifest = {
-        let cache = state.cache.clone();
-
-        task::spawn(
-            fetch_docker_and_cosign_manifest(
-                state.docker_registry_client.clone(),
-                image.clone(),
-                cache,
-            )
-            .instrument(info_span!("fetch_docker_and_cosign_manifest")),
+    // Joined rather than spawned: a spawned task outlives the request that
+    // wanted it, so a caller hanging up would leave the cosign process running
+    // for a result nobody is going to read -- and holding a scan slot while it
+    // does. Both of these wait on IO, so running them on this task concurrently
+    // is what spawning them bought anyway.
+    let (docker_and_cosign_manifest, cosign_verify) = tokio::join!(
+        fetch_docker_and_cosign_manifest(
+            state.docker_registry_client.clone(),
+            image.clone(),
+            state.cache.clone(),
         )
-    };
-
-    let cosign_verify = task::spawn(
+        .instrument(info_span!("fetch_docker_and_cosign_manifest")),
         fetch_cosign_verify(form.cosign_key, image.clone(), state.limits.clone())
             .instrument(info_span!("fetch_cosign_verify")),
     );
 
-    let (docker_information, cosign_information) = docker_and_cosign_manifest.await?;
-    let cosign_verify = cosign_verify.await?;
+    let (docker_information, cosign_information) = docker_and_cosign_manifest;
 
     let response = ImageResponse {
         image,

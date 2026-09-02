@@ -8,6 +8,7 @@ use std::{
         Mutex,
         Weak,
     },
+    time::Duration,
 };
 
 use chrono::Utc;
@@ -77,19 +78,32 @@ pub(crate) struct Cache {
     /// a cold key once each; the ceiling on what that can cost is
     /// [`Limits`](crate::handler::process::Limits), not this.
     in_flight: Arc<Mutex<HashMap<String, Weak<tokio::sync::Mutex<()>>>>>,
+
+    /// How long waiting for a running fetch of the same key is worth it.
+    ///
+    /// Waiting is the whole point -- the fetch being waited for is a scan, and
+    /// reading its result beats running a second one -- but it cannot be
+    /// unbounded: a fetch that fails caches nothing, so the next waiter runs
+    /// its own, and the one behind that would otherwise wait for both. Set to
+    /// the longest a single fetch can take, so the wait is bounded by one of
+    /// them rather than by however many happen to queue up.
+    fetch_wait_timeout: Duration,
 }
 
 impl Cache {
-    pub(crate) fn new(redis: Option<RedisClient>) -> Self {
+    pub(crate) fn new(redis: Option<RedisClient>, fetch_wait_timeout: Duration) -> Self {
         Self {
             redis,
             in_flight: Arc::default(),
+            fetch_wait_timeout,
         }
     }
 
     /// Waits until no other fetch of `key` is running, and keeps the next one
     /// waiting until the returned guard is dropped.
-    async fn lock_key(&self, key: &str) -> tokio::sync::OwnedMutexGuard<()> {
+    ///
+    /// Fails rather than waiting past [`Cache::fetch_wait_timeout`].
+    async fn lock_key(&self, key: &str) -> Result<tokio::sync::OwnedMutexGuard<()>> {
         let fetching = {
             let mut in_flight = match self.in_flight.lock() {
                 Ok(in_flight) => in_flight,
@@ -113,7 +127,15 @@ impl Cache {
             }
         };
 
-        fetching.lock_owned().await
+        tokio::time::timeout(self.fetch_wait_timeout, fetching.lock_owned())
+            .await
+            .map_err(|_elapsed| {
+                eyre::eyre!(
+                    "gave up after {seconds} seconds waiting for the fetch of {key} that is \
+                     already running, please try again in a moment",
+                    seconds = self.fetch_wait_timeout.as_secs()
+                )
+            })
     }
 }
 
@@ -185,7 +207,7 @@ pub(crate) trait Fetch {
         let _fetching = cache
             .lock_key(&key)
             .instrument(info_span!("wait for a running fetch of the same key"))
-            .await;
+            .await?;
 
         // Whoever held the lock has cached its result by now, if it got one.
         if let Some(cached) = cached(redis_client, &key).await? {
@@ -370,6 +392,7 @@ mod tests {
     use crate::handler::process::Limits;
 
     use super::{
+        Cache,
         Fetch,
         TrivyInformationFetcher,
     };
@@ -410,6 +433,40 @@ mod tests {
 
         assert!(anonymous.cacheable());
         assert!(!credentialed.cacheable());
+    }
+
+    /// Waiting for the fetch in front is worth doing, but not for as long as
+    /// it takes: a fetch that fails caches nothing, so the waiters behind it
+    /// would otherwise queue up one full scan each.
+    #[tokio::test]
+    async fn waiting_for_a_running_fetch_gives_up_eventually() {
+        let cache = Cache::new(None, Duration::from_millis(50));
+
+        let running = cache.lock_key("trivy-web:trivy:v2:alpine").await.unwrap();
+
+        let err = cache
+            .lock_key("trivy-web:trivy:v2:alpine")
+            .await
+            .unwrap_err()
+            .to_string();
+
+        assert!(err.contains("gave up after 0 seconds waiting"), "{err}");
+        assert!(err.contains("trivy-web:trivy:v2:alpine"), "{err}");
+
+        drop(running);
+
+        // And once the fetch in front is done, the next one is let through.
+        let _next = cache.lock_key("trivy-web:trivy:v2:alpine").await.unwrap();
+    }
+
+    /// One key holding up another would turn the whole service into a queue of
+    /// one, which is what the scan limits are for and not this.
+    #[tokio::test]
+    async fn a_running_fetch_only_holds_up_its_own_key() {
+        let cache = Cache::new(None, Duration::from_millis(50));
+
+        let _running = cache.lock_key("trivy-web:trivy:v2:alpine").await.unwrap();
+        let _other = cache.lock_key("trivy-web:trivy:v2:debian").await.unwrap();
     }
 
     #[test]

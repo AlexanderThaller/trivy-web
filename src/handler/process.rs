@@ -73,6 +73,14 @@ impl Limits {
         }
     }
 
+    /// The longest one [`Limits::run`] can take: the wait for a free slot plus
+    /// the deadline of the run itself.
+    ///
+    /// What anything waiting on a run has to bound its own waiting by.
+    pub(crate) fn max_duration(&self) -> Duration {
+        self.queue_timeout.saturating_add(self.run_timeout)
+    }
+
     /// Runs `command` to completion under the limits and collects its output.
     ///
     /// Fails without starting anything when no slot frees up in time, and
@@ -248,6 +256,32 @@ mod tests {
         );
 
         running.abort();
+    }
+
+    /// A caller that goes away mid-scan has to take the scan with it: the
+    /// child is killed and, what the next caller needs, the slot it held comes
+    /// back.
+    #[tokio::test]
+    async fn a_dropped_run_frees_its_slot() {
+        let limits = limits(1, 0, 10_000);
+
+        // Runs long enough to still hold the slot when the timeout drops the
+        // whole run, which is what a caller hanging up looks like from here.
+        let gone_away = tokio::time::timeout(
+            Duration::from_millis(200),
+            limits.run(Command::new("sleep").arg("60")),
+        )
+        .await;
+
+        assert!(gone_away.is_err(), "the run was supposed to be dropped");
+        assert_eq!(1, limits.permits.available_permits());
+
+        // With the slot still held this would be turned away: the queue timeout
+        // is zero.
+        limits
+            .run(Command::new("echo").arg("hello"))
+            .await
+            .expect("the slot should be free again");
     }
 
     #[tokio::test]

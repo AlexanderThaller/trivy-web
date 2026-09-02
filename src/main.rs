@@ -101,7 +101,9 @@ async fn main() -> Result<()> {
     let state = handler::AppState {
         server: opt.server,
         docker_registry_client: registry,
-        cache: handler::Cache::new(redis_client),
+        // Waiting for a fetch that is already running is bounded by how long
+        // that fetch can take, which is what the scan limits say.
+        cache: handler::Cache::new(redis_client, limits.max_duration()),
         limits,
 
         #[cfg(not(debug_assertions))]
