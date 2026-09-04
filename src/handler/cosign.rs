@@ -260,17 +260,22 @@ pub(crate) async fn cosign_verify(
     limits: &Limits,
     registry_rate_limit: &RateLimit,
 ) -> Result<CosignVerify, eyre::Error> {
-    // Cosign pulls the signature from the registry, so it is counted like
-    // every other request this service points at one.
+    // Through the same limits as the trivy scans: this is the other child
+    // process an unauthenticated request can start, and what has to be bounded
+    // is how many of them the host runs in total.
+    let admitted = limits.admit().await?;
+
+    // Cosign pulls the signature from the registry, so it is counted like every
+    // other request this service points at one -- but only now that it has a
+    // slot and is really going to be made. Counted before the wait for the
+    // slot, a request turned away by that wait would have spent budget the
+    // registry never saw a request for.
     registry_rate_limit
         .claim(image.registry.registry_domain())
         .await
         .context("not allowed to reach out to the registry")?;
 
-    // Through the same limits as the trivy scans: this is the other child
-    // process an unauthenticated request can start, and what has to be bounded
-    // is how many of them the host runs in total.
-    let output = limits
+    let output = admitted
         .run(
             Command::new("cosign")
                 .arg("verify")
@@ -326,13 +331,58 @@ fn triangulate(image: &Image, digest: &str) -> Result<Url> {
 #[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 #[expect(clippy::todo, reason = "using todo in tests is fine")]
 mod test {
+    use std::{
+        num::{
+            NonZeroU32,
+            NonZeroUsize,
+        },
+        time::Duration,
+    };
+
     use docker_registry_client::Manifest as DockerManifest;
     use pretty_assertions::assert_eq;
 
-    use crate::handler::cosign::{
-        cosign_manifest,
-        signature_from_manifest,
+    use crate::handler::{
+        cosign::{
+            cosign_manifest,
+            cosign_verify,
+            signature_from_manifest,
+        },
+        process::Limits,
+        registry::RateLimit,
     };
+
+    /// A verification that never gets a slot must not have spent the
+    /// registry's budget on its way to being turned away: nothing was sent to
+    /// the registry, and the budget is what the registries are sent.
+    #[tokio::test]
+    async fn a_verify_that_is_turned_away_does_not_spend_the_registry_budget() {
+        let limits = Limits::new(
+            NonZeroUsize::new(1).unwrap(),
+            Duration::ZERO,
+            Duration::from_secs(600),
+        );
+
+        let registry_rate_limit = RateLimit::new(None, NonZeroU32::new(1).unwrap());
+
+        // The only slot there is, held for as long as this test runs.
+        let _slot = limits.admit().await.unwrap();
+
+        let err = cosign_verify(
+            "cosign.pub",
+            &"ghcr.io/aquasecurity/trivy:0.52.0".parse().unwrap(),
+            &limits,
+            &registry_rate_limit,
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+
+        assert!(err.contains("too many scans are already running"), "{err}");
+
+        // Untouched: the one request a minute this allows is still to be had.
+        registry_rate_limit.claim("ghcr.io").await.unwrap();
+    }
 
     #[ignore = "need to check why manifest_location is failing because its expecting a url"]
     #[tokio::test]

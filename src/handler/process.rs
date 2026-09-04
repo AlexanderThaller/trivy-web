@@ -82,20 +82,23 @@ impl Limits {
         }
     }
 
-    /// The longest one [`Limits::run`] can take: the wait for a free slot plus
-    /// the deadline of the run itself.
+    /// The longest a scan can take from asking for a slot to being done with
+    /// it: the wait for the slot plus the deadline of the run itself.
     ///
     /// What anything waiting on a run has to bound its own waiting by.
     pub(crate) fn max_duration(&self) -> Duration {
         self.queue_timeout.saturating_add(self.run_timeout)
     }
 
-    /// Runs `command` to completion under the limits and collects its output.
+    /// Waits for a free scan slot.
     ///
-    /// Fails without starting anything when no slot frees up in time, and
-    /// fails with the child killed when it outruns the deadline or writes more
-    /// than [`MAX_OUTPUT_BYTES`].
-    pub(crate) async fn run(&self, command: &mut Command) -> Result<Output> {
+    /// Separate from the run so that what is only worth doing once a scan is
+    /// actually going to happen -- counting it against the registry it is about
+    /// to pull from -- happens in between, rather than being paid by the
+    /// callers that wait for a slot and never get one.
+    ///
+    /// Fails without starting anything when no slot frees up in time.
+    pub(crate) async fn admit(&self) -> Result<Admitted> {
         let permit = timeout(self.queue_timeout, self.permits.clone().acquire_owned())
             .instrument(info_span!("wait for a scan slot"))
             .await
@@ -108,6 +111,26 @@ impl Limits {
             })?
             .context("the scan slots are gone, the server is shutting down")?;
 
+        Ok(Admitted {
+            permit,
+            run_timeout: self.run_timeout,
+        })
+    }
+}
+
+/// A scan slot, taken and held until the scan it was taken for is over.
+#[derive(Debug)]
+pub(crate) struct Admitted {
+    permit: OwnedSemaphorePermit,
+    run_timeout: Duration,
+}
+
+impl Admitted {
+    /// Runs `command` to completion in this slot and collects its output.
+    ///
+    /// Fails with the child killed when it outruns the deadline or writes more
+    /// than [`MAX_OUTPUT_BYTES`].
+    pub(crate) async fn run(self, command: &mut Command) -> Result<Output> {
         let child = command
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -119,7 +142,7 @@ impl Limits {
 
         // The slot travels with the child from here on, and comes back only
         // once the child is gone.
-        let mut running = Running::new(child, permit);
+        let mut running = Running::new(child, self.permit);
 
         let stdout = running
             .child()
@@ -275,6 +298,12 @@ mod tests {
         read_limited,
     };
 
+    /// The two steps in one, for the tests that are not about what happens
+    /// between them.
+    async fn run(limits: &Limits, command: &mut Command) -> super::Result<super::Output> {
+        limits.admit().await?.run(command).await
+    }
+
     fn limits(max_concurrent: usize, queue_timeout_ms: u64, run_timeout_ms: u64) -> Limits {
         Limits::new(
             NonZeroUsize::new(max_concurrent).unwrap(),
@@ -285,8 +314,7 @@ mod tests {
 
     #[tokio::test]
     async fn output_is_collected() {
-        let got = limits(1, 1_000, 10_000)
-            .run(Command::new("echo").arg("hello"))
+        let got = run(&limits(1, 1_000, 10_000), Command::new("echo").arg("hello"))
             .await
             .unwrap();
 
@@ -300,8 +328,7 @@ mod tests {
     async fn a_run_past_the_deadline_is_killed() {
         let started = Instant::now();
 
-        let err = limits(1, 1_000, 200)
-            .run(Command::new("sleep").arg("60"))
+        let err = run(&limits(1, 1_000, 200), Command::new("sleep").arg("60"))
             .await
             .unwrap_err();
 
@@ -323,7 +350,7 @@ mod tests {
         let running = {
             let limits = limits.clone();
 
-            tokio::spawn(async move { limits.run(Command::new("sleep").arg("60")).await })
+            tokio::spawn(async move { run(&limits, Command::new("sleep").arg("60")).await })
         };
 
         // Long enough for the spawned scan to have taken the only permit.
@@ -331,8 +358,7 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
 
-        let err = limits
-            .run(Command::new("echo").arg("hello"))
+        let err = run(&limits, Command::new("echo").arg("hello"))
             .await
             .unwrap_err();
 
@@ -355,14 +381,13 @@ mod tests {
         // whole run, which is what a caller hanging up looks like from here.
         let gone_away = tokio::time::timeout(
             Duration::from_millis(200),
-            limits.run(Command::new("sleep").arg("60")),
+            run(&limits, Command::new("sleep").arg("60")),
         )
         .await;
 
         assert!(gone_away.is_err(), "the run was supposed to be dropped");
 
-        limits
-            .run(Command::new("echo").arg("hello"))
+        run(&limits, Command::new("echo").arg("hello"))
             .await
             .expect("the slot should come back");
     }

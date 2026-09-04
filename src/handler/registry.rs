@@ -34,6 +34,11 @@ use eyre::{
 use fred::{
     clients::Client as RedisClient,
     interfaces::KeysInterface,
+    types::{
+        Expiration,
+        SetOptions,
+        Value,
+    },
 };
 use tracing::{
     Instrument,
@@ -150,6 +155,28 @@ impl RateLimit {
 async fn claim_redis(redis: &RedisClient, registry: &str, window: i64) -> Result<i64> {
     let key = format!("{REDIS_KEY_PREFIX}:registry_requests:{registry}:{window}");
 
+    // The counter is created carrying its expiry, rather than incremented and
+    // then expired: an instance that died between those two would leave behind
+    // a counter that nothing ever reads again -- the key names a window that
+    // has passed -- and that nothing ever removes either.
+    //
+    // NX, so that this only ever starts a count and never resets one another
+    // instance is already keeping. It leaves one gap, the key expiring between
+    // this and the increment below, which would recreate it without an expiry.
+    // Nothing can reach it: the key names the minute it counts, so it stops
+    // being incremented a minute before it is due to expire.
+    let _: Value = redis
+        .set(
+            &key,
+            0,
+            Some(Expiration::EX(KEY_TTL_SECONDS)),
+            Some(SetOptions::NX),
+            false,
+        )
+        .instrument(info_span!("start the registry request count in redis"))
+        .await
+        .context("failed to start the registry request count in redis")?;
+
     let requests: i64 = redis
         .incr(&key)
         .instrument(info_span!(
@@ -157,15 +184,6 @@ async fn claim_redis(redis: &RedisClient, registry: &str, window: i64) -> Result
         ))
         .await
         .context("failed to count the request against the registry in redis")?;
-
-    // Refreshed on every request rather than only on the first: an instance
-    // that died between the two would otherwise leave behind a key named after
-    // a window that has passed, which nothing ever reads or removes again.
-    let () = redis
-        .expire(&key, KEY_TTL_SECONDS, None)
-        .instrument(info_span!("expire the registry request count in redis"))
-        .await
-        .context("failed to expire the registry request count in redis")?;
 
     Ok(requests)
 }

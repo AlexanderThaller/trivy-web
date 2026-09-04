@@ -174,12 +174,12 @@ pub(crate) trait Fetch {
     fn key(&self) -> String;
     async fn fetch(&self) -> Result<Self::Output>;
 
-    /// The registry a fetch reaches out to, which is what the fetch is counted
-    /// against before it is allowed to happen.
+    /// The registry to count this fetch against before it is allowed to run,
+    /// unless something inside the fetch is better placed to do the counting.
     ///
     /// Without a default on purpose: a fetch that touches a registry without
     /// saying so is one the rate limit does not cover, and that should take
-    /// writing `None` rather than forgetting.
+    /// writing `None` and saying why rather than forgetting.
     fn registry(&self) -> Option<&str>;
 
     /// Counts the fetch against the rate limit of the registry it reaches out
@@ -300,6 +300,7 @@ pub(crate) struct TrivyInformationFetcher<'a> {
     pub(crate) trivy_username: Option<&'a str>,
     pub(crate) trivy_password: Option<&'a str>,
     pub(crate) limits: &'a Limits,
+    pub(crate) registry_rate_limit: &'a RateLimit,
 }
 
 /// Hand written so the submitted credentials never reach a log or a trace:
@@ -319,12 +320,17 @@ impl std::fmt::Debug for TrivyInformationFetcher<'_> {
 impl Fetch for TrivyInformationFetcher<'_> {
     type Output = TrivyInformation;
 
-    /// Trivy pulls the image itself, and does so from this instance even when
-    /// the scanning is handed to a trivy server: it is the client that reads
-    /// the image and the server that matches what it finds against the
-    /// vulnerability database.
+    /// None, because the scan counts itself.
+    ///
+    /// Trivy pulls the image from this instance even when the scanning is
+    /// handed to a trivy server -- the client reads the image, the server
+    /// matches what it finds against the vulnerability database -- but it can
+    /// only do so once it has a scan slot, and it is there, with the slot in
+    /// hand, that the pull is counted. Counting it here would spend the
+    /// registry's budget on scans that are still waiting for a slot and may
+    /// never get one.
     fn registry(&self) -> Option<&str> {
-        Some(self.image.registry.registry_domain())
+        None
     }
 
     fn key(&self) -> String {
@@ -350,6 +356,7 @@ impl Fetch for TrivyInformationFetcher<'_> {
             self.trivy_username,
             self.trivy_password,
             self.limits,
+            self.registry_rate_limit,
         )
         .await?;
 
@@ -382,7 +389,18 @@ pub(crate) struct CosignInformationFetcher<'a> {
 impl Fetch for CosignInformationFetcher<'_> {
     type Output = CosignInformation;
 
+    /// Only when the fetch below is going to get as far as the registry.
+    /// Without a manifest digest to look the signature up by it gives up
+    /// before it makes a request, and a request that is not made is not
+    /// counted.
     fn registry(&self) -> Option<&str> {
+        self.docker_manifest
+            .as_ref()
+            .ok()?
+            .response
+            .digest
+            .as_ref()?;
+
         Some(self.image.registry.registry_domain())
     }
 
@@ -426,15 +444,23 @@ impl Fetch for CosignInformationFetcher<'_> {
 #[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 mod tests {
     use std::{
-        num::NonZeroUsize,
+        num::{
+            NonZeroU32,
+            NonZeroUsize,
+        },
         sync::LazyLock,
         time::Duration,
     };
 
-    use crate::handler::process::Limits;
+    use crate::handler::{
+        process::Limits,
+        registry::RateLimit,
+    };
 
     use super::{
         Cache,
+        CosignInformationFetcher,
+        DockerInformation,
         Fetch,
         TrivyInformationFetcher,
     };
@@ -447,6 +473,9 @@ mod tests {
         )
     });
 
+    static REGISTRY_RATE_LIMIT: LazyLock<RateLimit> =
+        LazyLock::new(|| RateLimit::new(None, NonZeroU32::new(60).unwrap()));
+
     fn fetcher<'a>(
         image: &'a docker_registry_client::Image,
         credentials: Option<(&'a str, &'a str)>,
@@ -457,6 +486,7 @@ mod tests {
             trivy_username: credentials.map(|(username, _)| username),
             trivy_password: credentials.map(|(_, password)| password),
             limits: &LIMITS,
+            registry_rate_limit: &REGISTRY_RATE_LIMIT,
         }
     }
 
@@ -509,6 +539,46 @@ mod tests {
 
         let _running = cache.lock_key("trivy-web:trivy:v2:alpine").await.unwrap();
         let _other = cache.lock_key("trivy-web:trivy:v2:debian").await.unwrap();
+    }
+
+    /// The cosign fetch gives up before it makes a request when there is no
+    /// manifest digest to look a signature up by, and a request that is not
+    /// made is not counted against the registry.
+    #[test]
+    fn a_cosign_fetch_that_cannot_reach_the_registry_is_not_counted() {
+        let image: docker_registry_client::Image = "ghcr.io/foo/bar:1".parse().unwrap();
+        let client = docker_registry_client::Client::default();
+
+        let fetcher = |docker_manifest| CosignInformationFetcher {
+            docker_registry_client: &client,
+            image: &image,
+            docker_manifest,
+        };
+
+        let failed = Err(eyre::eyre!("no manifest"));
+        assert_eq!(None, fetcher(&failed).registry());
+
+        let without_digest = Ok(docker_information(None));
+        assert_eq!(None, fetcher(&without_digest).registry());
+
+        let with_digest = Ok(docker_information(Some("sha256:c0ffee")));
+        assert_eq!(Some("ghcr.io"), fetcher(&with_digest).registry());
+    }
+
+    /// A manifest as it comes back from a registry, with the digest under test.
+    fn docker_information(digest: Option<&str>) -> DockerInformation {
+        let manifest = serde_json::from_str(include_str!(
+            "../resources/tests/trivy-manifest-response.json"
+        ))
+        .unwrap();
+
+        DockerInformation {
+            response: docker_registry_client::Response {
+                digest: digest.map(ToOwned::to_owned),
+                manifest,
+            },
+            fetch_time: chrono::Utc::now(),
+        }
     }
 
     #[test]

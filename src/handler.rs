@@ -316,6 +316,7 @@ pub(super) async fn trivy(
         },
 
         limits: &state.limits,
+        registry_rate_limit: &state.registry_rate_limit,
     }
     .cache_or_fetch(&state.cache, &state.registry_rate_limit)
     .await

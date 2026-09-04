@@ -17,7 +17,10 @@ use tracing::{
 };
 use url::Url;
 
-use super::process::Limits;
+use super::{
+    process::Limits,
+    registry::RateLimit,
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -265,6 +268,7 @@ pub(super) async fn scan_image(
     username: Option<&str>,
     password: Option<&str>,
     limits: &Limits,
+    registry_rate_limit: &RateLimit,
 ) -> Result<TrivyResult, eyre::Error> {
     // run following command trivy image --format json
     // linuxserver/code-server:latest
@@ -290,7 +294,18 @@ pub(super) async fn scan_image(
     // Through the limits rather than `Command::output`: the scan runs only
     // when the server has a slot for it, is killed if it overruns the deadline
     // and cannot buffer an unbounded amount of output.
-    let output = limits
+    let admitted = limits.admit().await?;
+
+    // Counted against the registry only now that the scan has a slot and is
+    // really going to pull from it. Counted before the wait for the slot, a
+    // scan turned away by that wait would have spent budget the registry never
+    // saw a request for.
+    registry_rate_limit
+        .claim(image.registry.registry_domain())
+        .await
+        .context("not allowed to reach out to the registry")?;
+
+    let output = admitted
         .run(command)
         .instrument(info_span!("run trivy command"))
         .await
@@ -316,12 +331,16 @@ pub(super) async fn scan_image(
 #[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 mod test {
     use std::{
-        num::NonZeroUsize,
+        num::{
+            NonZeroU32,
+            NonZeroUsize,
+        },
         time::Duration,
     };
 
     use super::{
         Limits,
+        RateLimit,
         TrivyResult,
     };
 
@@ -332,6 +351,11 @@ mod test {
             Duration::from_secs(30),
             Duration::from_secs(600),
         )
+    }
+
+    /// The same, for the registry the scan pulls from.
+    fn registry_rate_limit() -> RateLimit {
+        RateLimit::new(None, NonZeroU32::new(60).unwrap())
     }
 
     #[test]
@@ -375,6 +399,40 @@ mod test {
         );
     }
 
+    /// A scan that never gets a slot must not have spent the registry's budget
+    /// on its way to being turned away: nothing was sent to the registry, and
+    /// the budget is what the registries are sent.
+    #[tokio::test]
+    async fn a_scan_that_is_turned_away_does_not_spend_the_registry_budget() {
+        let limits = Limits::new(
+            NonZeroUsize::new(1).unwrap(),
+            Duration::ZERO,
+            Duration::from_secs(600),
+        );
+
+        let registry_rate_limit = RateLimit::new(None, NonZeroU32::new(1).unwrap());
+
+        // The only slot there is, held for as long as this test runs.
+        let _slot = limits.admit().await.unwrap();
+
+        let err = super::scan_image(
+            &"ghcr.io/aquasecurity/trivy:0.52.0".parse().unwrap(),
+            None,
+            None,
+            None,
+            &limits,
+            &registry_rate_limit,
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+
+        assert!(err.contains("too many scans are already running"), "{err}");
+
+        // Untouched: the one request a minute this allows is still to be had.
+        registry_rate_limit.claim("ghcr.io").await.unwrap();
+    }
+
     #[tokio::test]
     #[should_panic(expected = "should fail")]
     async fn missing() {
@@ -384,6 +442,7 @@ mod test {
             None,
             None,
             &limits(),
+            &registry_rate_limit(),
         )
         .await
         .expect("should fail");
@@ -401,6 +460,7 @@ mod test {
             None,
             None,
             &limits(),
+            &registry_rate_limit(),
         )
         .await
         .unwrap();
