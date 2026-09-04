@@ -1,142 +1,181 @@
 {% match information %}
 {% when Ok(information) %}
-<h3>Cache Information</h3>
-<p>Fetch Time: {{ information.fetch_time }} ({{ information.fetch_duration() }})</p>
-<p>Expires: {{ information.expires() }} ({{ information.expires_duration() }})</p>
-{% if !information.report_summary.is_empty() %}
-<h3>Report Summary</h3>
-<table id="report_summary">
-    <thead>
-        <tr>
-            <th>target</th>
-            <th>type</th>
-            <th>vulnerabilities</th>
-            <th>secrets</th>
-            <th>severities</th>
-        </tr>
-    </thead>
+<dl class="meta">
+    <div>
+        <dt>Scanned</dt>
+        <dd>{{ information.fetch_time|timestamp }} <span class="muted">({{ information.fetch_duration()|duration }} ago)</span></dd>
+    </div>
+    <div>
+        <dt>Cache expires</dt>
+        <dd>{{ information.expires()|timestamp }} <span class="muted">(in {{ information.expires_duration()|duration }})</span></dd>
+    </div>
+</dl>
 
-    <colgroup>
-        <col
-            span="1"
-            style="width: auto"
-        />
-        <col
-            span="1"
-            style="width: auto"
-        />
-        <col
-            span="1"
-            style="width: auto"
-        />
-        <col
-            span="1"
-            style="width: auto"
-        />
-        <col
-            span="1"
-            style="width: auto"
-        />
-    </colgroup>
-
-    <tbody>
-        {% for summary in information.report_summary %}
-        <tr>
-            <td
-                class="target"
-                {% if let Some(class) = summary.class %}
-                title="{{ class }}"
-                {% endif %}
-            >{{ summary.target }}</td>
-
-            <td>{% if let Some(target_type) = summary.target_type %}{{ target_type
-                }}{% else %}-{% endif %}</td>
-
-            <td>{% if summary.vulnerabilities > 0 %}{{ summary.vulnerabilities }}{%
-                else %}-{% endif %}</td>
-
-            <td>{% if summary.secrets > 0 %}{{ summary.secrets }}{% else %}-{% endif
-                %}</td>
-
-            <td>
-                {% let severity_count = summary.severity_count %}
-                {% include "severity_count.html" %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% endif %}
-
-<h3>Vulnerabilities</h3>
 {% let severity_count = information.severity_count %}
 {% include "severity_count.html" %}
 
-<table id="cves">
-    <thead>
-        <tr>
-            <th></th>
-            <th>severity</th>
-            <th>id</th>
-            <th>
-                affected packages [<span class="fixed_version">fixed version</span>]
-            </th>
-            <th>CVE Information</th>
-        </tr>
-    </thead>
+{% if !information.report_summary.is_empty() %}
+<section class="section">
+    <h3>Scan targets</h3>
 
-    <colgroup>
-        <col
-            span="1"
-            style="width: 5px"
-        />
-        <col
-            span="1"
-            style="width: auto"
-        />
-        <col
-            span="1"
-            style="width: auto"
-        />
-        <col
-            span="1"
-            style="width: auto"
-        />
-        <col
-            span="1"
-            style="width: auto"
-        />
-    </colgroup>
+    <div class="table-scroll">
+        <table id="report_summary">
+            <thead>
+                <tr>
+                    <th>Target</th>
+                    <th>Type</th>
+                    <th class="num">Vulns</th>
+                    <th class="num">Secrets</th>
+                    <th>Severities</th>
+                </tr>
+            </thead>
 
-    <tbody>
-        {% for vulnerability in information.vulnerabilities %}
-        <tr class="{{ vulnerability.severity }}">
-            <td></td>
-            <td>{{ vulnerability.severity }}</td>
+            <tbody>
+                {% for summary in information.report_summary %}
+                <tr>
+                    <td
+                        class="target"
+                        {% if let Some(class) = summary.class %}
+                        title="{{ class }}"
+                        {% endif %}
+                    >{{ summary.target }}</td>
 
-            {% match vulnerability.primary_url() %} {% when Some with (url) %}
-            <td>
-                <a href="{{ url }}"> {{ vulnerability.id }} </a>
-            </td>
-            {% when None %}
-            <td>{{ vulnerability.id }}</td>
-            {% endmatch %}
+                    <td>{% if let Some(target_type) = summary.target_type %}{{ target_type
+                        }}{% else %}<span class="muted">—</span>{% endif %}</td>
 
-            <td>
-                {{ vulnerability.pkg_name }} {{ vulnerability.installed_version }} {%
-                match vulnerability.fixed_version %}{% when Some with (fixed_version)
-                %}[<span class="fixed_version">{{ fixed_version}}</span>]{% when None
-                %}{% endmatch %}
-            </td>
-            <td>{% include "cve_information.html" %}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+                    <td class="num">{% if summary.vulnerabilities > 0 %}{{ summary.vulnerabilities
+                        }}{% else %}<span class="muted">—</span>{% endif %}</td>
+
+                    <td class="num">{% if summary.secrets > 0 %}{{ summary.secrets
+                        }}{% else %}<span class="muted">—</span>{% endif %}</td>
+
+                    <td>
+                        {% let severity_count = summary.severity_count %}
+                        {% include "severity_count.html" %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
+<section class="section">
+    <h3>Findings</h3>
+
+    {% if information.vulnerabilities.is_empty() %}
+    <p class="empty">No vulnerabilities found in this image.</p>
+    {% else %}
+    <div
+        class="toolbar"
+        id="cve_filter"
+    >
+        <input
+            class="filter-input"
+            type="search"
+            placeholder="Filter by CVE, package or title…"
+            aria-label="Filter vulnerabilities"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+        />
+
+        <div class="filter-severities">
+            <label title="Critical">
+                <input
+                    type="checkbox"
+                    value="CRITICAL"
+                    checked
+                />
+                <span class="severity severity-CRITICAL">Critical</span>
+            </label>
+            <label title="High">
+                <input
+                    type="checkbox"
+                    value="HIGH"
+                    checked
+                />
+                <span class="severity severity-HIGH">High</span>
+            </label>
+            <label title="Medium">
+                <input
+                    type="checkbox"
+                    value="MEDIUM"
+                    checked
+                />
+                <span class="severity severity-MEDIUM">Medium</span>
+            </label>
+            <label title="Low">
+                <input
+                    type="checkbox"
+                    value="LOW"
+                    checked
+                />
+                <span class="severity severity-LOW">Low</span>
+            </label>
+            <label title="Unknown">
+                <input
+                    type="checkbox"
+                    value="UNKNOWN"
+                    checked
+                />
+                <span class="severity severity-UNKNOWN">Unknown</span>
+            </label>
+        </div>
+
+        <span
+            class="filter-count"
+            id="cve_count"
+        ></span>
+    </div>
+
+    <div class="table-scroll">
+        <table id="cves">
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>ID</th>
+                    <th>Package</th>
+                    <th>Fixed in</th>
+                    <th class="num">CVSS</th>
+                    <th>Title</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for vulnerability in information.vulnerabilities %}
+                <tr class="{{ vulnerability.severity }}">
+                    <td data-label="Severity"><span class="severity severity-{{ vulnerability.severity }}">{{ vulnerability.severity }}</span></td>
+
+                    <td
+                        class="id"
+                        data-label="ID"
+                    >{% match vulnerability.primary_url() %}{% when Some with (url) %}<a
+                            href="{{ url }}"
+                            rel="noreferrer noopener"
+                            target="_blank"
+                        >{{ vulnerability.id }}</a>{% when None %}{{ vulnerability.id }}{% endmatch %}</td>
+
+                    <td
+                        class="package"
+                        data-label="Package"
+                    >{{ vulnerability.pkg_name }} <span class="muted">{{ vulnerability.installed_version }}</span></td>
+
+                    <td data-label="Fixed in">{% match vulnerability.fixed_version %}{% when Some with (fixed_version)
+                        %}<span class="fixed-version">{{ fixed_version }}</span>{% when None
+                        %}<span class="muted">—</span>{% endmatch %}</td>
+
+                    {% include "cve_information.html" %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</section>
 
 {% when Err(err) %}
-<h3>Error</h3>
-<code>
-{{ err|format_error|ansi_to_html|safe }}
-</code>
+<h4 class="error-title">Scan failed</h4>
+<code class="output output-error">{{ err|format_error|ansi_to_html|safe }}</code>
 {% endmatch %}

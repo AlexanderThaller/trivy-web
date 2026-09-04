@@ -8,7 +8,15 @@
     <meta charset="utf-8" />
     <meta
       name="viewport"
-      content="width=device-width"
+      content="width=device-width, initial-scale=1"
+    >
+    <meta
+      name="description"
+      content="Scan container images for vulnerabilities with Trivy and inspect their registry manifest and cosign signatures."
+    >
+    <meta
+      name="color-scheme"
+      content="dark light"
     >
 
     <link
@@ -24,62 +32,115 @@
   </head>
 
   <body>
-    <h1>Trivy Image Scanner</h1>
+    <header class="site-header">
+      <div class="wrap">
+        <h1 class="site-title"><span class="logo">▚</span> Trivy Image Scanner</h1>
+        <p class="site-tagline">
+          Vulnerabilities, registry manifest and cosign signatures for any
+          container image.
+        </p>
+      </div>
+    </header>
 
-    <form
-      id="form"
-      onsubmit="updateDivs(); return false;"
-    >
-      <fieldset>
-        <h2>Image</h2>
-        <p>
-          <label for="image">Image</label>
-          <input
-            id="image"
-            name="image"
-            {% if let Some(image) = image %}
-            value="{{ image }}"
-            {% endif %}
-          />
+    <main class="wrap">
+      <form
+        id="form"
+        class="card scan-form"
+        onsubmit="updateDivs(); return false;"
+      >
+        <div class="scan-row">
+          <div class="field">
+            <label for="image">Image reference</label>
+            <input
+              id="image"
+              name="image"
+              type="text"
+              placeholder="alpine:latest"
+              autocapitalize="off"
+              autocorrect="off"
+              autocomplete="off"
+              spellcheck="false"
+              required
+              {% if let Some(image) = image %}
+              value="{{ image }}"
+              {% endif %}
+            />
+          </div>
+
+          <button
+            id="submit"
+            type="submit"
+          >Scan</button>
+        </div>
+
+        <p class="hint">
+          Registry defaults to Docker Hub, e.g.
+          <code>ghcr.io/aquasecurity/trivy:latest</code>. The scan result is
+          linkable — the image ends up in the URL.
         </p>
 
-        <h2>Credentials</h2>
-        <p>
-          <label for="username">Username</label>
-          <input
-            id="username"
-            name="username"
-          />
-        </p>
+        <details class="advanced">
+          <summary>Private registry &amp; cosign</summary>
 
-        <p>
-          <label for="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            name="password"
-          />
-        </p>
+          <fieldset>
+            <div class="field-grid">
+              <div class="field">
+                <label for="username">Registry username</label>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  autocapitalize="off"
+                  autocorrect="off"
+                  autocomplete="username"
+                  spellcheck="false"
+                />
+              </div>
 
-        <h2>Cosign</h2>
-        <p>
-          <label for="cosign_key">Cosign Key</label>
-          <input
-            id="cosign_key"
-            name="cosign_key"
-          />
-        </p>
-      </fieldset>
+              <div class="field">
+                <label for="password">Registry password or token</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                />
+              </div>
 
-      <p>
-        <button>Submit</button>
-      </p>
-    </form>
+              <div class="field">
+                <label for="cosign_key">Cosign public key</label>
+                <input
+                  id="cosign_key"
+                  name="cosign_key"
+                  type="text"
+                  placeholder="https://… or inline key"
+                  autocapitalize="off"
+                  autocorrect="off"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+            </div>
 
-    <div id="image_information"></div>
-    <div id="scan_information"></div>
+            <p class="hint">
+              Credentials are only used for this scan and are never stored or
+              put into the URL.
+            </p>
+          </fieldset>
+        </details>
+      </form>
 
-    {% include "footer.html" %}
+      <div
+        id="image_information"
+        aria-live="polite"
+      ></div>
+      <div
+        id="scan_information"
+        aria-live="polite"
+      ></div>
+
+      {% include "footer.html" %}
+    </main>
 
     <script>
       function slugifyHeading(text) {
@@ -94,8 +155,10 @@
           .replace(/^-|-$/g, '');
       }
 
-      function addHeadingAnchors(root = document) {
-        var headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      function addHeadingAnchors(root) {
+        root = root || document;
+
+        var headings = root.querySelectorAll('h2, h3, h4, h5, h6');
         var usedIds = new Set(
           Array.from(document.querySelectorAll('[id]')).map(function (element) {
             return element.id;
@@ -135,6 +198,74 @@
         });
       }
 
+      function loadingCard(title) {
+        return `<section class="card">
+          <h2>${title}</h2>
+          <p class="loading"><span class="spinner"></span> Fetching…</p>
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+        </section>`;
+      }
+
+      function setBusy(busy) {
+        var button = document.getElementById('submit');
+        button.disabled = busy;
+        button.textContent = busy ? 'Scanning…' : 'Scan';
+      }
+
+      // Client side filtering of the vulnerability table. The table is swapped
+      // in by htmx, so everything is looked up lazily on each call.
+      function filterVulnerabilities() {
+        var table = document.getElementById('cves');
+        if (!table) {
+          return;
+        }
+
+        var toolbar = document.getElementById('cve_filter');
+        var needle = '';
+        var severities = null;
+
+        if (toolbar) {
+          needle = toolbar.querySelector('.filter-input').value.trim().toLowerCase();
+          severities = new Set(
+            Array.from(toolbar.querySelectorAll('input[type=checkbox]:checked')).map(
+              function (checkbox) {
+                return checkbox.value;
+              }
+            )
+          );
+        }
+
+        var rows = table.tBodies[0].rows;
+        var shown = 0;
+
+        for (var index = 0; index < rows.length; index += 1) {
+          var row = rows[index];
+
+          if (!row.dataset.haystack) {
+            row.dataset.haystack = row.textContent.toLowerCase().replace(/\s+/g, ' ');
+          }
+
+          var visible =
+            (severities === null || severities.has(row.className)) &&
+            (needle === '' || row.dataset.haystack.includes(needle));
+
+          row.hidden = !visible;
+          if (visible) {
+            shown += 1;
+          }
+        }
+
+        var count = document.getElementById('cve_count');
+        if (count) {
+          count.textContent =
+            shown === rows.length
+              ? `${rows.length} vulnerabilities`
+              : `${shown} of ${rows.length} vulnerabilities`;
+        }
+      }
+
       function updateDivs() {
         var form = document.getElementById('form');
         var formData = new FormData(form);
@@ -148,17 +279,14 @@
         thisPage.searchParams.set('image', image);
         window.history.pushState({}, '', thisPage);
 
-        document.getElementById('image_information').innerHTML = `<hr><h2>Image Information</h2>
-        <img src="/img/bars.svg">
-        <h2>Cosign Information</h2>
-        <img src="/img/bars.svg">`;
+        setBusy(true);
 
-        document.getElementById('scan_information').innerHTML = `<h2>Trivy Information</h2>
-        <img src="/img/bars.svg">`;
-        addHeadingAnchors(document.getElementById('image_information'));
-        addHeadingAnchors(document.getElementById('scan_information'));
+        document.getElementById('image_information').innerHTML =
+          loadingCard('Image') + loadingCard('Cosign');
+        document.getElementById('scan_information').innerHTML =
+          loadingCard('Vulnerabilities');
 
-        htmx.ajax('POST', '/image', {
+        var imageRequest = htmx.ajax('POST', '/image', {
           target: '#image_information',
           swap: 'innerHTML',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -168,7 +296,7 @@
           }
         });
 
-        htmx.ajax('POST', '/trivy', {
+        var trivyRequest = htmx.ajax('POST', '/trivy', {
           target: '#scan_information',
           swap: 'innerHTML',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -178,21 +306,39 @@
             password: password,
           }
         });
+
+        Promise.allSettled([imageRequest, trivyRequest]).then(function () {
+          setBusy(false);
+        });
       }
 
       function submitCheck() {
-        if (window.location.href.includes('?')) {
+        if (document.getElementById('image').value !== '') {
           updateDivs();
         }
       }
 
-      window.addEventListener("load", () => {
+      window.addEventListener('load', () => {
         addHeadingAnchors();
         submitCheck();
       });
 
-      document.body.addEventListener('htmx:afterSwap', function (event) {
+      // htmx 4 dispatches colon separated event names.
+      document.body.addEventListener('htmx:after:swap', function (event) {
         addHeadingAnchors(event.target);
+        filterVulnerabilities();
+      });
+
+      document.body.addEventListener('input', function (event) {
+        if (event.target.closest('#cve_filter')) {
+          filterVulnerabilities();
+        }
+      });
+
+      document.body.addEventListener('change', function (event) {
+        if (event.target.closest('#cve_filter')) {
+          filterVulnerabilities();
+        }
       });
     </script>
   </body>

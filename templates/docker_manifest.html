@@ -1,76 +1,87 @@
-<p>Image: {{ image }}</p>
-
 {% match docker_information %}
 {% when Ok(information) %}
-<h3>Cache Information</h3>
-<p>Fetch Time: {{ information.fetch_time }} ({{ information.fetch_duration() }})</p>
-<p>Expires: {{ information.expires() }} ({{ information.expires_duration() }})</p>
-{% if let Some(digest) = information.response.digest %}
-<h3>Image Information</h3>
-Digest: {{ digest }}
-{% else %}
-Digest: Not available
-{% endif %}
+<dl class="meta">
+    <div>
+        <dt>Digest</dt>
+        <dd>{% if let Some(digest) = information.response.digest %}{{ digest }}{% else %}<span class="muted">not available</span>{% endif %}</dd>
+    </div>
+    <div>
+        <dt>Fetched</dt>
+        <dd>{{ information.fetch_time|timestamp }} <span class="muted">({{ information.fetch_duration()|duration }} ago)</span></dd>
+    </div>
+    <div>
+        <dt>Cache expires</dt>
+        <dd>{{ information.expires()|timestamp }} <span class="muted">(in {{ information.expires_duration()|duration }})</span></dd>
+    </div>
+</dl>
 
 {% match information.response.manifest %}
 {% when DockerManifest::Image with (image) %}
-<table>
-  <thead>
-    <tr>
-      <th>Size</th>
-      <th>Digest</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>{{ image.config.size }}</td>
-      <td>{{ image.config.digest }}</td>
-    </tr>
-  </tbody>
-</table>
+<div class="table-scroll">
+    <table>
+        <thead>
+            <tr>
+                <th class="num">Size</th>
+                <th>Config digest</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="num">{{ image.config.size|human_bytes }}</td>
+                <td class="digest">{{ image.config.digest }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
 
 {% when DockerManifest::List with (list) %}
-<table>
-  <thead>
-    <tr>
-      <th>Architecture</th>
-      <th>Os</th>
-      <th>Size</th>
-      <th>Digest</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for entry in list.manifests %}
-    <tr>
-      <td>{{ entry.platform.architecture }}</td>
-      <td>{{ entry.platform.os }}</td>
-      <td>{{ entry.size }}</td>
-      <td>{{ entry.digest }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="table-scroll">
+    <table>
+        <thead>
+            <tr>
+                <th>Architecture</th>
+                <th>OS</th>
+                <th class="num">Size</th>
+                <th>Digest</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in list.manifests %}
+            <tr>
+                <td>{{ entry.platform.architecture }}</td>
+                <td>{{ entry.platform.os }}</td>
+                <td class="num">{{ entry.size|human_bytes }}</td>
+                <td class="digest">{{ entry.digest }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
 {% when DockerManifest::Single with (single) %}
-<table>
-  <thead>
-    <tr>
-      <th>Architecture</th>
-      <th>Size</th>
-      <th>Digest</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>{{ single.architecture }}</td>
-    </tr>
-  </tbody>
-</table>
+<div class="table-scroll">
+    <table>
+        <thead>
+            <tr>
+                <th>Repository</th>
+                <th>Tag</th>
+                <th>Architecture</th>
+                <th class="num">Layers</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="digest">{{ single.name }}</td>
+                <td>{{ single.tag }}</td>
+                <td>{{ single.architecture }}</td>
+                <td class="num">{{ single.fs_layers.len() }}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
 
 {% endmatch %}
 {% when Err(err) %}
-<h4>Error</h4>
-<code>
-{{ err|format_error|ansi_to_html|safe }}
-</code>
+<h4 class="error-title">Could not read the manifest</h4>
+<code class="output output-error">{{ err|format_error|ansi_to_html|safe }}</code>
 {% endmatch %}

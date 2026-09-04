@@ -1,34 +1,49 @@
-
 {% match cosign_information %}
 {% when Ok(information) %}
-<h3>Cache Information</h3>
-<p>Fetch Time: {{ information.fetch_time }} ({{ information.fetch_duration() }})</p>
-<p>Expires: {{ information.expires() }} ({{ information.expires_duration() }})</p>
-<h3>Manifest</h3>
-{% if let Some(manifest) = information.cosign %}
-<p>Location: {{ manifest.manifest_location }}</p>
-<table>
-  <thead>
-    <tr>
-      <th>Issuer</th>
-      <th>Identity</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for signature in manifest.signatures %}
-    <tr>
-      <td>{{ signature.issuer }}</td>
-      <td>{{ signature.identity }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p>No manifest found</p>
-{% endif %}
+<dl class="meta">
+    <div>
+        <dt>Fetched</dt>
+        <dd>{{ information.fetch_time|timestamp }} <span class="muted">({{ information.fetch_duration()|duration }} ago)</span></dd>
+    </div>
+    <div>
+        <dt>Cache expires</dt>
+        <dd>{{ information.expires()|timestamp }} <span class="muted">(in {{ information.expires_duration()|duration }})</span></dd>
+    </div>
+    {% if let Some(manifest) = information.cosign %}
+    <div>
+        <dt>Location</dt>
+        <dd>{{ manifest.manifest_location }}</dd>
+    </div>
+    {% endif %}
+</dl>
+
+<section class="section">
+    <h3>Signatures</h3>
+
+    {% if let Some(manifest) = information.cosign %}
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Issuer</th>
+                    <th>Identity</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for signature in manifest.signatures %}
+                <tr>
+                    <td class="digest">{{ signature.issuer }}</td>
+                    <td class="digest">{{ signature.identity }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty">This image is not signed with cosign.</p>
+    {% endif %}
+</section>
 {% when Err(err) %}
-<h4>Error</h4>
-<code>
-{{ err|format_error|ansi_to_html|safe }}
-</code>
+<h4 class="error-title">Could not read the cosign manifest</h4>
+<code class="output output-error">{{ err|format_error|ansi_to_html|safe }}</code>
 {% endmatch %}

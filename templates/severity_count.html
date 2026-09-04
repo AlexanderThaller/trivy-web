@@ -1,22 +1,22 @@
 <ul class="severity_count">
     <li
-        class="critical"
+        class="critical{% if severity_count.critical == 0 %} zero{% endif %}"
         title="Critical"
-    >{% if severity_count.critical > 0 %}{{ severity_count.critical }}{% else %}-{% endif %}</li>
+    ><span class="label">Critical</span><span class="count">{{ severity_count.critical }}</span></li>
     <li
-        class="high"
+        class="high{% if severity_count.high == 0 %} zero{% endif %}"
         title="High"
-    >{% if severity_count.high > 0 %}{{ severity_count.high }}{% else %}-{% endif %}</li>
+    ><span class="label">High</span><span class="count">{{ severity_count.high }}</span></li>
     <li
-        class="medium"
+        class="medium{% if severity_count.medium == 0 %} zero{% endif %}"
         title="Medium"
-    >{% if severity_count.medium > 0 %}{{ severity_count.medium }}{% else %}-{% endif %}</li>
+    ><span class="label">Medium</span><span class="count">{{ severity_count.medium }}</span></li>
     <li
-        class="low"
+        class="low{% if severity_count.low == 0 %} zero{% endif %}"
         title="Low"
-    >{% if severity_count.low > 0 %}{{ severity_count.low }}{% else %}-{% endif %}</li>
+    ><span class="label">Low</span><span class="count">{{ severity_count.low }}</span></li>
     <li
-        class="unknown"
+        class="unknown{% if severity_count.unknown == 0 %} zero{% endif %}"
         title="Unknown"
-    >{% if severity_count.unknown > 0 %}{{ severity_count.unknown }}{% else %}-{% endif %}</li>
+    ><span class="label">Unknown</span><span class="count">{{ severity_count.unknown }}</span></li>
 </ul>
