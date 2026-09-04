@@ -11,6 +11,7 @@
 use std::{
     num::NonZeroUsize,
     process::{
+        ExitStatus,
         Output,
         Stdio,
     },
@@ -27,12 +28,20 @@ use tokio::{
         AsyncRead,
         AsyncReadExt,
     },
-    process::Command,
-    sync::Semaphore,
+    process::{
+        Child,
+        Command,
+    },
+    runtime::Handle,
+    sync::{
+        OwnedSemaphorePermit,
+        Semaphore,
+    },
     time::timeout,
 };
 use tracing::{
     Instrument,
+    error,
     info_span,
 };
 
@@ -87,7 +96,7 @@ impl Limits {
     /// fails with the child killed when it outruns the deadline or writes more
     /// than [`MAX_OUTPUT_BYTES`].
     pub(crate) async fn run(&self, command: &mut Command) -> Result<Output> {
-        let _permit = timeout(self.queue_timeout, self.permits.acquire())
+        let permit = timeout(self.queue_timeout, self.permits.clone().acquire_owned())
             .instrument(info_span!("wait for a scan slot"))
             .await
             .map_err(|_elapsed| {
@@ -99,20 +108,31 @@ impl Limits {
             })?
             .context("the scan slots are gone, the server is shutting down")?;
 
-        let mut child = command
+        let child = command
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            // What actually enforces the deadline below: the child is killed
-            // when the future holding it is dropped. Nothing else would stop a
-            // scan whose caller has long since gone away.
+            // The backstop for a drop that has no runtime left to reap on, see
+            // the Drop of Running below.
             .kill_on_drop(true)
             .spawn()
             .context("failed to spawn the process")?;
 
-        let stdout = child.stdout.take().expect("stdout was piped above");
-        let stderr = child.stderr.take().expect("stderr was piped above");
+        // The slot travels with the child from here on, and comes back only
+        // once the child is gone.
+        let mut running = Running::new(child, permit);
 
-        timeout(self.run_timeout, async move {
+        let stdout = running
+            .child()
+            .stdout
+            .take()
+            .expect("stdout was piped above");
+        let stderr = running
+            .child()
+            .stderr
+            .take()
+            .expect("stderr was piped above");
+
+        timeout(self.run_timeout, async {
             // Both pipes are drained while the child is waited on, not after
             // it exits: a child that fills a pipe buffer blocks until someone
             // reads it, and waiting first would hang for the whole deadline on
@@ -120,12 +140,7 @@ impl Limits {
             let (stdout, stderr, status) = tokio::try_join!(
                 read_limited(stdout, MAX_OUTPUT_BYTES, "stdout"),
                 read_limited(stderr, MAX_OUTPUT_BYTES, "stderr"),
-                async {
-                    child
-                        .wait()
-                        .await
-                        .context("failed to wait for the process to exit")
-                },
+                running.wait(),
             )?;
 
             Ok::<_, eyre::Error>(Output {
@@ -141,6 +156,77 @@ impl Limits {
                 seconds = self.run_timeout.as_secs()
             )
         })?
+    }
+}
+
+/// A running child and the scan slot it occupies.
+///
+/// The slot comes back when this is dropped, and not before the child is gone:
+/// `kill_on_drop` only signals a process, and one that has been signalled but
+/// not yet reaped is still a process on the host, so handing its slot to the
+/// next scan would put one more of them on the machine than the limit says.
+/// Reaping has to be waited for and a [`Drop`] cannot wait, so a dropped one
+/// hands the child to a task that holds the slot until it has.
+struct Running {
+    /// Taken once the child has been reaped, which is what tells the [`Drop`]
+    /// there is nothing left to do.
+    child: Option<Child>,
+
+    permit: Option<OwnedSemaphorePermit>,
+}
+
+impl Running {
+    fn new(child: Child, permit: OwnedSemaphorePermit) -> Self {
+        Self {
+            child: Some(child),
+            permit: Some(permit),
+        }
+    }
+
+    fn child(&mut self) -> &mut Child {
+        self.child
+            .as_mut()
+            .expect("the child is only taken once it has been waited for")
+    }
+
+    /// Waits for the child to exit, which reaps it.
+    async fn wait(&mut self) -> Result<ExitStatus> {
+        let status = self
+            .child()
+            .wait()
+            .await
+            .context("failed to wait for the process to exit")?;
+
+        self.child = None;
+
+        Ok(status)
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        let (Some(mut child), Some(permit)) = (self.child.take(), self.permit.take()) else {
+            // Waited for already: nothing to kill, and the slot goes back with
+            // the permit dropped here.
+            return;
+        };
+
+        let Ok(handle) = Handle::try_current() else {
+            // Nothing left to spawn on, which is the runtime shutting down and
+            // taking the process with it. `kill_on_drop` still signals the
+            // child on the way out.
+            return;
+        };
+
+        // Holds the slot for as long as the killing takes, so that the scan
+        // this one is making room for cannot start while it is still there.
+        handle.spawn(async move {
+            let _permit = permit;
+
+            if let Err(err) = child.kill().await {
+                error!("failed to kill the scan that was given up on: {err}");
+            }
+        });
     }
 }
 
@@ -263,7 +349,7 @@ mod tests {
     /// back.
     #[tokio::test]
     async fn a_dropped_run_frees_its_slot() {
-        let limits = limits(1, 0, 10_000);
+        let limits = limits(1, 1_000, 10_000);
 
         // Runs long enough to still hold the slot when the timeout drops the
         // whole run, which is what a caller hanging up looks like from here.
@@ -274,14 +360,52 @@ mod tests {
         .await;
 
         assert!(gone_away.is_err(), "the run was supposed to be dropped");
-        assert_eq!(1, limits.permits.available_permits());
 
-        // With the slot still held this would be turned away: the queue timeout
-        // is zero.
         limits
             .run(Command::new("echo").arg("hello"))
             .await
-            .expect("the slot should be free again");
+            .expect("the slot should come back");
+    }
+
+    /// The slot is not free the moment the killing starts, it is free once the
+    /// killing is done: a child that has been signalled but not yet reaped is
+    /// still a process, and letting the next scan start next to it would put
+    /// one more on the machine than the limit allows.
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn the_slot_comes_back_only_once_the_child_is_reaped() {
+        use std::{
+            path::Path,
+            sync::Arc,
+        };
+
+        use tokio::sync::Semaphore;
+
+        use super::Running;
+
+        let permits = Arc::new(Semaphore::new(1));
+        let permit = permits.clone().acquire_owned().await.unwrap();
+
+        let child = Command::new("sleep")
+            .arg("60")
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+
+        let pid = child.id().expect("the child was just spawned");
+
+        // What a caller hanging up leaves behind.
+        drop(Running::new(child, permit));
+
+        let waited = tokio::time::timeout(Duration::from_secs(5), permits.acquire()).await;
+        assert!(waited.is_ok(), "the slot never came back");
+
+        // /proc keeps an entry for a process that has exited until it is
+        // reaped, so this is gone only if the killing was seen through.
+        assert!(
+            !Path::new(&format!("/proc/{pid}")).exists(),
+            "the child was still there when its slot was handed on"
+        );
     }
 
     #[tokio::test]
