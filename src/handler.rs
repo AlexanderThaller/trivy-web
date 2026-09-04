@@ -191,7 +191,7 @@ pub(super) async fn css_main() -> impl IntoResponse {
             "Cache-Control",
             "max-age=604800, stale-while-revalidate=86400",
         )
-        .header("ETag", "ad37e0795a78e9c0d8e9ef1534a7f6c1")
+        .header("ETag", "\"ad37e0795a78e9c0d8e9ef1534a7f6c1\"")
         .body(Body::from(include_str!("../resources/css/main.css")))
         .unwrap()
 }
