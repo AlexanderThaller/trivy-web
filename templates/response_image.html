@@ -1,8 +1,13 @@
-<hr>
+<section class="card">
+  <div class="card-head">
+    <h2>Image</h2>
+    <span class="mono muted">{{ image }}</span>
+  </div>
+  {% include "docker_manifest.html" %}
+</section>
 
-<h2>Image Information</h2>
-{% include "docker_manifest.html" %}
-
-<h2>Cosign Information</h2>
-{% include "cosign_manifest.html" %}
-{% include "cosign_verify.html" %}
+<section class="card">
+  <h2>Cosign</h2>
+  {% include "cosign_manifest.html" %}
+  {% include "cosign_verify.html" %}
+</section>

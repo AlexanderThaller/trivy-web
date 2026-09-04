@@ -101,7 +101,6 @@ pub(super) fn router(state: AppState) -> Router {
     Router::new()
     // assets
         .route("/css/main.css", get(css_main))
-        .route("/img/bars.svg", get(img_bars))
         .route("/js/htmx/4.0.0/htmx.min.js", get(js_htmx_4_0_0))
     // handlers
         .route("/", get(root))
@@ -192,7 +191,7 @@ pub(super) async fn css_main() -> impl IntoResponse {
             "Cache-Control",
             "max-age=604800, stale-while-revalidate=86400",
         )
-        .header("ETag", "7b6ccbd25af7a75d09ea6815defb397a")
+        .header("ETag", "ad37e0795a78e9c0d8e9ef1534a7f6c1")
         .body(Body::from(include_str!("../resources/css/main.css")))
         .unwrap()
 }
@@ -219,18 +218,6 @@ pub(super) async fn js_htmx_4_0_0() -> impl IntoResponse {
         .header("Cache-Control", "max-age=31536000, immutable")
         .body(Body::from(
             include_bytes!("../resources/js/htmx/4.0.0/htmx.min.js").to_vec(),
-        ))
-        .expect("should never fail")
-}
-
-#[tracing::instrument]
-pub(super) async fn img_bars() -> impl IntoResponse {
-    Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", "image/svg+xml")
-        .header("Cache-Control", "max-age=31536000, immutable")
-        .body(Body::from(
-            include_bytes!("../resources/img/bars.svg").to_vec(),
         ))
         .expect("should never fail")
 }

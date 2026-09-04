@@ -18,7 +18,7 @@ exports_files([
 #   - templates/ is read by askama's derive at macro-expansion time, resolved
 #     against CARGO_MANIFEST_DIR (which rules_rust points at this package).
 #   - resources/ is pulled in by the include_str!/include_bytes! calls in
-#     src/handler.rs that serve the stylesheet, htmx and the spinner.
+#     src/handler.rs that serve the stylesheet and htmx.
 COMPILE_DATA = glob([
     "templates/**",
     "resources/**",
