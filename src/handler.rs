@@ -196,17 +196,27 @@ pub(super) async fn css_main() -> impl IntoResponse {
         .unwrap()
 }
 
+// Read off disk so an edit to the stylesheet only needs a reload, not a
+// rebuild. That only works when the process was started from the repository
+// root: `bazel run` puts it in the runfiles tree instead, and a binary run
+// from anywhere else has no source tree beside it, so fall back to the copy
+// baked into the binary rather than panicking in the middle of a request.
 #[cfg(debug_assertions)]
 #[tracing::instrument]
 pub(super) async fn css_main() -> impl IntoResponse {
+    let css = match read_to_string("resources/css/main.css").await {
+        Ok(css) => css,
+
+        Err(err) => {
+            tracing::debug!("serving the embedded main.css: {err}");
+            include_str!("../resources/css/main.css").to_string()
+        }
+    };
+
     Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "text/css")
-        .body(Body::from(
-            read_to_string("resources/css/main.css")
-                .await
-                .expect("failed to read main.css file"),
-        ))
+        .body(Body::from(css))
         .expect("should never fail")
 }
 
