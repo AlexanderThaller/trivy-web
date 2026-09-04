@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use askama::Template;
 use cache::{
+    Cache,
     CosignInformationFetcher,
     DockerInformationFetcher,
     Fetch,
@@ -21,12 +22,10 @@ use eyre::{
     Result,
     WrapErr,
 };
-use fred::clients::Client as RedisClient;
 use serde::{
     Deserialize,
     Serialize,
 };
-use tokio::task;
 use tracing::{
     Instrument,
     error,
@@ -50,6 +49,7 @@ use crate::{
 
 use super::{
     AppState,
+    Limits,
     SubmitFormImage,
     cosign::cosign_verify,
 };
@@ -99,26 +99,23 @@ pub(crate) async fn image(
 ) -> Result<ImageResponse, eyre::Error> {
     let image: Image = form.image.trim().parse()?;
 
-    let docker_and_cosign_manifest = {
-        let redis_client = state.redis_client.clone();
-
-        task::spawn(
-            fetch_docker_and_cosign_manifest(
-                state.docker_registry_client.clone(),
-                image.clone(),
-                redis_client,
-            )
-            .instrument(info_span!("fetch_docker_and_cosign_manifest")),
+    // Joined rather than spawned: a spawned task outlives the request that
+    // wanted it, so a caller hanging up would leave the cosign process running
+    // for a result nobody is going to read -- and holding a scan slot while it
+    // does. Both of these wait on IO, so running them on this task concurrently
+    // is what spawning them bought anyway.
+    let (docker_and_cosign_manifest, cosign_verify) = tokio::join!(
+        fetch_docker_and_cosign_manifest(
+            state.docker_registry_client.clone(),
+            image.clone(),
+            state.cache.clone(),
         )
-    };
-
-    let cosign_verify = task::spawn(
-        fetch_cosign_verify(form.cosign_key, image.clone())
+        .instrument(info_span!("fetch_docker_and_cosign_manifest")),
+        fetch_cosign_verify(form.cosign_key, image.clone(), state.limits.clone())
             .instrument(info_span!("fetch_cosign_verify")),
     );
 
-    let (docker_information, cosign_information) = docker_and_cosign_manifest.await?;
-    let cosign_verify = cosign_verify.await?;
+    let (docker_information, cosign_information) = docker_and_cosign_manifest;
 
     let response = ImageResponse {
         image,
@@ -134,13 +131,13 @@ pub(crate) async fn image(
 async fn fetch_docker_and_cosign_manifest(
     docker_registry_client: DockerRegistryClient,
     image: Image,
-    redis_client: Option<RedisClient>,
+    cache: Cache,
 ) -> (Result<DockerInformation>, Result<CosignInformation>) {
     let docker_manifest = DockerInformationFetcher {
         docker_registry_client: &docker_registry_client,
         image: &image,
     }
-    .cache_or_fetch(redis_client.as_ref())
+    .cache_or_fetch(&cache)
     .await
     .context("failed to fetch docker manifest");
 
@@ -153,7 +150,7 @@ async fn fetch_docker_and_cosign_manifest(
         image: &image,
         docker_manifest: &docker_manifest,
     }
-    .cache_or_fetch(redis_client.as_ref())
+    .cache_or_fetch(&cache)
     .await
     .context("failed to get cosign manifest");
 
@@ -164,11 +161,12 @@ async fn fetch_docker_and_cosign_manifest(
 async fn fetch_cosign_verify(
     cosign_key: String,
     image: Image,
+    limits: Limits,
 ) -> Option<Result<cosign::CosignVerify, eyre::Error>> {
     if cosign_key.is_empty() {
         None
     } else {
-        Some(cosign_verify(&cosign_key, &image).await)
+        Some(cosign_verify(&cosign_key, &image, &limits).await)
     }
 }
 

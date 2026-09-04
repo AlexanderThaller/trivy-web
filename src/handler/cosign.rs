@@ -31,6 +31,8 @@ use x509_parser::{
     pem::parse_x509_pem,
 };
 
+use super::process::Limits;
+
 #[derive(Debug)]
 pub(crate) enum CertificateError {
     InvalidNotBefore,
@@ -252,15 +254,21 @@ pub(crate) async fn cosign_manifest(
 pub(crate) async fn cosign_verify(
     cosign_key: &str,
     image: &Image,
+    limits: &Limits,
 ) -> Result<CosignVerify, eyre::Error> {
-    let output = Command::new("cosign")
-        .arg("verify")
-        .arg("--private-infrastructure=true")
-        .arg("--output=json")
-        .arg("--key")
-        .arg(cosign_key)
-        .arg(image.to_string())
-        .output()
+    // Through the same limits as the trivy scans: this is the other child
+    // process an unauthenticated request can start, and what has to be bounded
+    // is how many of them the host runs in total.
+    let output = limits
+        .run(
+            Command::new("cosign")
+                .arg("verify")
+                .arg("--private-infrastructure=true")
+                .arg("--output=json")
+                .arg("--key")
+                .arg(cosign_key)
+                .arg(image.to_string()),
+        )
         .instrument(info_span!("running cosign verify"))
         .await
         .context("Failed to run cosign verify")?;
