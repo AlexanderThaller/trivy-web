@@ -3,3 +3,7 @@
 
 # Bazel's convenience symlinks into the output base.
 /bazel-*
+
+# The git worktree directory. It holds git worktrees of this same repository,
+# each with its own BUILD.bazel, which //... would otherwise load a second time.
+/.worktrees
