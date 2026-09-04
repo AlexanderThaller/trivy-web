@@ -1,6 +1,9 @@
 use std::{
     net::SocketAddr,
-    num::NonZeroUsize,
+    num::{
+        NonZeroU32,
+        NonZeroUsize,
+    },
     time::Duration,
 };
 
@@ -71,6 +74,19 @@ pub(super) struct Args {
         env = "TRIVY_WEB_SCAN_TIMEOUT"
     )]
     pub scan_timeout: u64,
+
+    /// How often a single registry may be reached out to in a minute
+    ///
+    /// Counted per registry across every instance sharing the redis server, so
+    /// that scaling the deployment out does not scale up what the registries
+    /// are sent. Without a redis server it bounds this instance alone.
+    #[clap(
+        long,
+        value_name = "count",
+        default_value = "60",
+        env = "TRIVY_WEB_REGISTRY_REQUESTS_PER_MINUTE"
+    )]
+    pub registry_requests_per_minute: NonZeroU32,
 }
 
 impl Args {
