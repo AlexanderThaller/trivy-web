@@ -3,6 +3,5 @@
 * [ ] Allow settings credentials for image information fetching
 * [ ] Cache policy for static content: /css/main.css and /js/filter.js are the
   only two left now that htmx is gone
-* [ ] Cosign Verify should also verify the image even when no key is provided
 * [ ] Expire tokens correctly
 * [ ] Store tokens in redis when using the docker client library

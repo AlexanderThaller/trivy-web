@@ -1,3 +1,86 @@
 = trivy-web
 
 Webinterface for the link:https://github.com/aquasecurity/trivy[trivy image scanner].
+
+Point it at a container image reference and it scans the image with
+trivy and shows the vulnerabilities found, alongside whatever
+link:https://github.com/sigstore/cosign[cosign] has to say about that
+image: its signatures, an SBOM if one was attached, and a
+cryptographic verification of any keyless signature -- not just what
+the signing certificate claims about itself, but whether it actually
+chains to Sigstore's trust root.
+
+== Running
+
+The published image carries `trivy`, `cosign` and `trivy-web` and needs
+nothing else to scan public images:
+
+[source,shell]
+----
+docker run -p 16223:16223 ghcr.io/alexanderthaller/trivy-web:latest
+----
+
+Built and pushed to `ghcr.io/alexanderthaller/trivy-web` automatically
+on every push to `main` (see `.github/workflows/publish-image.yml`),
+tagged `latest` and `sha-<short-sha>`. `docker-compose.yml`-style
+deployments should pin the sha tag rather than track `latest`.
+
+=== Configuration
+
+Every setting is a flag or the environment variable next to it; run
+with `--help` for the full list including defaults. The ones most
+likely to matter:
+
+[cols="1,1,2"]
+|===
+|Flag |Environment variable |What it does
+
+|`--binding`
+|`TRIVY_WEB_BINDING`
+|Address to listen on (default `0.0.0.0:16223`).
+
+|`--redis-server`
+|`TRIVY_REDIS_SERVER`
+|`redis://host:port` to cache scan results and share the registry rate
+limit across instances. Without it, both are in-memory and per-instance.
+
+|`--server`
+|`TRIVY_SERVER`
+|A trivy server to scan through instead of running `trivy` as a child
+process locally.
+
+|`--max-concurrent-scans`
+|`TRIVY_WEB_MAX_CONCURRENT_SCANS`
+|How many trivy/cosign child processes may run at once (default `4`) --
+the ceiling an unauthenticated request can push the host to.
+
+|`--registry-requests-per-minute`
+|`TRIVY_WEB_REGISTRY_REQUESTS_PER_MINUTE`
+|How often a single registry may be reached out to per minute (default
+`60`), counted per registry across every instance sharing a redis server.
+|===
+
+== Development
+
+=== Cargo
+
+[source,shell]
+----
+cargo build
+cargo test --features ci   # skips the tests that need a local redis or network access
+----
+
+=== Bazel
+
+`bazel test //...` covers build, test, clippy and rustfmt in one
+invocation (see `.github/workflows/bazel.yml`); `//:image` and
+`//:push_image` are excluded from that wildcard on purpose (they carry
+`tags = ["manual"]`) so an ordinary check doesn't pull external base
+images or need registry credentials.
+
+[source,shell]
+----
+bazel test //...                        # build, test, clippy, rustfmt
+bazel build --config=deploy //:image    # build the container image locally
+bazel run --config=deploy //:push_image -- --tag <tag>   # needs `docker login ghcr.io` first
+----
