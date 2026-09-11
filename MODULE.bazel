@@ -91,3 +91,80 @@ crate.from_cargo(
     ],
 )
 use_repo(crate, "crates")
+
+# --- Container image -----------------------------------------------------
+#
+# Packages //:trivy-web into an OCI image and pushes it to GHCR from CI (see
+# .github/workflows/publish-image.yml). linux/amd64 only: the crate
+# resolution above is pinned to that one platform, so a second architecture
+# would need cross-compiling the Rust binary first, not just a second
+# oci.pull.
+bazel_dep(name = "rules_oci", version = "2.3.0")
+
+# rules_oci 2.3.0 itself depends on 0.10.4; declared explicitly at that
+# version rather than left to bzlmod's minimal-version-selection bump, so
+# there is no "requires X but got Y" warning telling us the declared version
+# here was never the one actually in use.
+bazel_dep(name = "tar.bzl", version = "0.10.4")
+
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+
+# Not the Alpine base the Dockerfile builds its final stage from: the
+# crate.from_cargo platform above is x86_64-unknown-linux-gnu, so this
+# binary is dynamically linked against glibc (confirmed with `ldd` --
+# libc.so.6, libm.so.6, libgcc_s.so.1, and the glibc /lib64/ld-linux
+# interpreter, no libssl since rustls/aws-lc are statically linked in), and
+# will not run against Alpine's musl at all: `docker run` on that
+# combination fails "exec trivy-web: no such file or directory", which is
+# musl's loader complaining about a glibc binary, not a missing file.
+# distroless/cc is Google's minimal glibc base (glibc, libgcc, libstdc++,
+# ca-certificates, no shell, no package manager); this build fetches trivy
+# and cosign as static binaries onto it below rather than relying on
+# whatever libc a given trivy/cosign base image happens to use.
+#
+# debian13 (trixie), not debian12 (bookworm): bookworm's glibc 2.36 is too
+# old for this binary -- `docker run` against it fails with
+# "GLIBC_2.38/2.39 not found", a version newer than bookworm ships, however
+# recent the Debian point release. trixie's 2.40 covers it.
+#
+# Digest of gcr.io/distroless/cc-debian13:latest.
+oci.pull(
+    name = "distroless_cc",
+    image = "gcr.io/distroless/cc-debian13",
+    digest = "sha256:9b615fff20e1a4fad29c2b30562580b212c7dd5e2225236735cca0070ed11c78",
+    platforms = ["linux/amd64"],
+)
+use_repo(oci, "distroless_cc", "distroless_cc_linux_amd64")
+
+# `cosign_verify` (the `cosign verify --key` path) shells out to this.
+# Fetched as the plain static release binary rather than through the
+# Alpine `apk add cosign` the Dockerfile uses, since an oci_image build has
+# no shell to run that in and distroless has no package manager anyway --
+# checksum-pinned the same way the Dockerfile pins its own apk packages.
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+http_file(
+    name = "cosign_linux_amd64",
+    downloaded_file_path = "cosign",
+    executable = True,
+    sha256 = "4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71",
+    urls = ["https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign-linux-amd64"],
+)
+
+# trivy itself. Static Go binary (no libc dependency at all -- `file` shows
+# "statically linked"), so it runs fine on distroless/cc's glibc despite
+# being the same binary aquasecurity's own Alpine/musl image ships.
+#
+# v0.67.2, matching the Dockerfile's pin, has no GitHub Release assets left
+# (its release page 404s; presumably pruned upstream), so this is pinned to
+# the latest release instead. The two build paths can drift a trivy version
+# apart until the Dockerfile's pin is bumped to catch up -- acceptable, not
+# ideal; bump both together next time either moves.
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "trivy_linux_amd64",
+    build_file_content = """exports_files(["trivy"])""",
+    sha256 = "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a",
+    urls = ["https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz"],
+)

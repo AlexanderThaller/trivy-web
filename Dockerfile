@@ -1,7 +1,7 @@
 FROM rust:1.98.1-alpine3.22 AS rust-base
 
 RUN apk add --no-cache \
-  musl-dev=1.2.5-r10 \
+  musl-dev=1.2.5-r12 \
   cargo-chef=0.1.71-r1 \
   git=2.49.1-r0
 
@@ -26,6 +26,11 @@ COPY . .
 RUN cargo build --profile deploy
 
 FROM ghcr.io/aquasecurity/trivy:0.67.2
+
+# cosign_verify (the `cosign verify --key` path) shells out to this; the
+# base trivy image does not carry it.
+RUN apk add --no-cache \
+  cosign=2.4.3-r8
 
 COPY --from=builder /app/target/deploy/trivy-web /app/trivy-web
 

@@ -1,0 +1,64 @@
+name: Publish image
+
+on:
+  push:
+    branches: [ "main" ]
+
+# packages: write is what lets GITHUB_TOKEN push to this repository's own
+# GHCR namespace (ghcr.io/alexanderthaller/trivy-web) -- no separate PAT or
+# secret to manage or rotate. Scoped to this workflow alone (bazel.yml,
+# which also runs on untrusted pull_request checkouts, only ever gets
+# contents: read) rather than granted repo-wide.
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      # See bazel.yml for why persist-credentials is off; nothing here
+      # pushes to git either, only to the container registry.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Same caching setup as bazel.yml. cache-save is unconditional here --
+      # this workflow only ever runs on a push to main, never a pull_request
+      # -- kept as the same expression anyway so the two workflows read the
+      # same way and neither silently drifts if either one's triggers change.
+      - name: Set up Bazel with caching
+        uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+          external-cache: true
+          disk-cache: ${{ github.workflow }}
+          cache-save: ${{ github.event_name != 'pull_request' }}
+
+      # oci_push shells out to crane, which authenticates the same way
+      # `docker push` does: reading the config.json a `docker login` writes.
+      # Has to happen before the push step below, not as part of it.
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute short commit sha
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # --config=deploy is the same profile the Dockerfile builds with (see
+      # .bazelrc): LTO, one codegen unit, panic=abort. //:image has no
+      # default remote_tags (see BUILD.bazel) -- every tag this push lands
+      # on is named here explicitly: a moving `latest` and an immutable
+      # `sha-<short-sha>` a rollback can pin to.
+      - name: Build and push the image
+        run: |
+          bazel run --config=deploy //:push_image -- \
+            --tag "sha-${{ steps.sha.outputs.short }}" \
+            --tag latest

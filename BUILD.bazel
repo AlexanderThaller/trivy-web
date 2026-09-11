@@ -1,8 +1,10 @@
 load("@crates//:defs.bzl", "aliases", "all_crate_deps", "edition", "lint_config")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_push")
 load("@rules_rs//rs:cargo_build_script.bzl", "cargo_build_script")
 load("@rules_rs//rs:rust_binary.bzl", "rust_binary")
 load("@rules_rs//rs:rust_test.bzl", "rust_test")
 load("@rules_rust//rust:defs.bzl", "rust_clippy", "rustfmt_test")
+load("@tar.bzl", "mutate", "tar")
 
 # Cargo.toml is the source of truth for dependencies, edition and lints;
 # MODULE.bazel's crate.from_cargo reads it through these labels. .rustfmt.toml
@@ -112,4 +114,83 @@ rustfmt_test(
     name = "rustfmt",
     size = "small",
     targets = ALL_TARGETS,
+)
+
+# --- Container image -------------------------------------------------------
+#
+# Layered on top of @distroless_cc_linux_amd64 (see MODULE.bazel, and the
+# note there on why it isn't the Alpine image the Dockerfile uses): the
+# compiled binary, trivy, and cosign (needed by cosign_verify's
+# `cosign verify --key` subprocess) each as their own layer so none has to
+# share another's strip_prefix/package_dir.
+#
+# Every target from here down carries tags = ["manual"], not just :image and
+# :push_image: a bare `tar()`/`oci_image()` is picked up by `//...` wildcard
+# expansion by its own tag regardless of what (also manual) target depends on
+# it, so leaving these three untagged would still pull the base image and
+# fetch trivy/cosign on every ordinary `bazel test //...` PR run -- exactly
+# what tagging :image manual was meant to avoid. bazel.yml's "Build the
+# container image" step is the one place all of this is meant to run outside
+# of a deliberate `bazel build //:image`.
+
+tar(
+    name = "trivy_web_layer",
+    srcs = [":trivy-web"],
+    # trivy-web needs no runfiles tree at runtime -- COMPILE_DATA is baked
+    # into the binary at compile time via include_str!, nothing is read from
+    # disk relative to it -- and the default `tar()` would otherwise also
+    # pack a second full copy of the binary under a .runfiles/ directory,
+    # doubling this layer's size for nothing.
+    include_runfiles = False,
+    mutate = mutate(
+        mtime = 0,
+        package_dir = "/usr/local/bin",
+    ),
+    tags = ["manual"],
+)
+
+tar(
+    name = "trivy_layer",
+    srcs = ["@trivy_linux_amd64//:trivy"],
+    mutate = mutate(
+        mtime = 0,
+        package_dir = "/usr/local/bin",
+    ),
+    tags = ["manual"],
+)
+
+tar(
+    name = "cosign_layer",
+    srcs = ["@cosign_linux_amd64//file"],
+    mutate = mutate(
+        mtime = 0,
+        package_dir = "/usr/local/bin",
+        strip_prefix = "file",
+    ),
+    tags = ["manual"],
+)
+
+oci_image(
+    name = "image",
+    base = "@distroless_cc_linux_amd64",
+    entrypoint = ["/usr/local/bin/trivy-web"],
+    exposed_ports = ["16223/tcp"],
+    tags = ["manual"],
+    tars = [
+        ":trivy_web_layer",
+        ":trivy_layer",
+        ":cosign_layer",
+    ],
+)
+
+# No default `remote_tags`: CI supplies whatever tags a push is for with
+# repeated `-t|--tag` flags (see .github/workflows/publish-image.yml, which
+# passes the git sha and `latest`) rather than this target hardcoding
+# `latest` as a fallback nobody asked for. `bazel run //:push_image --
+# --tag <tag>` from a checkout pushes by hand the same way.
+oci_push(
+    name = "push_image",
+    image = ":image",
+    repository = "ghcr.io/alexanderthaller/trivy-web",
+    tags = ["manual"],
 )
