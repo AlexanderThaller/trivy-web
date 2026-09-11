@@ -251,6 +251,97 @@ pub(crate) async fn js_filter() -> Result<impl topcoat::router::response::IntoRe
     ))
 }
 
+/// A response carrying `bytes` under `content_type`, cached the same long way
+/// `js_filter` is: this only ever changes by shipping a new binary, so there
+/// is nothing a client's cached copy could go stale against between one and
+/// the next.
+///
+/// Shared by every route below instead of repeating the tuple six times --
+/// one per icon size plus the manifest -- for what is otherwise the same
+/// three lines apiece.
+fn static_asset(
+    content_type: &'static str,
+    bytes: &'static [u8],
+) -> impl topcoat::router::response::IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, HeaderValue::from_static(content_type)),
+            (
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("max-age=604800, stale-while-revalidate=86400"),
+            ),
+        ],
+        bytes,
+    )
+}
+
+/// resources/icons/icon.svg is the source; see the comment there for what it
+/// draws and why. `image/x-icon` is what browsers still probing `/favicon.ico`
+/// directly expect regardless of what the page's own `<link rel="icon">`
+/// points at.
+#[route(GET "/favicon.ico")]
+pub(crate) async fn favicon_ico() -> Result<impl topcoat::router::response::IntoResponse> {
+    Ok(static_asset(
+        "image/x-icon",
+        include_bytes!("../resources/icons/favicon.ico"),
+    ))
+}
+
+#[route(GET "/favicon-16x16.png")]
+pub(crate) async fn favicon_16() -> Result<impl topcoat::router::response::IntoResponse> {
+    Ok(static_asset(
+        "image/png",
+        include_bytes!("../resources/icons/favicon-16x16.png"),
+    ))
+}
+
+#[route(GET "/favicon-32x32.png")]
+pub(crate) async fn favicon_32() -> Result<impl topcoat::router::response::IntoResponse> {
+    Ok(static_asset(
+        "image/png",
+        include_bytes!("../resources/icons/favicon-32x32.png"),
+    ))
+}
+
+/// What iOS uses for a home screen icon and Safari's tab/favorite previews.
+#[route(GET "/apple-touch-icon.png")]
+pub(crate) async fn apple_touch_icon() -> Result<impl topcoat::router::response::IntoResponse> {
+    Ok(static_asset(
+        "image/png",
+        include_bytes!("../resources/icons/apple-touch-icon.png"),
+    ))
+}
+
+/// Referenced from site.webmanifest; what Android/Chrome use for a home
+/// screen or PWA icon.
+#[route(GET "/android-chrome-192x192.png")]
+pub(crate) async fn android_chrome_192() -> Result<impl topcoat::router::response::IntoResponse> {
+    Ok(static_asset(
+        "image/png",
+        include_bytes!("../resources/icons/android-chrome-192x192.png"),
+    ))
+}
+
+/// Also what `og:image` in the document head points at (see layout.rs): a
+/// large icon standing in for a proper social-card image, since this app has
+/// no single fixed public deployment to design one specific graphic for --
+/// it is meant to be self-hosted anywhere (see README's Running section).
+#[route(GET "/android-chrome-512x512.png")]
+pub(crate) async fn android_chrome_512() -> Result<impl topcoat::router::response::IntoResponse> {
+    Ok(static_asset(
+        "image/png",
+        include_bytes!("../resources/icons/android-chrome-512x512.png"),
+    ))
+}
+
+#[route(GET "/site.webmanifest")]
+pub(crate) async fn site_webmanifest() -> Result<impl topcoat::router::response::IntoResponse> {
+    Ok(static_asset(
+        "application/manifest+json",
+        include_bytes!("../resources/icons/site.webmanifest"),
+    ))
+}
+
 impl ScanForm {
     /// Whether this scan carries anything that must not end up in the URL.
     fn has_credentials(&self) -> bool {

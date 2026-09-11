@@ -32,6 +32,34 @@ pub(crate) async fn shell(slot: Slot<'_>) -> Result<impl View> {
                     content="Scan container images for vulnerabilities with Trivy and inspect their registry manifest and cosign signatures."
                 >
                 <meta name="color-scheme" content="dark light">
+                <meta name="theme-color" content="#0d0f12">
+
+                // The header's "▚" logo, in its accent color on its
+                // background -- see resources/icons/icon.svg -- at every
+                // size something asking for a site icon might want.
+                // favicon.ico covers browsers that still probe for it
+                // directly rather than reading the <link> below.
+                <link rel="icon" href="/favicon.ico" sizes="any">
+                <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+                <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+                <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+                <link rel="manifest" href="/site.webmanifest">
+
+                // Open Graph, so a link pasted into Teams, Slack or similar
+                // shows the same icon and a real description in its preview
+                // instead of nothing. og:image is relative rather than a
+                // fixed absolute URL -- this app is meant to be self-hosted
+                // wherever (see README), so there is no one public origin to
+                // hardcode here, and the unfurlers that matter in practice
+                // resolve a relative og:image against the page's own URL
+                // even though the spec calls for absolute.
+                <meta property="og:type" content="website">
+                <meta property="og:title" content="Trivy Web Scanner">
+                <meta
+                    property="og:description"
+                    content="Scan container images for vulnerabilities with Trivy and inspect their registry manifest and cosign signatures."
+                >
+                <meta property="og:image" content="/android-chrome-512x512.png">
 
                 <link rel="stylesheet" type="text/css" href="/css/main.css">
 
