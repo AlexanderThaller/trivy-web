@@ -46,7 +46,6 @@ use crate::handler::{
 
 use super::{
     AppState,
-    Limits,
     RateLimit,
     SubmitFormImage,
     cosign::cosign_verify,
@@ -106,10 +105,10 @@ pub(crate) async fn image(
     let image: Image = form.image.trim().parse()?;
 
     // Joined rather than spawned: a spawned task outlives the request that
-    // wanted it, so a caller hanging up would leave the cosign process running
-    // for a result nobody is going to read -- and holding a scan slot while it
-    // does. Both of these wait on IO, so running them on this task concurrently
-    // is what spawning them bought anyway.
+    // wanted it, so a caller hanging up would leave the verification's
+    // registry round trips going for a result nobody is going to read. Both
+    // of these wait on IO, so running them on this task concurrently is what
+    // spawning them bought anyway.
     let (docker_and_cosign_manifest, cosign_verify) = tokio::join!(
         fetch_docker_and_cosign_manifest(
             state.docker_registry_client.clone(),
@@ -122,7 +121,6 @@ pub(crate) async fn image(
         fetch_cosign_verify(
             form.cosign_key,
             image.clone(),
-            state.limits.clone(),
             state.registry_rate_limit.clone(),
         )
         .instrument(info_span!("fetch_cosign_verify")),
@@ -221,13 +219,12 @@ async fn fetch_docker_and_cosign_manifest(
 async fn fetch_cosign_verify(
     cosign_key: String,
     image: Image,
-    limits: Limits,
     registry_rate_limit: RateLimit,
 ) -> Option<Result<cosign::CosignVerify, eyre::Error>> {
     if cosign_key.is_empty() {
         None
     } else {
-        Some(cosign_verify(&cosign_key, &image, &limits, &registry_rate_limit).await)
+        Some(cosign_verify(&cosign_key, &image, &registry_rate_limit).await)
     }
 }
 

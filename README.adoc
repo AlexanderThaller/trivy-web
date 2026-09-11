@@ -8,12 +8,14 @@ link:https://github.com/sigstore/cosign[cosign] has to say about that
 image: its signatures, an SBOM if one was attached, and a
 cryptographic verification of any keyless signature -- not just what
 the signing certificate claims about itself, but whether it actually
-chains to Sigstore's trust root.
+chains to Sigstore's trust root. Given a public key (pasted in, or a
+URL to one) it verifies key-based signatures against that too. Both
+verifications run in-process; the `cosign` binary is not involved.
 
 == Running
 
-The published image carries `trivy`, `cosign` and `trivy-web` and needs
-nothing else to scan public images:
+The published image carries `trivy` and `trivy-web` and needs nothing
+else to scan public images:
 
 [source,shell]
 ----
@@ -66,8 +68,8 @@ process locally.
 
 |`--max-concurrent-scans`
 |`TRIVY_WEB_MAX_CONCURRENT_SCANS`
-|How many trivy/cosign child processes may run at once (default `4`) --
-the ceiling an unauthenticated request can push the host to.
+|How many trivy child processes may run at once (default `4`) -- the
+ceiling an unauthenticated request can push the host to.
 
 |`--registry-requests-per-minute`
 |`TRIVY_WEB_REGISTRY_REQUESTS_PER_MINUTE`
@@ -98,11 +100,10 @@ bazel test //...
 === Nix
 
 The container image (see `flake.nix`) is built with Nix rather than
-Bazel: `trivy` and `cosign` come straight from nixpkgs instead of a
-URL and a checksum to keep in step by hand, and
-`dockerTools.buildLayeredImage` computes the image's closure --
-`trivy-web`, `trivy`, `cosign`, CA certificates, glibc, nothing else --
-rather than layers assembled by hand.
+Bazel: `trivy` comes straight from nixpkgs instead of a URL and a
+checksum to keep in step by hand, and `dockerTools.buildLayeredImage`
+computes the image's closure -- `trivy-web`, `trivy`, CA certificates,
+glibc, nothing else -- rather than layers assembled by hand.
 
 [source,shell]
 ----

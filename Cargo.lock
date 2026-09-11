@@ -4753,6 +4753,7 @@ dependencies = [
  "fred",
  "mimalloc",
  "pretty_assertions",
+ "reqwest",
  "serde",
  "serde_json",
  "sigstore",

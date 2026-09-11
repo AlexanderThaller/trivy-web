@@ -27,11 +27,6 @@ RUN cargo build --profile deploy
 
 FROM ghcr.io/aquasecurity/trivy:0.67.2
 
-# cosign_verify (the `cosign verify --key` path) shells out to this; the
-# base trivy image does not carry it.
-RUN apk add --no-cache \
-  cosign=2.4.3-r8
-
 COPY --from=builder /app/target/deploy/trivy-web /app/trivy-web
 
 EXPOSE 16223

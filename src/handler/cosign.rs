@@ -18,7 +18,6 @@ use serde::{
     Deserialize,
     Serialize,
 };
-use tokio::process::Command;
 use tracing::{
     Instrument,
     info_span,
@@ -31,10 +30,15 @@ use x509_parser::{
     pem::parse_x509_pem,
 };
 
-use super::{
-    process::Limits,
-    registry::RateLimit,
-};
+use super::registry::RateLimit;
+
+/// How large a public key fetched from a URL may be. A cosign public key is a
+/// few hundred bytes of PEM; whatever a URL serves beyond this is not one, and
+/// there is no reason to keep reading it into memory to find that out.
+const PUBLIC_KEY_MAX_BYTES: usize = 64 * 1024;
+
+/// How long fetching a URL-hosted public key may take, in total.
+const PUBLIC_KEY_FETCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 #[derive(Debug)]
 pub(crate) enum CertificateError {
@@ -144,43 +148,32 @@ impl SbomDocument {
     }
 }
 
+/// The outcome of [`cosign_verify`]: the signatures on the image that the
+/// supplied public key checks out against, and a summary of what was checked.
 #[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
 pub(crate) struct CosignVerify {
     pub(crate) message: String,
 
-    pub(crate) signatures: Vec<VerifySignature>,
+    pub(crate) signatures: Vec<VerifiedSignature>,
 }
 
+/// One signature the key verified: the claims cosign signed (its Simple
+/// Signing payload) and the signature over them.
 #[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
-pub(crate) struct VerifySignature {
-    pub(crate) critical: Critical,
-    pub(crate) optional: Option<Optional>,
-}
-
-#[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
-pub(crate) struct Critical {
-    pub(crate) identity: Identity,
-    pub(crate) image: CosignImage,
-
-    #[serde(rename = "type")]
-    pub(crate) cosign_type: String,
-}
-
-#[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
-pub(crate) struct Identity {
-    #[serde(rename = "docker-reference")]
+pub(crate) struct VerifiedSignature {
+    /// The image reference the signer claimed to be signing.
     pub(crate) docker_reference: String,
-}
 
-#[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
-pub(crate) struct CosignImage {
-    #[serde(rename = "docker-manifest-digest")]
+    /// The manifest digest the signature covers -- checked against the
+    /// image's actual digest before the signature is even considered.
     pub(crate) digest: String,
-}
 
-#[derive(Debug, PartialEq, Ord, Eq, PartialOrd, Serialize, Deserialize)]
-pub(crate) struct Optional {
-    pub(crate) sig: String,
+    /// The payload's `critical.type`: `cosign container image signature` for
+    /// anything cosign itself produced.
+    pub(crate) signature_type: String,
+
+    /// The base64 signature over the payload.
+    pub(crate) signature: Option<String>,
 }
 
 impl TryFrom<X509Certificate<'_>> for Certificate {
@@ -448,59 +441,171 @@ fn parse_sbom_document(blob: &[u8]) -> Result<SbomDocument, eyre::Error> {
     Ok(SbomDocument::Unknown { raw })
 }
 
+/// Verifies the image's signatures against a public key the user supplied --
+/// what `cosign verify --key <key> --private-infrastructure=true` did back
+/// when this shelled out to the cosign binary, and the reason that binary is
+/// no longer in the container image. Every signature layer whose signature
+/// checks out against the key is reported; neither Fulcio nor Rekor is
+/// consulted, since a key-signed image from private infrastructure has no
+/// business with either; and an image none of whose signatures were made with
+/// the key is a verification failure, not an empty result, the same way it
+/// was a non-zero exit before.
+///
+/// `cosign_key` is either the PEM public key itself or an `http(s)://` URL to
+/// fetch it from -- the two forms the scan form offers. A file path, which
+/// the cosign binary also accepted, is deliberately not one of them: this
+/// string comes straight from an unauthenticated form, and reading whatever
+/// server-local path it names is not something looking up a public key
+/// should be able to do.
+///
+/// Like [`cosign_keyless_verify`], the `sigstore` client reaches the registry
+/// through its own OCI client rather than [`DockerRegistryClient`], so the
+/// registry budget is claimed here by hand rather than by
+/// [`Fetch::rate_limited_fetch`](super::response::cache::Fetch::rate_limited_fetch).
 #[tracing::instrument]
 pub(crate) async fn cosign_verify(
     cosign_key: &str,
     image: &Image,
-    limits: &Limits,
     registry_rate_limit: &RateLimit,
 ) -> Result<CosignVerify, eyre::Error> {
-    // Through the same limits as the trivy scans: this is the other child
-    // process an unauthenticated request can start, and what has to be bounded
-    // is how many of them the host runs in total.
-    let admitted = limits.admit().await?;
+    use sigstore::cosign::{
+        CosignCapabilities,
+        verification_constraint::{
+            PublicKeyVerifier,
+            VerificationConstraint,
+        },
+    };
 
-    // Cosign pulls the signature from the registry, so it is counted like every
-    // other request this service points at one -- but only now that it has a
-    // slot and is really going to be made. Counted before the wait for the
-    // slot, a request turned away by that wait would have spent budget the
-    // registry never saw a request for.
+    let public_key = public_key(cosign_key)
+        .await
+        .context("failed to read the cosign public key")?;
+
+    let verifier = PublicKeyVerifier::try_from(public_key.as_bytes())
+        .context("the cosign public key is not a PEM encoded public key")?;
+
+    // Claimed only once the key is known to be usable: a request turned away
+    // for a key that cannot be read has spent nothing the registry would have
+    // seen a request for.
     registry_rate_limit
         .claim(image.registry.registry_domain())
         .await
         .context("not allowed to reach out to the registry")?;
 
-    let output = admitted
-        .run(
-            Command::new("cosign")
-                .arg("verify")
-                .arg("--private-infrastructure=true")
-                .arg("--output=json")
-                .arg("--key")
-                .arg(cosign_key)
-                .arg(image.to_string()),
-        )
-        .instrument(info_span!("running cosign verify"))
+    // No trust repository on purpose: without Fulcio certificates and Rekor
+    // keys the client checks neither certificates nor bundles, which is
+    // exactly what `--private-infrastructure=true` switched off. It also
+    // keeps key-based verification from depending on Sigstore's servers
+    // being reachable, which the trust-root fetch of the keyless path does.
+    let mut client = sigstore::cosign::ClientBuilder::default()
+        .build()
+        .context("failed to build the sigstore cosign client")?;
+
+    let oci_reference: sigstore::registry::OciReference = image
+        .to_string()
+        .parse()
+        .context("failed to convert the image reference for sigstore")?;
+
+    let layers = client
+        .trusted_signature_layers(&sigstore::registry::Auth::Anonymous, &oci_reference)
+        .instrument(info_span!("trusted signature layers"))
         .await
-        .context("Failed to run cosign verify")?;
+        .context("failed to fetch the signature layers")?;
 
-    if !output.status.success() {
-        let message =
-            String::from_utf8(output.stderr).context("Failed to convert cosign stderr to utf8")?;
+    let total = layers.len();
 
-        return Err(eyre::Report::msg(message));
+    // A layer the constraint cannot even evaluate (no signature annotation,
+    // say) is a layer this key did not sign, not an error for the whole
+    // verification: the other layers may well check out.
+    let signatures = layers
+        .into_iter()
+        .filter(|layer| verifier.verify(layer).unwrap_or(false))
+        .map(|layer| VerifiedSignature {
+            docker_reference: layer.simple_signing.critical.identity.docker_reference,
+            digest: layer.simple_signing.critical.image.docker_manifest_digest,
+            signature_type: layer.simple_signing.critical.type_name,
+            signature: layer.signature,
+        })
+        .collect::<Vec<_>>();
+
+    if signatures.is_empty() {
+        return Err(if total == 0 {
+            eyre::Report::msg("no signatures found for the image")
+        } else {
+            eyre::Report::msg(format!(
+                "none of the {total} signatures on the image were made with the supplied public \
+                 key"
+            ))
+        });
     }
 
-    let message =
-        String::from_utf8(output.stderr).context("Failed to convert cosign stderr utf8")?;
-
-    let signature: Vec<VerifySignature> = serde_json::from_slice(output.stdout.as_slice())
-        .context("Failed to parse cosign output json")?;
+    let message = format!(
+        "Verification for {image} -- The following checks were performed on each of these \
+         signatures:\n  - The cosign claims were validated\n  - The signatures were verified \
+         against the specified public key"
+    );
 
     Ok(CosignVerify {
         message,
-        signatures: signature,
+        signatures,
     })
+}
+
+/// Resolves the scan form's key field to PEM: a key pasted inline is taken as
+/// is, an `http(s)://` URL is fetched, and anything else -- a file path most
+/// of all, see [`cosign_verify`] -- is turned away.
+async fn public_key(cosign_key: &str) -> Result<String> {
+    let cosign_key = cosign_key.trim();
+
+    if cosign_key.starts_with("-----BEGIN") {
+        return Ok(cosign_key.to_owned());
+    }
+
+    let url = match Url::parse(cosign_key) {
+        Ok(url) if matches!(url.scheme(), "http" | "https") => url,
+        _ => {
+            return Err(eyre::Report::msg(
+                "the cosign public key must be a PEM encoded public key or an http(s) URL to one",
+            ));
+        }
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(PUBLIC_KEY_FETCH_TIMEOUT)
+        .build()
+        .context("failed to build the http client")?;
+
+    let mut response = client
+        .get(url.clone())
+        .send()
+        .instrument(info_span!("fetch cosign public key"))
+        .await
+        .with_context(|| format!("failed to fetch the cosign public key from {url}"))?;
+
+    response
+        .error_for_status_ref()
+        .with_context(|| format!("failed to fetch the cosign public key from {url}"))?;
+
+    // Read in chunks against a ceiling rather than `bytes()` in one go: the
+    // URL is user supplied, and a public key is the one thing it need not be
+    // pointing at.
+    let mut body = Vec::new();
+
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .with_context(|| format!("failed to read the cosign public key from {url}"))?
+    {
+        if body.len() + chunk.len() > PUBLIC_KEY_MAX_BYTES {
+            return Err(eyre::Report::msg(format!(
+                "the cosign public key at {url} is larger than {PUBLIC_KEY_MAX_BYTES} bytes, \
+                 which no public key is"
+            )));
+        }
+
+        body.extend_from_slice(&chunk);
+    }
+
+    String::from_utf8(body).context("the cosign public key is not utf8")
 }
 
 /// Sigstore's public trust root (Fulcio's CA certificates and Rekor's public
@@ -660,13 +765,7 @@ fn triangulate(image: &Image, digest: &str, suffix: &str) -> Result<Url> {
 #[expect(clippy::unwrap_used, reason = "using unwrap in tests is fine")]
 #[expect(clippy::todo, reason = "using todo in tests is fine")]
 mod test {
-    use std::{
-        num::{
-            NonZeroU32,
-            NonZeroUsize,
-        },
-        time::Duration,
-    };
+    use std::num::NonZeroU32;
 
     use docker_registry_client::Manifest as DockerManifest;
     use pretty_assertions::assert_eq;
@@ -680,37 +779,111 @@ mod test {
             sbom_manifest,
             signature_from_manifest,
         },
-        process::Limits,
         registry::RateLimit,
     };
 
-    /// A verification that never gets a slot must not have spent the
-    /// registry's budget on its way to being turned away: nothing was sent to
-    /// the registry, and the budget is what the registries are sent.
+    /// The key cosign's own releases are signed with
+    /// (`release/release-cosign.pub` in the sigstore/cosign repository),
+    /// alongside the keyless signature
+    /// [`keyless_verify_confirms_a_real_signature`] checks: the same image
+    /// carries one signature of each kind.
+    const COSIGN_RELEASE_KEY: &str = "-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEhyQCx0E9wQWSFI9ULGwy3BuRklnt
+IqozONbbdbqz11hlRJy9c7SG+hdcFl9jE9uE/dwtuwU2MqU9T/cN0YkWww==
+-----END PUBLIC KEY-----
+";
+
+    const COSIGN_RELEASE_KEY_URL: &str =
+        "https://raw.githubusercontent.com/sigstore/cosign/main/release/release-cosign.pub";
+
+    /// Distroless' release key: a perfectly good key that did not sign the
+    /// cosign image.
+    const SOMEBODY_ELSES_KEY: &str = "-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWZzVzkb8A+DbgDpaJId/bOmV8n7Q
+OqxYbK0Iro6GzSmOzxkn+N2AKawLyXi84WSwJQBK//psATakCgAQKkNTAA==
+-----END PUBLIC KEY-----
+";
+
+    const COSIGN_IMAGE_DIGEST: &str =
+        "sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31";
+
+    /// A real key-based signature, verified in-process against the key
+    /// pasted straight into the form.
     #[tokio::test]
-    async fn a_verify_that_is_turned_away_does_not_spend_the_registry_budget() {
-        let limits = Limits::new(
-            NonZeroUsize::new(1).unwrap(),
-            Duration::ZERO,
-            Duration::from_secs(600),
+    async fn key_verify_confirms_a_real_signature() {
+        let registry_rate_limit = RateLimit::new(None, NonZeroU32::new(60).unwrap());
+        let image = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
+
+        let got = cosign_verify(COSIGN_RELEASE_KEY, &image, &registry_rate_limit)
+            .await
+            .unwrap();
+
+        // The keyless signature on the same image is not this key's, so it
+        // is not in the result -- one signature, not two.
+        assert_eq!(got.signatures.len(), 1, "{got:?}");
+
+        let signature = &got.signatures[0];
+        assert_eq!(signature.digest, COSIGN_IMAGE_DIGEST);
+        assert_eq!(signature.signature_type, "cosign container image signature");
+        assert!(signature.signature.is_some(), "{signature:?}");
+
+        assert!(
+            got.message
+                .contains("verified against the specified public key"),
+            "{}",
+            got.message
         );
+    }
 
+    /// The form's other shape of the key field: a URL the key is fetched from.
+    #[tokio::test]
+    async fn key_verify_reads_the_key_from_a_url() {
+        let registry_rate_limit = RateLimit::new(None, NonZeroU32::new(60).unwrap());
+        let image = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
+
+        let got = cosign_verify(COSIGN_RELEASE_KEY_URL, &image, &registry_rate_limit)
+            .await
+            .unwrap();
+
+        assert_eq!(got.signatures.len(), 1, "{got:?}");
+        assert_eq!(got.signatures[0].digest, COSIGN_IMAGE_DIGEST);
+    }
+
+    /// A signed image whose signatures were all made with some other key is a
+    /// failed verification, not an empty one -- the same non-zero exit the
+    /// cosign binary answered with.
+    #[tokio::test]
+    async fn key_verify_rejects_a_signature_made_with_another_key() {
+        let registry_rate_limit = RateLimit::new(None, NonZeroU32::new(60).unwrap());
+        let image = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
+
+        let err = cosign_verify(SOMEBODY_ELSES_KEY, &image, &registry_rate_limit)
+            .await
+            .unwrap_err()
+            .to_string();
+
+        assert!(
+            err.contains("none of the 2 signatures on the image were made with the supplied"),
+            "{err}"
+        );
+    }
+
+    /// Neither a key nor a URL -- a file path, as the cosign binary would
+    /// have read -- is turned away before anything is fetched, and without
+    /// the registry budget having been spent on it.
+    #[tokio::test]
+    async fn key_verify_rejects_what_is_neither_a_key_nor_a_url() {
         let registry_rate_limit = RateLimit::new(None, NonZeroU32::new(1).unwrap());
+        let image = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
 
-        // The only slot there is, held for as long as this test runs.
-        let _slot = limits.admit().await.unwrap();
+        let err = cosign_verify("cosign.pub", &image, &registry_rate_limit)
+            .await
+            .unwrap_err();
 
-        let err = cosign_verify(
-            "cosign.pub",
-            &"ghcr.io/aquasecurity/trivy:0.52.0".parse().unwrap(),
-            &limits,
-            &registry_rate_limit,
-        )
-        .await
-        .unwrap_err()
-        .to_string();
-
-        assert!(err.contains("too many scans are already running"), "{err}");
+        assert!(
+            format!("{err:?}").contains("must be a PEM encoded public key or an http(s) URL"),
+            "{err:?}"
+        );
 
         // Untouched: the one request a minute this allows is still to be had.
         registry_rate_limit.claim("ghcr.io").await.unwrap();

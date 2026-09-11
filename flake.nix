@@ -2,11 +2,11 @@
   description = "trivy-web -- built binary and the container image it ships in";
 
   inputs = {
-    # unstable, not a stable release channel: trivy and cosign are security
-    # tools, and this flake exists specifically so the image can track
-    # current releases of both without hand-fetching and checksumming a
-    # binary for every bump (see publish-image.yml history for what that
-    # looked like before).
+    # unstable, not a stable release channel: trivy is a security tool, and
+    # this flake exists specifically so the image can track its current
+    # releases without hand-fetching and checksumming a binary for every
+    # bump (see publish-image.yml history for what that looked like
+    # before).
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
     # The pinned Rust toolchain this repo already commits to in
@@ -78,6 +78,14 @@
         # panic=abort -- the same profile the Dockerfile builds with.
         buildType = "deploy";
 
+        # `strip -s` on the binary rather than the default `strip -S`, which
+        # only takes the debug sections and left .symtab/.strtab -- about 2 MB
+        # nothing reads, since panic=abort never prints a backtrace -- in the
+        # shipped binary. The Cargo profile's own `strip` setting cannot do
+        # this: nixpkgs' cargo build hook overrides it with
+        # CARGO_PROFILE_<type>_STRIP=false to leave stripping to this phase.
+        stripAllList = [ "bin" ];
+
         # Covered by `bazel test //...` already; the tests needing a
         # reachable registry or a local redis have no route to either
         # inside Nix's sandboxed build (no network access outside of
@@ -87,17 +95,18 @@
         meta.mainProgram = "trivy-web";
       };
 
-      # cosign_verify's `cosign verify --key` subprocess and trivy image
-      # scanning both need their own binary on PATH; nixpkgs already
-      # packages both, so there is nothing to fetch or checksum by hand
-      # here the way MODULE.bazel used to.
+      # trivy image scanning needs the trivy binary on PATH; nixpkgs already
+      # packages it, so there is nothing to fetch or checksum by hand here
+      # the way MODULE.bazel used to. No cosign: both kinds of signature
+      # verification (keyless and against a supplied key) run in-process
+      # through the sigstore crate (see src/handler/cosign.rs), and the
+      # binary was a third of the compressed image.
       image = pkgs.dockerTools.buildLayeredImage {
         name = "trivy-web";
         tag = "latest";
         contents = [
           trivy-web
           pkgs.trivy
-          pkgs.cosign
           pkgs.cacert
         ];
 

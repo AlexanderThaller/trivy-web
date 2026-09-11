@@ -56,9 +56,9 @@ pub(crate) struct AppState {
     pub(crate) docker_registry_client: DockerRegistryClient,
     pub(crate) cache: Cache,
 
-    /// The ceiling every trivy scan and cosign verification runs under. Both
-    /// endpoints start child processes for anyone who asks, so this is what
-    /// keeps a burst of requests from becoming a burst of scanners.
+    /// The ceiling every trivy scan runs under. Scanning starts a child
+    /// process for anyone who asks, so this is what keeps a burst of requests
+    /// from becoming a burst of scanners.
     pub(crate) limits: Limits,
 
     /// How often the registries hear from this deployment. Counted per registry
