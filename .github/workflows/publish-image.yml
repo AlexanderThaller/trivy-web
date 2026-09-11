@@ -6,12 +6,16 @@ on:
 
 # packages: write is what lets GITHUB_TOKEN push to this repository's own
 # GHCR namespace (ghcr.io/alexanderthaller/trivy-web) -- no separate PAT or
-# secret to manage or rotate. Scoped to this workflow alone (bazel.yml,
-# which also runs on untrusted pull_request checkouts, only ever gets
-# contents: read) rather than granted repo-wide.
+# secret to manage or rotate. id-token: write is what lets `cosign sign`
+# obtain a short-lived Sigstore certificate bound to this workflow's OIDC
+# identity, so signing needs no key to generate or store either. Both are
+# scoped to this workflow alone (bazel.yml, which also runs on untrusted
+# pull_request checkouts, only ever gets contents: read) rather than
+# granted repo-wide.
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 jobs:
   publish:
@@ -48,17 +52,77 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Pinned to the same cosign release //:cosign_layer fetches for the
+      # image itself (see MODULE.bazel) -- keep the two in step.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.3
+
+      # trivy generates the SBOM attached below; not something Bazel already
+      # puts on this runner's PATH (//:trivy_layer is a Bazel *output*, not a
+      # tool this build runs). Pinned to the same release and checksum
+      # //:trivy_layer fetches (see MODULE.bazel) -- keep the two in step.
+      - name: Install trivy
+        run: |
+          curl -sL -o /tmp/trivy.tar.gz \
+            https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz
+          echo "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a  /tmp/trivy.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
+          sudo install -m 0755 /tmp/trivy /usr/local/bin/trivy
+
       - name: Compute short commit sha
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       # --config=deploy is the same profile the Dockerfile builds with (see
-      # .bazelrc): LTO, one codegen unit, panic=abort. //:image has no
-      # default remote_tags (see BUILD.bazel) -- every tag this push lands
-      # on is named here explicitly: a moving `latest` and an immutable
-      # `sha-<short-sha>` a rollback can pin to.
-      - name: Build and push the image
+      # .bazelrc): LTO, one codegen unit, panic=abort. Built (not just
+      # pushed) here explicitly so the digest below is read from this
+      # exact build's own output rather than trusted back from whatever
+      # crane's push happened to report.
+      - name: Build the image
+        run: bazel build --config=deploy //:image
+
+      - name: Compute image digest
+        id: image
+        run: |
+          echo "digest=$(jq -r '.manifests[0].digest' bazel-bin/image/index.json)" >> "$GITHUB_OUTPUT"
+
+      # //:image has no default remote_tags (see BUILD.bazel) -- every tag
+      # this push lands on is named here explicitly: a moving `latest` and
+      # an immutable `sha-<short-sha>` a rollback can pin to. Cached from
+      # the build step above, so this does not rebuild.
+      - name: Push the image
         run: |
           bazel run --config=deploy //:push_image -- \
             --tag "sha-${{ steps.sha.outputs.short }}" \
             --tag latest
+
+      # Keyless: no `--key`, so cosign looks for the ambient GitHub Actions
+      # OIDC token (from id-token: write above) and gets a short-lived
+      # Fulcio certificate for it instead. Signs by digest, per cosign's own
+      # advice, not by the mutable tags just pushed.
+      - name: Sign the image
+        run: |
+          cosign sign --yes \
+            "ghcr.io/alexanderthaller/trivy-web@${{ steps.image.outputs.digest }}"
+
+      # SPDX, matching the format trivy-web's own SBOM display already
+      # parses (see SbomDocument::Spdx in src/handler/cosign.rs) -- so the
+      # image can show its own SBOM through its own feature. Scans the
+      # image that was just pushed, by digest, not the local bazel-bin/image
+      # output tree: what's attached should describe what a puller actually
+      # gets.
+      #
+      # `cosign attach sbom` is itself deprecated in favor of SBOM
+      # attestations, but still writes the same digest.sbom tag scheme this
+      # app's cosign_manifest reads -- the modern replacement does not, and
+      # switching to it would make the SBOM display invisible to this app's
+      # own webinterface. Revisit if cosign drops the deprecated command
+      # entirely.
+      - name: Generate and attach the SBOM
+        run: |
+          trivy image --format spdx-json --output sbom.spdx.json \
+            "ghcr.io/alexanderthaller/trivy-web@${{ steps.image.outputs.digest }}"
+          cosign attach sbom --type spdx --sbom sbom.spdx.json \
+            "ghcr.io/alexanderthaller/trivy-web@${{ steps.image.outputs.digest }}"
