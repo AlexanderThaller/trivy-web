@@ -46,9 +46,9 @@ pub(super) struct Args {
 
     /// How many scans may run at the same time
     ///
-    /// Every request the cache can not answer starts a trivy or cosign
-    /// process, and nothing about the endpoints is authenticated, so this is
-    /// the ceiling on what a burst of requests can cost the host.
+    /// Every scan the cache can not answer starts a trivy process, and
+    /// nothing about the endpoints is authenticated, so this is the ceiling
+    /// on what a burst of requests can cost the host.
     #[clap(
         long,
         value_name = "count",

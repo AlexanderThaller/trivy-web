@@ -16,12 +16,17 @@ eyre = "0.6"
 fred = { version = "10", features = ["i-keys"], default-features = false }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
-# Keyless-signature verification (chain of trust to Sigstore's Fulcio root,
-# signature validity, Rekor bundle) without shelling out to the cosign
-# binary. `cosign`/`rekor` bring the verification logic itself;
-# `sigstore-trust-root` fetches Sigstore's public trust root over TUF;
-# `rustls-tls` matches the TLS backend the rest of this crate uses instead of
-# pulling in native-tls too.
+# Fetches a URL-hosted cosign public key (the scan form's "https://…" form of
+# the key field). Already in the tree through `sigstore` with exactly this
+# feature set, so this is a direct dependency on it, not a second HTTP stack.
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+# Signature verification -- keyless (chain of trust to Sigstore's Fulcio
+# root, signature validity, Rekor bundle) and against a supplied public key
+# alike -- without shelling out to the cosign binary, which is what keeps it
+# out of the container image. `cosign`/`rekor` bring the verification logic
+# itself; `sigstore-trust-root` fetches Sigstore's public trust root over
+# TUF; `rustls-tls` matches the TLS backend the rest of this crate uses
+# instead of pulling in native-tls too.
 sigstore = { version = "0.14", default-features = false, features = [
   "cosign",
   "rekor",
@@ -68,3 +73,6 @@ inherits = "release"
 lto = true
 codegen-units = 1
 panic = "abort"
+# No `strip` here: the binary that ships is built by Nix, whose cargo build
+# hook overrides the profile's strip setting with its own fixup phase --
+# see `stripAllList` in flake.nix, which is where the symbol table comes off.

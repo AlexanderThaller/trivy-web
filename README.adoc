@@ -8,12 +8,14 @@ link:https://github.com/sigstore/cosign[cosign] has to say about that
 image: its signatures, an SBOM if one was attached, and a
 cryptographic verification of any keyless signature -- not just what
 the signing certificate claims about itself, but whether it actually
-chains to Sigstore's trust root.
+chains to Sigstore's trust root. Given a public key (pasted in, or a
+URL to one) it verifies key-based signatures against that too. Both
+verifications run in-process; the `cosign` binary is not involved.
 
 == Running
 
-The published image carries `trivy`, `cosign` and `trivy-web` and needs
-nothing else to scan public images:
+The published image carries `trivy` and `trivy-web` and needs nothing
+else to scan public images:
 
 [source,shell]
 ----
@@ -66,8 +68,8 @@ process locally.
 
 |`--max-concurrent-scans`
 |`TRIVY_WEB_MAX_CONCURRENT_SCANS`
-|How many trivy/cosign child processes may run at once (default `4`) --
-the ceiling an unauthenticated request can push the host to.
+|How many trivy child processes may run at once (default `4`) -- the
+ceiling an unauthenticated request can push the host to.
 
 |`--registry-requests-per-minute`
 |`TRIVY_WEB_REGISTRY_REQUESTS_PER_MINUTE`
@@ -99,11 +101,14 @@ reformat the tree to its own defaults); CI runs the same `cargo
 test`/`clippy`/`fmt` under it a contributor would locally, rather than
 whatever `cargo` happens to resolve to on a given machine.
 
-The image itself is `trivy-web`, `trivy` and `cosign` (the latter two
-straight from nixpkgs, not a URL and a checksum to keep in step by
-hand) plus CA certificates, with `dockerTools.buildLayeredImage`
-computing the actual closure -- glibc and nothing past what those four
-things need at runtime -- rather than layers assembled by hand.
+The image itself is `trivy-web` and `trivy` (the latter straight from
+nixpkgs, not a URL and a checksum to keep in step by hand) plus CA
+certificates, with `dockerTools.buildLayeredImage` computing the actual
+closure -- glibc and nothing past what those three things need at
+runtime -- rather than layers assembled by hand. No `cosign`: both
+kinds of signature verification run in-process (see
+`src/handler/cosign.rs`), and the binary was a third of the compressed
+image.
 
 [source,shell]
 ----

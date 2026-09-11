@@ -441,16 +441,16 @@ async fn cosign_verification(result: eyre::Result<CosignVerify>) -> Result<impl 
                             <tbody>
                                 for signature in &manifest.signatures {
                                     <tr>
-                                        <td class="digest">(&signature.critical.identity.docker_reference)</td>
-                                        <td class="digest">(&signature.critical.image.digest)</td>
-                                        <td>(&signature.critical.cosign_type)</td>
+                                        <td class="digest">(&signature.docker_reference)</td>
+                                        <td class="digest">(&signature.digest)</td>
+                                        <td>(&signature.signature_type)</td>
                                         <td
-                                            if signature.optional.is_some() {
+                                            if signature.signature.is_some() {
                                                 class="digest"
                                             }
                                         >
-                                            if let Some(optional) = &signature.optional {
-                                                (&optional.sig)
+                                            if let Some(sig) = &signature.signature {
+                                                (sig)
                                             } else {
                                                 <span class="muted">"—"</span>
                                             }
