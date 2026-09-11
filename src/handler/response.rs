@@ -5,6 +5,7 @@ use cache::{
     CosignInformationFetcher,
     DockerInformationFetcher,
     Fetch,
+    SbomInformationFetcher,
 };
 use chrono::{
     DateTime,
@@ -50,12 +51,13 @@ use super::{
     cosign::cosign_verify,
 };
 
-/// Everything the "Image" and "Cosign" cards render.
+/// Everything the "Image", "Cosign" and "SBOM" cards render.
 #[derive(Debug)]
 pub(crate) struct ImageResponse {
     pub(crate) image: Image,
     pub(crate) docker_information: Result<DockerInformation>,
     pub(crate) cosign_information: Result<CosignInformation>,
+    pub(crate) sbom_information: Result<SbomInformation>,
     pub(crate) cosign_verify: Option<Result<cosign::CosignVerify>>,
 }
 
@@ -73,6 +75,12 @@ pub(crate) struct TrivyInformation {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub(crate) struct CosignInformation {
     pub(crate) cosign: Option<cosign::Cosign>,
+    pub(crate) fetch_time: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub(crate) struct SbomInformation {
+    pub(crate) sbom: Option<cosign::Sbom>,
     pub(crate) fetch_time: DateTime<Utc>,
 }
 
@@ -111,12 +119,13 @@ pub(crate) async fn image(
         .instrument(info_span!("fetch_cosign_verify")),
     );
 
-    let (docker_information, cosign_information) = docker_and_cosign_manifest;
+    let (docker_information, cosign_information, sbom_information) = docker_and_cosign_manifest;
 
     let response = ImageResponse {
         image,
         docker_information,
         cosign_information,
+        sbom_information,
         cosign_verify,
     };
 
@@ -129,7 +138,11 @@ async fn fetch_docker_and_cosign_manifest(
     image: Image,
     cache: Cache,
     registry_rate_limit: RateLimit,
-) -> (Result<DockerInformation>, Result<CosignInformation>) {
+) -> (
+    Result<DockerInformation>,
+    Result<CosignInformation>,
+    Result<SbomInformation>,
+) {
     let docker_manifest = DockerInformationFetcher {
         docker_registry_client: &docker_registry_client,
         image: &image,
@@ -142,16 +155,34 @@ async fn fetch_docker_and_cosign_manifest(
         error!("{err}");
     }
 
-    let cosign_manifest = CosignInformationFetcher {
+    // Signatures and the SBOM are two independent tags off the same manifest
+    // digest, so they are fetched concurrently rather than one after the
+    // other.
+    let cosign_fetcher = CosignInformationFetcher {
         docker_registry_client: &docker_registry_client,
         image: &image,
         docker_manifest: &docker_manifest,
-    }
-    .cache_or_fetch(&cache, &registry_rate_limit)
-    .await
-    .context("failed to get cosign manifest");
+    };
 
-    (docker_manifest, cosign_manifest)
+    let sbom_fetcher = SbomInformationFetcher {
+        docker_registry_client: &docker_registry_client,
+        image: &image,
+        docker_manifest: &docker_manifest,
+    };
+
+    let (cosign_manifest, sbom_manifest) = tokio::join!(
+        cosign_fetcher
+            .cache_or_fetch(&cache, &registry_rate_limit)
+            .instrument(info_span!("fetch cosign manifest")),
+        sbom_fetcher
+            .cache_or_fetch(&cache, &registry_rate_limit)
+            .instrument(info_span!("fetch sbom manifest")),
+    );
+
+    let cosign_manifest = cosign_manifest.context("failed to get cosign manifest");
+    let sbom_manifest = sbom_manifest.context("failed to get sbom manifest");
+
+    (docker_manifest, cosign_manifest, sbom_manifest)
 }
 
 #[tracing::instrument]
@@ -197,6 +228,20 @@ impl TrivyInformation {
 }
 
 impl CosignInformation {
+    pub(crate) fn fetch_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.fetch_time)
+    }
+
+    pub(crate) fn expires(&self) -> DateTime<Utc> {
+        self.fetch_time + Duration::seconds(REDIS_TTL)
+    }
+
+    pub(crate) fn expires_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.expires())
+    }
+}
+
+impl SbomInformation {
     pub(crate) fn fetch_duration(&self) -> Duration {
         Utc::now().signed_duration_since(self.fetch_time)
     }

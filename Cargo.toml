@@ -11,7 +11,7 @@ ci = []
 [dependencies]
 chrono = "0.4"
 clap = { version = "4", features = ["derive", "env", "cargo"] }
-docker-registry-client = "0.4"
+docker-registry-client = "0.4.1"
 eyre = "0.6"
 fred = { version = "10", features = ["i-keys"], default-features = false }
 serde_json = "1"

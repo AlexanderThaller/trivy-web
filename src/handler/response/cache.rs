@@ -48,6 +48,7 @@ use crate::handler::{
 use super::{
     CosignInformation,
     DockerInformation,
+    SbomInformation,
     TrivyInformation,
 };
 
@@ -405,7 +406,7 @@ impl Fetch for CosignInformationFetcher<'_> {
     }
 
     fn key(&self) -> String {
-        format!("{{ REDIS_KEY_PREFIX }}:cosign:{}", self.image)
+        format!("{REDIS_KEY_PREFIX}:cosign:{}", self.image)
     }
 
     async fn fetch(&self) -> Result<Self::Output> {
@@ -435,6 +436,66 @@ impl Fetch for CosignInformationFetcher<'_> {
 
         Ok(CosignInformation {
             cosign,
+            fetch_time: Utc::now(),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct SbomInformationFetcher<'a> {
+    pub(crate) docker_registry_client: &'a DockerRegistryClient,
+    pub(crate) image: &'a Image,
+    pub(crate) docker_manifest: &'a Result<DockerInformation>,
+}
+
+impl Fetch for SbomInformationFetcher<'_> {
+    type Output = SbomInformation;
+
+    /// Same reasoning as [`CosignInformationFetcher::registry`]: without a
+    /// manifest digest to look the SBOM up by, nothing is sent to the
+    /// registry, so nothing is counted against it either.
+    fn registry(&self) -> Option<&str> {
+        self.docker_manifest
+            .as_ref()
+            .ok()?
+            .response
+            .digest
+            .as_ref()?;
+
+        Some(self.image.registry.registry_domain())
+    }
+
+    fn key(&self) -> String {
+        format!("{REDIS_KEY_PREFIX}:sbom:{}", self.image)
+    }
+
+    async fn fetch(&self) -> Result<Self::Output> {
+        if self.docker_manifest.is_err() {
+            return Err(eyre::eyre!("Failed to get docker manifest"));
+        }
+
+        let docker_manifest = self
+            .docker_manifest
+            .as_ref()
+            .expect("already checked if its an error");
+
+        if docker_manifest.response.digest.is_none() {
+            return Err(eyre::eyre!("Missing docker manifest digest"));
+        }
+
+        let digest = docker_manifest
+            .response
+            .digest
+            .as_ref()
+            .expect("already checked if digest is some");
+
+        let sbom = cosign::sbom_manifest(self.docker_registry_client, self.image, digest)
+            .instrument(info_span!("get sbom manifest"))
+            .await
+            .context("failed to get sbom manifest")?;
+
+        Ok(SbomInformation {
+            sbom,
             fetch_time: Utc::now(),
         })
     }

@@ -20,6 +20,7 @@ use crate::{
             CosignInformation,
             DockerInformation,
             ImageResponse,
+            SbomInformation,
         },
     },
     view::{
@@ -46,7 +47,7 @@ pub(crate) async fn image_information(cx: &Cx, image: &str, cosign_key: &str) ->
         cosign_key: cosign_key.to_owned(),
     };
 
-    let response = match crate::handler::response::image(state, form).await {
+    let response = match Box::pin(crate::handler::response::image(state, form)).await {
         Ok(response) => response,
 
         // A reference the registry client cannot parse is the caller's
@@ -70,6 +71,7 @@ pub(crate) async fn image_information(cx: &Cx, image: &str, cosign_key: &str) ->
         image,
         docker_information,
         cosign_information,
+        sbom_information,
         cosign_verify,
     } = response;
 
@@ -88,6 +90,11 @@ pub(crate) async fn image_information(cx: &Cx, image: &str, cosign_key: &str) ->
             if let Some(result) = cosign_verify {
                 cosign_verification(result: result)
             }
+        </section>
+
+        <section class="card">
+            <h2>"SBOM"</h2>
+            sbom_manifest(information: sbom_information)
         </section>
     }
     .boxed())
@@ -249,6 +256,88 @@ async fn cosign_manifest(information: eyre::Result<CosignInformation>) -> Result
                 <p class="empty">"This image is not signed with cosign."</p>
             }
         </section>
+    }
+    .boxed())
+}
+
+/// The SBOM cosign attached to the image, if any.
+#[component]
+async fn sbom_manifest(information: eyre::Result<SbomInformation>) -> Result<impl View> {
+    let information = match information {
+        Ok(information) => information,
+
+        Err(err) => {
+            return Ok(view! {
+                error_block(title: "Could not read the sbom manifest", message: format::error(&err))
+            }
+            .boxed());
+        }
+    };
+
+    Ok(view! {
+        <dl class="meta">
+            cache_meta(
+                fetched: format::timestamp(information.fetch_time),
+                fetched_ago: format::duration(information.fetch_duration()),
+                expires: format::timestamp(information.expires()),
+                expires_in: format::duration(information.expires_duration()),
+            )
+            if let Some(sbom) = information.sbom.as_ref() {
+                <div>
+                    <dt>"Location"</dt>
+                    <dd>(sbom.manifest_location.to_string())</dd>
+                </div>
+            }
+        </dl>
+
+        if let Some(sbom) = information.sbom.as_ref() {
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>"Format"</th>
+                            <th>"Version"</th>
+                            <th>"Name"</th>
+                            <th class="num">"Components"</th>
+                            <th class="num">"Size"</th>
+                            <th>"Digest"</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        for layer in &sbom.layers {
+                            <tr>
+                                <td>(layer.document.format_label())</td>
+                                <td>
+                                    if let Some(version) = layer.document.spec_version() {
+                                        (version)
+                                    } else {
+                                        <span class="muted">"—"</span>
+                                    }
+                                </td>
+                                <td class="digest">
+                                    if let Some(name) = layer.document.name() {
+                                        (name)
+                                    } else {
+                                        <span class="muted">"—"</span>
+                                    }
+                                </td>
+                                <td class="num">
+                                    if let Some(count) = layer.document.component_count() {
+                                        (count)
+                                    } else {
+                                        <span class="muted">"—"</span>
+                                    }
+                                </td>
+                                <td class="num">(format::human_bytes(layer.size))</td>
+                                <td class="digest">(&layer.digest)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        } else {
+            <p class="empty">"This image has no SBOM attached."</p>
+        }
     }
     .boxed())
 }
