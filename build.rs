@@ -1,12 +1,12 @@
 fn main() {
     // Get the current Git commit hash.
     //
-    // Both failure modes are tolerated rather than fatal, because the Bazel
-    // build hits them: the sandbox has no .git (and no guarantee of a git
-    // binary), so `git` either fails to spawn or exits non-zero with empty
-    // stdout. Panicking there would make `bazel test //...` unbuildable for a
-    // string that only decorates the /info page. Cargo builds still see a real
-    // hash; see the note on //:build_script in BUILD.bazel.
+    // Both failure modes are tolerated rather than fatal, because the Nix
+    // build hits them: flake.nix's source filtering excludes .git (and Nix's
+    // sandbox has no guarantee of a git binary either), so `git` either fails
+    // to spawn or exits non-zero with empty stdout. Panicking there would
+    // make `nix build` unbuildable for a string that only decorates the
+    // /info page. Cargo builds still see a real hash.
     let git_commit = std::process::Command::new("git")
         .args(["rev-parse", "HEAD"])
         .output()

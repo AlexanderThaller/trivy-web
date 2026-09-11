@@ -43,6 +43,21 @@
         rustc = toolchain;
       };
 
+      # rustfmt pinned to a nightly separately from rustc, the same split
+      # the old Bazel toolchain kept. Every option in .rustfmt.toml --
+      # imports_granularity, imports_layout, format_strings and the rest --
+      # is unstable, so stable rustfmt prints "can't set X, unstable
+      # features are only available in nightly channel" for each and then
+      # formats with the defaults, which is not what's actually committed.
+      # This nightly is only ever used for its rustfmt; devShell still
+      # builds, tests and lints with the pinned stable toolchain above.
+      nightlyRustfmt =
+        (fenix.packages.${system}.toolchainOf {
+          channel = "nightly";
+          date = "2026-07-14";
+          sha256 = "sha256-Vo4TslYYA7ldRP9vocgb0Y3c8PvcRcHipKArlRXq9xY=";
+        }).rustfmt;
+
       trivy-web = rustPlatform.buildRustPackage {
         pname = "trivy-web";
         version = "0.1.0";
@@ -78,10 +93,12 @@
         # panic=abort -- the same profile the Dockerfile builds with.
         buildType = "deploy";
 
-        # Covered by `bazel test //...` already; the tests needing a
-        # reachable registry or a local redis have no route to either
-        # inside Nix's sandboxed build (no network access outside of
-        # fixed-output derivations), so they are not run a third way here.
+        # Covered by CI's own `cargo test` step (see nix.yml) instead: the
+        # tests needing a reachable registry or a local redis have no route
+        # to either inside Nix's sandboxed build (no network access outside
+        # of fixed-output derivations), so running them here would just be
+        # the same failure this session already hit once, packaged instead
+        # of fixed.
         doCheck = false;
 
         meta.mainProgram = "trivy-web";
@@ -121,6 +138,22 @@
       packages.${system} = {
         inherit trivy-web image;
         default = trivy-web;
+      };
+
+      # `nix develop` for local work, and what CI (see nix.yml) runs `cargo
+      # test`/`clippy`/`fmt` under -- the same pinned versions either way,
+      # rather than whatever `cargo` happens to resolve to on a given
+      # machine. rustfmt first in the combine so it wins the conflict with
+      # the stable toolchain's own bundled rustfmt (fenix.combine keeps the
+      # earliest entry on a path collision; verified by checking
+      # `rustfmt --version` both ways round rather than assuming).
+      devShells.${system}.default = pkgs.mkShell {
+        packages = [
+          (fenix.packages.${system}.combine [
+            nightlyRustfmt
+            toolchain
+          ])
+        ];
       };
     };
 }

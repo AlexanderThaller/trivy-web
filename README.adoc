@@ -77,39 +77,37 @@ the ceiling an unauthenticated request can push the host to.
 
 == Development
 
-=== Cargo
+`just --list` for the full set; the ones worth knowing about:
 
 [source,shell]
 ----
-cargo build
-cargo test --features ci   # skips the tests that need a local redis or network access
-----
-
-=== Bazel
-
-`bazel test //...` covers build, test, clippy and rustfmt in one
-invocation (see `.github/workflows/bazel.yml`).
-
-[source,shell]
-----
-bazel test //...
+just dev            # cargo run, stylesheet served off disk so an edit just needs a reload
+just check          # cargo test --features ci, clippy, rustfmt -- what CI runs
+just build          # the way it ships: optimised, fat LTO, panic=abort
+just docker_build   # the container image, as a docker-archive tarball at ./result
+just docker_run     # build it and run it locally
 ----
 
 === Nix
 
-The container image (see `flake.nix`) is built with Nix rather than
-Bazel: `trivy` and `cosign` come straight from nixpkgs instead of a
-URL and a checksum to keep in step by hand, and
-`dockerTools.buildLayeredImage` computes the image's closure --
-`trivy-web`, `trivy`, `cosign`, CA certificates, glibc, nothing else --
-rather than layers assembled by hand.
+`flake.nix` is the source of truth for both the toolchain and the
+container image, not just a way to build the latter. `nix develop`
+puts the exact pinned toolchain on PATH (rustc/cargo/clippy from
+rust-toolchain.toml, rustfmt from a separate nightly pin -- every
+option in `.rustfmt.toml` is unstable, so stable rustfmt would silently
+reformat the tree to its own defaults); CI runs the same `cargo
+test`/`clippy`/`fmt` under it a contributor would locally, rather than
+whatever `cargo` happens to resolve to on a given machine.
+
+The image itself is `trivy-web`, `trivy` and `cosign` (the latter two
+straight from nixpkgs, not a URL and a checksum to keep in step by
+hand) plus CA certificates, with `dockerTools.buildLayeredImage`
+computing the actual closure -- glibc and nothing past what those four
+things need at runtime -- rather than layers assembled by hand.
 
 [source,shell]
 ----
-nix build '.#trivy-web'   # just the binary
-nix build '.#image'       # the container image, as a docker-archive tarball at ./result
-
-# load it locally to poke at it
-skopeo copy docker-archive:./result docker-daemon:trivy-web:local
-docker run -p 16223:16223 trivy-web:local
+nix develop                   # a shell with the pinned toolchain on PATH
+nix build '.#trivy-web'       # just the binary
+nix build '.#image'           # the container image, as a docker-archive tarball at ./result
 ----

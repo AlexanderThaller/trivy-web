@@ -14,7 +14,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # See bazel.yml for why persist-credentials is off.
+      # persist-credentials: false because nothing downstream authenticates
+      # to git. The default would leave GITHUB_TOKEN in .git/config as an
+      # http.extraheader for the rest of the job -- readable by every build
+      # script Nix and Cargo go on to run.
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -26,12 +29,27 @@ jobs:
       - name: Set up the Nix binary cache
         uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
 
-      # Builds both packages flake.nix exposes: trivy-web itself, and the
-      # container image built from it. Read-only, no registry credentials
-      # needed for either -- pushing the image is publish-image.yml's job,
-      # gated to pushes on main. This is here so a flake.nix change that
-      # breaks the build (or a Cargo.lock change that changes what
-      # cargoLock.lockFile has to vendor) is caught on every PR rather than
-      # only surfacing when publish-image.yml next runs against main.
+      # Build, test, clippy and rustfmt, replacing what `bazel test //...`
+      # used to cover: `nix develop` puts the exact pinned toolchain
+      # (rustc/cargo/clippy from rust-toolchain.toml, rustfmt from the
+      # separate nightly pin -- see flake.nix) on PATH, the same one a
+      # contributor gets from `nix develop` locally, rather than whatever
+      # `cargo` happens to resolve to on the runner.
+      #
+      # `ci` marks the tests needing a local redis or a reachable image
+      # registry as #[ignore] -- neither exists in this sandbox, the same
+      # reason Bazel's rust_test carried the same feature.
+      - name: Test, clippy and rustfmt
+        run: |
+          nix develop --command cargo test --features ci
+          nix develop --command cargo clippy --all-targets -- -D warnings
+          nix develop --command cargo fmt --check
+
+      # Read-only, no registry credentials needed for either -- pushing the
+      # image is publish-image.yml's job, gated to pushes on main. This is
+      # here so a flake.nix change that breaks the build (or a Cargo.lock
+      # change that changes what cargoLock.lockFile has to vendor) is caught
+      # on every PR rather than only surfacing when publish-image.yml next
+      # runs against main.
       - name: Build trivy-web and the container image
         run: nix build '.#trivy-web' '.#image'

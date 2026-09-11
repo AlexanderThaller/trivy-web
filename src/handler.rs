@@ -214,9 +214,9 @@ pub(crate) async fn css_main() -> Result<impl topcoat::router::response::IntoRes
 
 // Read off disk so an edit to the stylesheet only needs a reload, not a
 // rebuild. That only works when the process was started from the repository
-// root: `bazel run` puts it in the runfiles tree instead, and a binary run
-// from anywhere else has no source tree beside it, so fall back to the copy
-// baked into the binary rather than panicking in the middle of a request.
+// root: a debug binary run from anywhere else has no source tree beside it,
+// so fall back to the copy baked into the binary rather than panicking in
+// the middle of a request.
 #[cfg(debug_assertions)]
 #[route(GET "/css/main.css")]
 pub(crate) async fn css_main() -> Result<impl topcoat::router::response::IntoResponse> {

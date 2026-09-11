@@ -9,7 +9,7 @@ on:
 # secret to manage or rotate. id-token: write is what lets `cosign sign`
 # obtain a short-lived Sigstore certificate bound to this workflow's OIDC
 # identity, so signing needs no key to generate or store either. Both are
-# scoped to this workflow alone (bazel.yml, which also runs on untrusted
+# scoped to this workflow alone (nix.yml, which also runs on untrusted
 # pull_request checkouts, only ever gets contents: read) rather than
 # granted repo-wide.
 permissions:
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # persist-credentials: false the same way bazel.yml's checkout is:
+      # persist-credentials: false the same way nix.yml's checkout is:
       # nothing here pushes to git, only to the container registry.
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
