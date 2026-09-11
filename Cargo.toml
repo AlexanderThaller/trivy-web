@@ -14,7 +14,7 @@ axum-macros = "0.5"
 axum = { version = "0.8", features = ["json", "macros", "tracing"] }
 chrono = "0.4"
 clap = { version = "4", features = ["derive", "env", "cargo"] }
-docker-registry-client = "0.3"
+docker-registry-client = "0.4"
 eyre = "0.6"
 fred = { version = "10", features = ["i-keys"], default-features = false }
 maud = "0.27"
