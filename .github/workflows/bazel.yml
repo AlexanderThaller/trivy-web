@@ -56,16 +56,8 @@ jobs:
       # --lockfile_mode=error fails the build if MODULE.bazel.lock does not
       # match MODULE.bazel, rather than silently regenerating it, so a stale
       # committed lockfile is caught here instead of drifting.
+      #
+      # The container image is a separate, Nix-built thing now (see
+      # flake.nix and nix.yml) -- nothing left for Bazel to build here.
       - name: Build, test, clippy and rustfmt
         run: bazel test --lockfile_mode=error //...
-
-      # //:image and //:push_image carry tags = ["manual"], so the //...
-      # above never touches them -- on purpose, so an ordinary PR run does
-      # not pull the (large, external) base images on every push. Built here
-      # explicitly instead, so a change that breaks the image graph (a bad
-      # label, a renamed layer) is still caught on every PR rather than only
-      # surfacing when publish-image.yml runs against main. This only
-      # builds; pushing needs registry credentials this workflow does not
-      # have, and lives in publish-image.yml instead.
-      - name: Build the container image
-        run: bazel build --lockfile_mode=error //:image

@@ -88,14 +88,28 @@ cargo test --features ci   # skips the tests that need a local redis or network 
 === Bazel
 
 `bazel test //...` covers build, test, clippy and rustfmt in one
-invocation (see `.github/workflows/bazel.yml`); `//:image` and
-`//:push_image` are excluded from that wildcard on purpose (they carry
-`tags = ["manual"]`) so an ordinary check doesn't pull external base
-images or need registry credentials.
+invocation (see `.github/workflows/bazel.yml`).
 
 [source,shell]
 ----
-bazel test //...                        # build, test, clippy, rustfmt
-bazel build --config=deploy //:image    # build the container image locally
-bazel run --config=deploy //:push_image -- --tag <tag>   # needs `docker login ghcr.io` first
+bazel test //...
+----
+
+=== Nix
+
+The container image (see `flake.nix`) is built with Nix rather than
+Bazel: `trivy` and `cosign` come straight from nixpkgs instead of a
+URL and a checksum to keep in step by hand, and
+`dockerTools.buildLayeredImage` computes the image's closure --
+`trivy-web`, `trivy`, `cosign`, CA certificates, glibc, nothing else --
+rather than layers assembled by hand.
+
+[source,shell]
+----
+nix build '.#trivy-web'   # just the binary
+nix build '.#image'       # the container image, as a docker-archive tarball at ./result
+
+# load it locally to poke at it
+skopeo copy docker-archive:./result docker-daemon:trivy-web:local
+docker run -p 16223:16223 trivy-web:local
 ----
