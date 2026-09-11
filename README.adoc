@@ -25,6 +25,21 @@ on every push to `main` (see `.github/workflows/publish-image.yml`),
 tagged `latest` and `sha-<short-sha>`. `docker-compose.yml`-style
 deployments should pin the sha tag rather than track `latest`.
 
+Every published image is signed keylessly (no key to leak, verified
+against Sigstore's public trust root the same way this app's own
+"Keyless verification" panel checks other images) and carries an SBOM
+trivy generated from the image itself:
+
+[source,shell]
+----
+cosign verify \
+  --certificate-identity-regexp 'https://github.com/AlexanderThaller/trivy-web/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/alexanderthaller/trivy-web@<digest>
+
+cosign tree ghcr.io/alexanderthaller/trivy-web@<digest>   # signature + SBOM
+----
+
 === Configuration
 
 Every setting is a flag or the environment variable next to it; run
