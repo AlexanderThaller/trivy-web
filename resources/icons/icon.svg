@@ -1,10 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- The same "▚" (U+259A quadrant upper left and lower right) the header
        logo uses, and the same colors: the bg and accent custom properties
-       from resources/css/main.css's dark palette. Drawn as two rects rather
-       than set as text so it renders identically everywhere, independent of
-       whether a given rasterizer's font has that glyph. -->
+       from resources/css/main.css's dark palette. Proportions (a tall,
+       roughly 12:31 wide:high bounding box, not a square split down the
+       middle) measured pixel for pixel off a screenshot of the glyph as
+       the system font actually renders it, not a geometric guess: an even
+       quadrant split of the full square looked wrong precisely because
+       that is not what the glyph looks like. Drawn as rects rather than
+       set as text so it renders identically everywhere, independent of
+       font. -->
+
   <rect width="32" height="32" fill="#0d0f12"/>
-  <rect x="0" y="0" width="16" height="16" fill="#4fd1c5"/>
-  <rect x="16" y="16" width="16" height="16" fill="#4fd1c5"/>
+  <rect x="11" y="3" width="5" height="13" fill="#4fd1c5"/>
+  <rect x="16" y="16" width="5" height="13" fill="#4fd1c5"/>
 </svg>
