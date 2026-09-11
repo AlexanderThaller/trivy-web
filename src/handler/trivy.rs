@@ -24,27 +24,27 @@ use super::{
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub(super) struct TrivyResult {
+pub(crate) struct TrivyResult {
     #[serde(default)]
-    pub(super) results: Vec<Results>,
+    pub(crate) results: Vec<Results>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub(super) struct Results {
+pub(crate) struct Results {
     #[serde(default)]
-    pub(super) target: String,
+    pub(crate) target: String,
 
     #[serde(rename = "Type")]
-    pub(super) target_type: Option<String>,
+    pub(crate) target_type: Option<String>,
 
-    pub(super) class: Option<String>,
-    pub(super) vulnerabilities: Option<Vec<Vulnerability>>,
+    pub(crate) class: Option<String>,
+    pub(crate) vulnerabilities: Option<Vec<Vulnerability>>,
 
     /// Only the amount of secrets is reported so the contents of the secrets
     /// are counted while deserializing instead of being kept around.
     #[serde(default, deserialize_with = "deserialize_count")]
-    pub(super) secrets: usize,
+    pub(crate) secrets: usize,
 }
 
 /// Deserializes the length of a sequence without collecting its elements.
@@ -103,36 +103,36 @@ where
 
 /// Summary of a single scan target as shown in the trivy report summary table.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub(super) struct ReportSummary {
-    pub(super) target: String,
-    pub(super) target_type: Option<String>,
-    pub(super) class: Option<String>,
-    pub(super) vulnerabilities: usize,
-    pub(super) secrets: usize,
-    pub(super) severity_count: SeverityCount,
+pub(crate) struct ReportSummary {
+    pub(crate) target: String,
+    pub(crate) target_type: Option<String>,
+    pub(crate) class: Option<String>,
+    pub(crate) vulnerabilities: usize,
+    pub(crate) secrets: usize,
+    pub(crate) severity_count: SeverityCount,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 #[serde(rename_all = "PascalCase")]
-pub(super) struct Vulnerability {
-    pub(super) severity: Severity,
+pub(crate) struct Vulnerability {
+    pub(crate) severity: Severity,
 
     #[serde(rename = "VulnerabilityID")]
-    pub(super) id: String,
+    pub(crate) id: String,
 
-    pub(super) references: Option<BTreeSet<String>>,
-    pub(super) pkg_name: String,
-    pub(super) installed_version: String,
-    pub(super) primary_url: Option<Url>,
-    pub(super) fixed_version: Option<String>,
-    pub(super) title: Option<String>,
+    pub(crate) references: Option<BTreeSet<String>>,
+    pub(crate) pkg_name: String,
+    pub(crate) installed_version: String,
+    pub(crate) primary_url: Option<Url>,
+    pub(crate) fixed_version: Option<String>,
+    pub(crate) title: Option<String>,
 
     #[serde(rename = "CVSS")]
-    pub(super) cvss: Option<BTreeMap<String, Cvss>>,
+    pub(crate) cvss: Option<BTreeMap<String, Cvss>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub(super) struct Cvss {
+pub(crate) struct Cvss {
     #[serde(rename = "V2Vector")]
     v2vector: Option<String>,
     #[serde(rename = "V3Vector")]
@@ -144,7 +144,7 @@ pub(super) struct Cvss {
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub(super) struct Score(String);
+pub(crate) struct Score(String);
 
 impl Serialize for Score {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -173,14 +173,14 @@ impl std::fmt::Display for Score {
 }
 
 impl Cvss {
-    pub(super) fn score(&self) -> Option<&Score> {
+    pub(crate) fn score(&self) -> Option<&Score> {
         self.v2score.as_ref().or(self.v3score.as_ref())
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 #[serde(rename_all = "UPPERCASE")]
-pub(super) enum Severity {
+pub(crate) enum Severity {
     Critical,
     High,
     Medium,
@@ -189,12 +189,12 @@ pub(super) enum Severity {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub(super) struct SeverityCount {
-    pub(super) critical: usize,
-    pub(super) high: usize,
-    pub(super) medium: usize,
-    pub(super) low: usize,
-    pub(super) unknown: usize,
+pub(crate) struct SeverityCount {
+    pub(crate) critical: usize,
+    pub(crate) high: usize,
+    pub(crate) medium: usize,
+    pub(crate) low: usize,
+    pub(crate) unknown: usize,
 }
 
 impl std::fmt::Display for Severity {
@@ -209,7 +209,7 @@ impl std::fmt::Display for Severity {
     }
 }
 
-pub(super) fn get_vulnerabilities_count<'a>(
+pub(crate) fn get_vulnerabilities_count<'a>(
     vulnerabilities: impl IntoIterator<Item = &'a Vulnerability>,
 ) -> SeverityCount {
     let mut vulnerabilities_count = SeverityCount::default();
@@ -229,7 +229,7 @@ pub(super) fn get_vulnerabilities_count<'a>(
 
 impl Results {
     /// Summary of this target as shown in the trivy report summary table.
-    pub(super) fn summary(&self) -> ReportSummary {
+    pub(crate) fn summary(&self) -> ReportSummary {
         ReportSummary {
             target: self.target.clone(),
             target_type: self.target_type.clone(),
@@ -242,7 +242,7 @@ impl Results {
 }
 
 impl Vulnerability {
-    pub(super) fn primary_url(&self) -> Option<&str> {
+    pub(crate) fn primary_url(&self) -> Option<&str> {
         self.primary_url.as_ref().map(url::Url::as_str).or_else(|| {
             self.references
                 .as_ref()
@@ -262,7 +262,7 @@ impl Vulnerability {
         password = password.map(|_| "REDACTED")
     )
 )]
-pub(super) async fn scan_image(
+pub(crate) async fn scan_image(
     image: &Image,
     server: Option<&str>,
     username: Option<&str>,
