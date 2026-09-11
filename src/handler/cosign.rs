@@ -503,6 +503,135 @@ pub(crate) async fn cosign_verify(
     })
 }
 
+/// Sigstore's public trust root (Fulcio's CA certificates and Rekor's public
+/// keys), fetched once per process rather than once per request.
+///
+/// Fetching it is a network round trip to Sigstore's own TUF distribution
+/// point, independent of any image registry, so it is not something the
+/// per-registry [`RateLimit`] has any business gating -- but doing it on
+/// every keyless verification would mean every one of those requests also
+/// waiting on Sigstore's infrastructure. [`tokio::sync::OnceCell`] makes the
+/// first caller pay for the fetch and every later one reuse it; a fetch that
+/// fails is not cached, so the next caller gets to retry rather than being
+/// stuck with a permanent error from what might have been a transient
+/// network hiccup at startup.
+#[derive(Clone, Default)]
+pub(crate) struct SigstoreTrustRoot(
+    std::sync::Arc<
+        tokio::sync::OnceCell<std::sync::Arc<sigstore::trust::sigstore::SigstoreTrustRoot>>,
+    >,
+);
+
+impl SigstoreTrustRoot {
+    async fn get(&self) -> Result<std::sync::Arc<sigstore::trust::sigstore::SigstoreTrustRoot>> {
+        self.0
+            .get_or_try_init(|| async {
+                sigstore::trust::sigstore::SigstoreTrustRoot::new(None)
+                    .await
+                    .map(std::sync::Arc::new)
+            })
+            .await
+            .cloned()
+            .context("failed to fetch the sigstore trust root")
+    }
+}
+
+impl std::fmt::Debug for SigstoreTrustRoot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SigstoreTrustRoot")
+            .field("fetched", &self.0.initialized())
+            .finish()
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub(crate) struct KeylessVerification {
+    pub(crate) verified_identities: Vec<VerifiedIdentity>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub(crate) struct VerifiedIdentity {
+    /// Whether `subject` is the signer's email or a URI (e.g. the GitHub
+    /// Actions workflow that produced the signature).
+    pub(crate) subject_kind: SubjectKind,
+    pub(crate) subject: String,
+    pub(crate) issuer: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub(crate) enum SubjectKind {
+    Email,
+    Uri,
+}
+
+/// Cryptographically verifies the keyless signatures [`cosign_manifest`]
+/// only displays the certificate contents of.
+///
+/// This walks the same trust chain `cosign verify` does in keyless mode --
+/// the certificate chains to Sigstore's Fulcio root, was valid at the time
+/// Rekor's bundle says it signed, and the signature itself checks out --
+/// without shelling out to the `cosign` binary: the `sigstore` crate carries
+/// its own verification logic.
+///
+/// Its `Client` fetches the manifest and signature layers itself through its
+/// own OCI client, a separate path from [`DockerRegistryClient`] -- so unlike
+/// [`cosign_manifest`] and [`sbom_manifest`], which reach the registry
+/// through the same client [`RateLimit::claim`] is charged against by
+/// [`Fetch::rate_limited_fetch`](super::response::cache::Fetch::rate_limited_fetch)
+/// automatically, this function's caller has to be the one that claims: see
+/// `KeylessVerificationFetcher::registry` in `response::cache`.
+#[tracing::instrument(skip(trust_root))]
+pub(crate) async fn cosign_keyless_verify(
+    trust_root: &SigstoreTrustRoot,
+    image: &Image,
+) -> Result<KeylessVerification, eyre::Error> {
+    use sigstore::cosign::CosignCapabilities;
+
+    let trust_root = trust_root.get().await?;
+
+    let mut client = sigstore::cosign::ClientBuilder::default()
+        .with_trust_repository(trust_root.as_ref())
+        .context("failed to configure the sigstore trust repository")?
+        .build()
+        .context("failed to build the sigstore cosign client")?;
+
+    let oci_reference: sigstore::registry::OciReference = image
+        .to_string()
+        .parse()
+        .context("failed to convert the image reference for sigstore")?;
+
+    let layers = client
+        .trusted_signature_layers(&sigstore::registry::Auth::Anonymous, &oci_reference)
+        .instrument(info_span!("trusted signature layers"))
+        .await
+        .context("failed to fetch and verify signature layers")?;
+
+    let verified_identities = layers
+        .into_iter()
+        .filter_map(|layer| layer.certificate_signature)
+        .map(|certificate_signature| {
+            let (subject_kind, subject) = match certificate_signature.subject {
+                sigstore::cosign::signature_layers::CertificateSubject::Email(subject) => {
+                    (SubjectKind::Email, subject)
+                }
+                sigstore::cosign::signature_layers::CertificateSubject::Uri(subject) => {
+                    (SubjectKind::Uri, subject)
+                }
+            };
+
+            VerifiedIdentity {
+                subject_kind,
+                subject,
+                issuer: certificate_signature.issuer,
+            }
+        })
+        .collect();
+
+    Ok(KeylessVerification {
+        verified_identities,
+    })
+}
+
 /// Builds the Distribution API URL for the cosign tag that carries `digest`'s
 /// signature (`suffix = "sig"`), SBOM (`suffix = "sbom"`), or attestations
 /// (`suffix = "att"`).
@@ -545,6 +674,7 @@ mod test {
     use crate::handler::{
         cosign::{
             SbomDocument,
+            cosign_keyless_verify,
             cosign_manifest,
             cosign_verify,
             sbom_manifest,
@@ -676,6 +806,44 @@ mod test {
             }
             other => panic!("expected an SPDX document, got: {other:?}"),
         }
+    }
+
+    /// A real keyless signature, cryptographically verified against
+    /// Sigstore's trust root (not just the certificate contents
+    /// [`cosign_manifest`] displays without verifying anything).
+    #[tokio::test]
+    async fn keyless_verify_confirms_a_real_signature() {
+        let trust_root = super::SigstoreTrustRoot::default();
+        let image = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
+
+        let got = cosign_keyless_verify(&trust_root, &image).await.unwrap();
+
+        assert!(!got.verified_identities.is_empty(), "{got:?}");
+
+        let identity = &got.verified_identities[0];
+        assert_eq!(
+            identity.issuer.as_deref(),
+            Some("https://accounts.google.com")
+        );
+        assert!(
+            identity
+                .subject
+                .contains("keyless@projectsigstore.iam.gserviceaccount.com"),
+            "{identity:?}"
+        );
+    }
+
+    /// An image nobody signed has nothing to verify -- this is not an error,
+    /// it is an empty result, the same way [`cosign_manifest`] returns
+    /// `Ok(None)` rather than an error for an unsigned image.
+    #[tokio::test]
+    async fn keyless_verify_finds_nothing_for_an_unsigned_image() {
+        let trust_root = super::SigstoreTrustRoot::default();
+        let image = "docker.io/library/alpine:3.20".parse().unwrap();
+
+        let got = cosign_keyless_verify(&trust_root, &image).await.unwrap();
+
+        assert!(got.verified_identities.is_empty(), "{got:?}");
     }
 
     #[ignore = "incomplete test"]

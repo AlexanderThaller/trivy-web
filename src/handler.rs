@@ -64,6 +64,10 @@ pub(crate) struct AppState {
     /// How often the registries hear from this deployment. Counted per registry
     /// in redis, so every instance draws from the same budget.
     pub(crate) registry_rate_limit: RateLimit,
+
+    /// Sigstore's trust root, fetched once and shared by every keyless
+    /// verification this instance runs.
+    pub(crate) sigstore_trust_root: cosign::SigstoreTrustRoot,
 }
 
 /// The application state, registered on the router with `.app_context`.

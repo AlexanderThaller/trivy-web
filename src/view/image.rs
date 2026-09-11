@@ -20,6 +20,7 @@ use crate::{
             CosignInformation,
             DockerInformation,
             ImageResponse,
+            KeylessVerificationInformation,
             SbomInformation,
         },
     },
@@ -72,6 +73,7 @@ pub(crate) async fn image_information(cx: &Cx, image: &str, cosign_key: &str) ->
         docker_information,
         cosign_information,
         sbom_information,
+        keyless_verification_information,
         cosign_verify,
     } = response;
 
@@ -87,6 +89,7 @@ pub(crate) async fn image_information(cx: &Cx, image: &str, cosign_key: &str) ->
         <section class="card">
             <h2>"Cosign"</h2>
             cosign_manifest(information: cosign_information)
+            keyless_verification(information: keyless_verification_information)
             if let Some(result) = cosign_verify {
                 cosign_verification(result: result)
             }
@@ -254,6 +257,78 @@ async fn cosign_manifest(information: eyre::Result<CosignInformation>) -> Result
                 </div>
             } else {
                 <p class="empty">"This image is not signed with cosign."</p>
+            }
+        </section>
+    }
+    .boxed())
+}
+
+/// Cryptographic verification of the keyless signatures the manifest above
+/// only displays the certificate contents of: does each one chain to
+/// Sigstore's Fulcio root, was it valid when Rekor's bundle says it signed,
+/// and does the signature itself check out.
+#[component]
+async fn keyless_verification(
+    information: eyre::Result<KeylessVerificationInformation>,
+) -> Result<impl View> {
+    let information = match information {
+        Ok(information) => information,
+
+        Err(err) => {
+            return Ok(view! {
+                error_block(
+                    title: "Could not verify the keyless signatures",
+                    message: format::error(&err),
+                )
+            }
+            .boxed());
+        }
+    };
+
+    Ok(view! {
+        <dl class="meta">
+            cache_meta(
+                fetched: format::timestamp(information.fetch_time),
+                fetched_ago: format::duration(information.fetch_duration()),
+                expires: format::timestamp(information.expires()),
+                expires_in: format::duration(information.expires_duration()),
+            )
+        </dl>
+
+        <section class="section">
+            heading(level: "h3", text: "Keyless verification")
+
+            if information.keyless_verification.verified_identities.is_empty() {
+                <p class="empty">
+                    "No keyless signature could be verified against Sigstore's trust root."
+                </p>
+            } else {
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>"Verified"</th>
+                                <th>"Issuer"</th>
+                                <th>"Identity"</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            for identity in &information.keyless_verification.verified_identities {
+                                <tr>
+                                    <td>"Verified"</td>
+                                    <td class="digest">
+                                        if let Some(issuer) = &identity.issuer {
+                                            (issuer)
+                                        } else {
+                                            <span class="muted">"—"</span>
+                                        }
+                                    </td>
+                                    <td class="digest">(&identity.subject)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             }
         </section>
     }

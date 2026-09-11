@@ -119,6 +119,10 @@ async fn main() -> Result<()> {
         cache: handler::Cache::new(redis_client, limits.max_duration()),
         limits,
         registry_rate_limit,
+        // Fetched lazily, on the first keyless verification this instance
+        // runs, rather than here: failing to reach Sigstore's TUF
+        // distribution point at startup should not fail startup.
+        sigstore_trust_root: handler::cosign::SigstoreTrustRoot::default(),
     };
 
     // `discover` picks up every `#[page]`, `#[layout]` and `#[route]` linked

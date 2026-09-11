@@ -5,6 +5,7 @@ use cache::{
     CosignInformationFetcher,
     DockerInformationFetcher,
     Fetch,
+    KeylessVerificationFetcher,
     SbomInformationFetcher,
 };
 use chrono::{
@@ -58,6 +59,7 @@ pub(crate) struct ImageResponse {
     pub(crate) docker_information: Result<DockerInformation>,
     pub(crate) cosign_information: Result<CosignInformation>,
     pub(crate) sbom_information: Result<SbomInformation>,
+    pub(crate) keyless_verification_information: Result<KeylessVerificationInformation>,
     pub(crate) cosign_verify: Option<Result<cosign::CosignVerify>>,
 }
 
@@ -81,6 +83,12 @@ pub(crate) struct CosignInformation {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub(crate) struct SbomInformation {
     pub(crate) sbom: Option<cosign::Sbom>,
+    pub(crate) fetch_time: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub(crate) struct KeylessVerificationInformation {
+    pub(crate) keyless_verification: cosign::KeylessVerification,
     pub(crate) fetch_time: DateTime<Utc>,
 }
 
@@ -108,6 +116,7 @@ pub(crate) async fn image(
             image.clone(),
             state.cache.clone(),
             state.registry_rate_limit.clone(),
+            state.sigstore_trust_root.clone(),
         )
         .instrument(info_span!("fetch_docker_and_cosign_manifest")),
         fetch_cosign_verify(
@@ -119,13 +128,19 @@ pub(crate) async fn image(
         .instrument(info_span!("fetch_cosign_verify")),
     );
 
-    let (docker_information, cosign_information, sbom_information) = docker_and_cosign_manifest;
+    let (
+        docker_information,
+        cosign_information,
+        sbom_information,
+        keyless_verification_information,
+    ) = docker_and_cosign_manifest;
 
     let response = ImageResponse {
         image,
         docker_information,
         cosign_information,
         sbom_information,
+        keyless_verification_information,
         cosign_verify,
     };
 
@@ -138,10 +153,12 @@ async fn fetch_docker_and_cosign_manifest(
     image: Image,
     cache: Cache,
     registry_rate_limit: RateLimit,
+    sigstore_trust_root: cosign::SigstoreTrustRoot,
 ) -> (
     Result<DockerInformation>,
     Result<CosignInformation>,
     Result<SbomInformation>,
+    Result<KeylessVerificationInformation>,
 ) {
     let docker_manifest = DockerInformationFetcher {
         docker_registry_client: &docker_registry_client,
@@ -155,9 +172,9 @@ async fn fetch_docker_and_cosign_manifest(
         error!("{err}");
     }
 
-    // Signatures and the SBOM are two independent tags off the same manifest
-    // digest, so they are fetched concurrently rather than one after the
-    // other.
+    // Signatures, the SBOM and keyless verification are three independent
+    // things to look up off the same manifest digest, so they are fetched
+    // concurrently rather than one after the other.
     let cosign_fetcher = CosignInformationFetcher {
         docker_registry_client: &docker_registry_client,
         image: &image,
@@ -170,19 +187,34 @@ async fn fetch_docker_and_cosign_manifest(
         docker_manifest: &docker_manifest,
     };
 
-    let (cosign_manifest, sbom_manifest) = tokio::join!(
+    let keyless_verification_fetcher = KeylessVerificationFetcher {
+        sigstore_trust_root: &sigstore_trust_root,
+        image: &image,
+        docker_manifest: &docker_manifest,
+    };
+
+    let (cosign_manifest, sbom_manifest, keyless_verification) = tokio::join!(
         cosign_fetcher
             .cache_or_fetch(&cache, &registry_rate_limit)
             .instrument(info_span!("fetch cosign manifest")),
         sbom_fetcher
             .cache_or_fetch(&cache, &registry_rate_limit)
             .instrument(info_span!("fetch sbom manifest")),
+        keyless_verification_fetcher
+            .cache_or_fetch(&cache, &registry_rate_limit)
+            .instrument(info_span!("fetch keyless verification")),
     );
 
     let cosign_manifest = cosign_manifest.context("failed to get cosign manifest");
     let sbom_manifest = sbom_manifest.context("failed to get sbom manifest");
+    let keyless_verification = keyless_verification.context("failed to get keyless verification");
 
-    (docker_manifest, cosign_manifest, sbom_manifest)
+    (
+        docker_manifest,
+        cosign_manifest,
+        sbom_manifest,
+        keyless_verification,
+    )
 }
 
 #[tracing::instrument]
@@ -242,6 +274,20 @@ impl CosignInformation {
 }
 
 impl SbomInformation {
+    pub(crate) fn fetch_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.fetch_time)
+    }
+
+    pub(crate) fn expires(&self) -> DateTime<Utc> {
+        self.fetch_time + Duration::seconds(REDIS_TTL)
+    }
+
+    pub(crate) fn expires_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.expires())
+    }
+}
+
+impl KeylessVerificationInformation {
     pub(crate) fn fetch_duration(&self) -> Duration {
         Utc::now().signed_duration_since(self.fetch_time)
     }

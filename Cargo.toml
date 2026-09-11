@@ -16,6 +16,18 @@ eyre = "0.6"
 fred = { version = "10", features = ["i-keys"], default-features = false }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
+# Keyless-signature verification (chain of trust to Sigstore's Fulcio root,
+# signature validity, Rekor bundle) without shelling out to the cosign
+# binary. `cosign`/`rekor` bring the verification logic itself;
+# `sigstore-trust-root` fetches Sigstore's public trust root over TUF;
+# `rustls-tls` matches the TLS backend the rest of this crate uses instead of
+# pulling in native-tls too.
+sigstore = { version = "0.14", default-features = false, features = [
+  "cosign",
+  "rekor",
+  "rustls-tls",
+  "sigstore-trust-root",
+] }
 tokio = { version = "1", features = ["full", "tracing"] }
 topcoat = { version = "0.8", default-features = false, features = [
   "compression",

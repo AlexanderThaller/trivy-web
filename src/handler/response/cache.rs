@@ -48,6 +48,7 @@ use crate::handler::{
 use super::{
     CosignInformation,
     DockerInformation,
+    KeylessVerificationInformation,
     SbomInformation,
     TrivyInformation,
 };
@@ -496,6 +497,52 @@ impl Fetch for SbomInformationFetcher<'_> {
 
         Ok(SbomInformation {
             sbom,
+            fetch_time: Utc::now(),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct KeylessVerificationFetcher<'a> {
+    pub(crate) sigstore_trust_root: &'a cosign::SigstoreTrustRoot,
+    pub(crate) image: &'a Image,
+    pub(crate) docker_manifest: &'a Result<DockerInformation>,
+}
+
+impl Fetch for KeylessVerificationFetcher<'_> {
+    type Output = KeylessVerificationInformation;
+
+    /// Same reasoning as [`CosignInformationFetcher::registry`]: without a
+    /// resolved manifest there is no image reference worth asking sigstore
+    /// to verify.
+    fn registry(&self) -> Option<&str> {
+        self.docker_manifest
+            .as_ref()
+            .ok()?
+            .response
+            .digest
+            .as_ref()?;
+
+        Some(self.image.registry.registry_domain())
+    }
+
+    fn key(&self) -> String {
+        format!("{REDIS_KEY_PREFIX}:keyless_verification:{}", self.image)
+    }
+
+    async fn fetch(&self) -> Result<Self::Output> {
+        if self.docker_manifest.is_err() {
+            return Err(eyre::eyre!("Failed to get docker manifest"));
+        }
+
+        let keyless_verification =
+            cosign::cosign_keyless_verify(self.sigstore_trust_root, self.image)
+                .instrument(info_span!("keyless verify"))
+                .await
+                .context("failed to verify keyless signatures")?;
+
+        Ok(KeylessVerificationInformation {
+            keyless_verification,
             fetch_time: Utc::now(),
         })
     }
