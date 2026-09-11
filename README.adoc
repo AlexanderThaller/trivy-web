@@ -104,11 +104,13 @@ whatever `cargo` happens to resolve to on a given machine.
 The image itself is `trivy-web` and `trivy` (the latter straight from
 nixpkgs, not a URL and a checksum to keep in step by hand) plus CA
 certificates, with `dockerTools.buildLayeredImage` computing the actual
-closure -- glibc and nothing past what those three things need at
-runtime -- rather than layers assembled by hand. No `cosign`: both
-kinds of signature verification run in-process (see
-`src/handler/cosign.rs`), and the binary was a third of the compressed
-image.
+closure rather than layers assembled by hand. Both binaries are
+statically linked -- `trivy-web` for musl through `pkgsStatic`, `trivy`
+as pure Go with cgo off -- so there is no libc in the image at all,
+only the few data files Go's standard library reads (time zones,
+`/etc/services`, MIME types). No `cosign` either: both kinds of
+signature verification run in-process (see `src/handler/cosign.rs`),
+and the binary was a third of the compressed image.
 
 [source,shell]
 ----

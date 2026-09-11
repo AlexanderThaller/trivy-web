@@ -45,7 +45,13 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = { version = "2", features = ["serde"] }
 x509-parser = "0.18"
-mimalloc = "0.1"
+# `override` makes mimalloc define malloc/free themselves, so the C in the
+# tree (aws-lc's OPENSSL_malloc, most of all) allocates through it too rather
+# than through musl's allocator, which is what the static build would
+# otherwise link in for those callers. Verified on the unstripped binary:
+# malloc/free/calloc/realloc are aliases of their mi_ counterparts and
+# musl's allocator internals are absent.
+mimalloc = { version = "0.1", features = ["override"] }
 
 [build-dependencies]
 chrono = "0.4"

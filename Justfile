@@ -32,8 +32,9 @@ run *args:
 
 # --- docker --------------------------------------------------------------
 #
-# The image (see flake.nix) is trivy-web, trivy, cosign, CA certificates,
-# and whatever glibc they pull in as a shared dependency -- nothing else.
+# The image (see flake.nix) is trivy-web and trivy, both statically linked,
+# plus CA certificates and the few data files Go's standard library reads
+# (time zones, /etc/services, MIME types) -- no libc, nothing else.
 
 # Build the container image. Ends up as a docker-archive tarball at ./result.
 docker_build:

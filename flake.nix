@@ -33,12 +33,38 @@
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
 
-      toolchain = fenix.packages.${system}.fromToolchainFile {
-        file = ./rust-toolchain.toml;
-        sha256 = "sha256-p8h3Sl/YRByZfZTAKXdsvF6xEenXKrXSVvpphmZENH4=";
-      };
+      # fenix's fixed-output hash of the release channel's manifest; the same
+      # manifest lists the musl standard library below, so one hash covers
+      # both.
+      channelSha256 = "sha256-p8h3Sl/YRByZfZTAKXdsvF6xEenXKrXSVvpphmZENH4=";
 
-      rustPlatform = pkgs.makeRustPlatform {
+      # The channel from rust-toolchain.toml, read rather than repeated, so
+      # a version bump there is the whole bump: fromToolchainFile reads the
+      # same file for the host toolchain.
+      channel = (builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain.channel;
+
+      # The pinned toolchain, plus that same version's standard library for
+      # x86_64-unknown-linux-musl. Only rust-std, not a second rustc: the
+      # host compiler emits musl code fine once it has a std to link.
+      toolchain = fenix.packages.${system}.combine [
+        (fenix.packages.${system}.fromToolchainFile {
+          file = ./rust-toolchain.toml;
+          sha256 = channelSha256;
+        })
+        (fenix.packages.${system}.targets.x86_64-unknown-linux-musl.toolchainOf {
+          inherit channel;
+          sha256 = channelSha256;
+        }).rust-std
+      ];
+
+      # pkgsStatic: builds for x86_64-unknown-linux-musl with static linking,
+      # so the shipped trivy-web is one self-contained ELF with no libc in
+      # its closure -- what let glibc (35 MB unpacked, mostly locale data
+      # nothing here reads) drop out of the image. The C in the dependency
+      # tree (aws-lc, ring, mimalloc) all builds against musl without
+      # patching; mimalloc's `override` feature (see Cargo.toml) keeps
+      # musl's own allocator out of the binary too.
+      rustPlatform = pkgs.pkgsStatic.makeRustPlatform {
         cargo = toolchain;
         rustc = toolchain;
       };
@@ -114,16 +140,32 @@
 
       # trivy image scanning needs the trivy binary on PATH; nixpkgs already
       # packages it, so there is nothing to fetch or checksum by hand here
-      # the way MODULE.bazel used to. No cosign: both kinds of signature
-      # verification (keyless and against a supplied key) run in-process
-      # through the sigstore crate (see src/handler/cosign.rs), and the
-      # binary was a third of the compressed image.
+      # the way MODULE.bazel used to. Built with cgo off: nixpkgs' default
+      # build links it against glibc through cgo, and that build also
+      # carries 85 MB more code than the pure-Go one (253 MB vs 168 MB on
+      # disk, 79 MB vs 50 MB compressed). With cgo off it is a static binary
+      # that uses Go's own resolver and TLS, which is how trivy's official
+      # image ships it. `old.env //` rather than a fresh set: the package
+      # keeps its GOEXPERIMENT there, and dropping it breaks the build.
+      #
+      # Not in the public binary cache, so CI compiles it -- about a minute
+      # here, and only again when nixpkgs bumps trivy.
+      trivy = pkgs.trivy.overrideAttrs (old: {
+        env = old.env // {
+          CGO_ENABLED = 0;
+        };
+      });
+
+      # No cosign: both kinds of signature verification (keyless and against
+      # a supplied key) run in-process through the sigstore crate (see
+      # src/handler/cosign.rs), and the binary was a third of the compressed
+      # image.
       image = pkgs.dockerTools.buildLayeredImage {
         name = "trivy-web";
         tag = "latest";
         contents = [
           trivy-web
-          pkgs.trivy
+          trivy
           pkgs.cacert
         ];
 
