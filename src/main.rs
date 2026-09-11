@@ -17,6 +17,7 @@ use fred::{
         },
     },
 };
+use mimalloc::MiMalloc;
 use topcoat::router::{
     Router,
     RouterBuilderDiscoverExt,
@@ -26,6 +27,9 @@ use tracing::{
     event,
 };
 use url::Url;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 mod args;
 mod handler;
