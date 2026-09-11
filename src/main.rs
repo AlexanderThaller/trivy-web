@@ -17,6 +17,10 @@ use fred::{
         },
     },
 };
+use topcoat::router::{
+    Router,
+    RouterBuilderDiscoverExt,
+};
 use tracing::{
     Level,
     event,
@@ -24,9 +28,8 @@ use tracing::{
 use url::Url;
 
 mod args;
-mod filters;
 mod handler;
-mod signal;
+mod view;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -116,17 +119,14 @@ async fn main() -> Result<()> {
         cache: handler::Cache::new(redis_client, limits.max_duration()),
         limits,
         registry_rate_limit,
-
-        #[cfg(not(debug_assertions))]
-        minify_config: minify_html::Cfg {
-            minify_doctype: false,
-            allow_noncompliant_unquoted_attribute_values: false,
-            allow_removing_spaces_between_attributes: false,
-            ..Default::default()
-        },
     };
 
-    let router = handler::router(state);
+    // `discover` picks up every `#[page]`, `#[layout]` and `#[route]` linked
+    // into the binary, so the routing table is the annotations on the handlers
+    // rather than a list kept in step with them by hand. Response compression
+    // is part of the router now, which is what `tower_http`'s CompressionLayer
+    // used to be here for.
+    let router = Router::builder().app_context(state).discover().build();
 
     let listener = tokio::net::TcpListener::bind(opt.binding)
         .await
@@ -138,8 +138,9 @@ async fn main() -> Result<()> {
         "Starting trivy-web"
     );
 
-    axum::serve(listener, router)
-        .with_graceful_shutdown(signal::shutdown_signal())
+    // Serves until SIGINT or SIGTERM, then drains in-flight requests -- the
+    // graceful shutdown `signal::shutdown_signal` used to provide.
+    topcoat::serve(listener, router)
         .await
         .context("failed to start server")?;
 

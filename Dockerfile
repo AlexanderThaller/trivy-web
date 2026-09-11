@@ -1,4 +1,4 @@
-FROM rust:1.90.0-alpine3.22 AS rust-base
+FROM rust:1.98.1-alpine3.22 AS rust-base
 
 RUN apk add --no-cache \
   musl-dev=1.2.5-r10 \

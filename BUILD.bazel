@@ -15,14 +15,21 @@ exports_files([
 
 # Files rustc has to be able to open while compiling, as opposed to link:
 #
-#   - templates/ is read by askama's derive at macro-expansion time, resolved
-#     against CARGO_MANIFEST_DIR (which rules_rust points at this package).
-#   - resources/ is pulled in by the include_str!/include_bytes! calls in
-#     src/handler.rs that serve the stylesheet and htmx.
-COMPILE_DATA = glob([
-    "templates/**",
-    "resources/**",
-])
+#   - resources/ is pulled in by the include_str! calls in src/handler.rs that
+#     serve the stylesheet and the findings filter.
+#   - Cargo.toml is read by topcoat's macros. `view!` and `#[component]` expand
+#     to paths into the framework, and which path is right depends on how the
+#     call site reaches it: an application crate like this one depends on the
+#     `topcoat` facade and gets `::topcoat::view`, while a component library
+#     depending on `topcoat-view` directly gets `::topcoat_view`. The macros
+#     tell the two apart with proc-macro-crate, which reads the manifest at
+#     CARGO_MANIFEST_DIR -- so without this the expansion falls back to
+#     `::topcoat_view`, which is not an extern here, and every view! fails to
+#     resolve.
+#
+# templates/ used to be in this list as well, for askama's derive. topcoat
+# takes its markup from the Rust source, so there is no template tree left.
+COMPILE_DATA = glob(["resources/**"]) + ["Cargo.toml"]
 
 # Only the #[cfg(test)] modules reach for these: recorded trivy and cosign
 # output, parsed and rendered by the unit tests.

@@ -1,9 +1,0 @@
-<td
-    class="num"
-    data-label="CVSS"
->{% match vulnerability.cvss %}{% when Some with (cvss) %}{% for value in cvss %}{% match value.1.score() %}{% when Some with (score) %}<span title="{{ value.0 }}">{{ score }}</span> {% when None %}{% endmatch %}{% endfor %}{% when None %}<span class="muted">—</span>{% endmatch %}</td>
-
-<td
-    class="title"
-    data-label="Title"
->{% match vulnerability.title %}{% when Some with (title) %}{{ title }}{% when None %}<span class="muted">—</span>{% endmatch %}</td>

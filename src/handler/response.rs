@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 
-use askama::Template;
 use cache::{
     Cache,
     CosignInformationFetcher,
@@ -15,7 +14,6 @@ use chrono::{
 use docker_registry_client::{
     Client as DockerRegistryClient,
     Image,
-    Manifest as DockerManifest,
     Response as DockerResponse,
 };
 use eyre::{
@@ -34,16 +32,13 @@ use tracing::{
 
 pub(crate) mod cache;
 
-use crate::{
-    filters,
-    handler::{
-        cosign,
-        response::cache::REDIS_TTL,
-        trivy::{
-            ReportSummary,
-            SeverityCount,
-            Vulnerability,
-        },
+use crate::handler::{
+    cosign,
+    response::cache::REDIS_TTL,
+    trivy::{
+        ReportSummary,
+        SeverityCount,
+        Vulnerability,
     },
 };
 
@@ -55,8 +50,8 @@ use super::{
     cosign::cosign_verify,
 };
 
-#[derive(Debug, Template)]
-#[template(path = "response_image.html")]
+/// Everything the "Image" and "Cosign" cards render.
+#[derive(Debug)]
 pub(crate) struct ImageResponse {
     pub(crate) image: Image,
     pub(crate) docker_information: Result<DockerInformation>,
@@ -64,33 +59,27 @@ pub(crate) struct ImageResponse {
     pub(crate) cosign_verify: Option<Result<cosign::CosignVerify>>,
 }
 
-#[derive(Debug, Template)]
-#[template(path = "response_trivy.html")]
-pub(crate) struct TrivyResponse {
-    pub(crate) information: Result<TrivyInformation>,
-}
-
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub(crate) struct TrivyInformation {
-    vulnerabilities: BTreeSet<Vulnerability>,
-    severity_count: SeverityCount,
+    pub(crate) vulnerabilities: BTreeSet<Vulnerability>,
+    pub(crate) severity_count: SeverityCount,
 
     #[serde(default)]
-    report_summary: Vec<ReportSummary>,
+    pub(crate) report_summary: Vec<ReportSummary>,
 
-    fetch_time: DateTime<Utc>,
+    pub(crate) fetch_time: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub(crate) struct CosignInformation {
-    cosign: Option<cosign::Cosign>,
-    fetch_time: DateTime<Utc>,
+    pub(crate) cosign: Option<cosign::Cosign>,
+    pub(crate) fetch_time: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct DockerInformation {
-    response: DockerResponse,
-    fetch_time: DateTime<Utc>,
+    pub(crate) response: DockerResponse,
+    pub(crate) fetch_time: DateTime<Utc>,
 }
 
 #[tracing::instrument]
