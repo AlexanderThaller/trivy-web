@@ -55,7 +55,17 @@ procname="/usr/local/bin/trivy-web"
 # is left to rc.subr, which does it for ${name}_user on its own -- doing it
 # here as well would have daemon(8) try to setuid as a user that cannot.
 command="/usr/sbin/daemon"
-command_args="-p ${pidfile} -t ${desc} -o ${trivy_web_logfile} \
+
+# ${name} rather than ${desc} as the title, and every other word here a single
+# one: rc.subr expands command_args unquoted and then eval(1)s the result, so a
+# value with a space in it does not stay one argument. ${desc} has five, and
+# what that costs is not a funny looking title -- daemon(8) parses with a
+# getopt(3) that stops at the first non-option, so the four leftover words end
+# the option list and -o is never seen. The log then goes nowhere and daemon
+# tries to exec the second word of the description. Quoting is not the fix
+# either: rc.subr wraps the whole command in su -m www -c '...' when
+# ${name}_user is set, and a quote in here lands inside that.
+command_args="-p ${pidfile} -t ${name} -o ${trivy_web_logfile} \
     -- ${procname} ${trivy_web_args}"
 
 start_precmd="trivy_web_precmd"
