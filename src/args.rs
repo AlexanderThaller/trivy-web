@@ -4,6 +4,7 @@ use std::{
         NonZeroU32,
         NonZeroUsize,
     },
+    path::PathBuf,
     time::Duration,
 };
 
@@ -108,6 +109,21 @@ pub(super) struct Args {
         env = "TRIVY_WEB_SCANNERS"
     )]
     pub scanners: Vec<Scanner>,
+
+    /// Where the scanners keep what they download between scans
+    ///
+    /// grype's vulnerability database above all: a few hundred megabytes that
+    /// every scan waits for when there is nowhere to keep it. The scanners
+    /// would each use a directory under `$HOME`, which a service account does
+    /// not have -- a FreeBSD `www` is given `/nonexistent` -- so a deployment
+    /// running as one has to name a directory that user can write to.
+    ///
+    /// Unset, the first of `$XDG_CACHE_HOME/trivy-web`,
+    /// `$HOME/.cache/trivy-web` and a directory under the temporary directory
+    /// that can actually be created is used, and which one it was is logged at
+    /// startup.
+    #[clap(long, value_name = "path", env = "TRIVY_WEB_CACHE_DIR")]
+    pub cache_dir: Option<PathBuf>,
 
     /// How often a single registry may be reached out to in a minute
     ///

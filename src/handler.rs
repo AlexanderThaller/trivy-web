@@ -38,6 +38,7 @@ pub(crate) mod grype;
 mod process;
 mod registry;
 pub(crate) mod response;
+pub(crate) mod scanner_cache;
 pub(crate) mod syft;
 pub(crate) mod trivy;
 pub(crate) mod vex;
@@ -45,6 +46,7 @@ pub(crate) mod vex;
 pub(super) use process::Limits;
 pub(super) use registry::RateLimit;
 pub(super) use response::cache::Cache;
+pub(super) use scanner_cache::ScannerCache;
 
 use crate::{
     args::Scanner,
@@ -69,6 +71,11 @@ pub(crate) struct AppState {
     /// process for anyone who asks, so this is what keeps a burst of requests
     /// from becoming a burst of scanners.
     pub(crate) limits: Limits,
+
+    /// Where the scanner child processes keep what they download, grype's
+    /// vulnerability database above all. Fixed at startup and shared by every
+    /// scan, so a database is fetched once rather than once per scan.
+    pub(crate) scanner_cache: ScannerCache,
 
     /// How often the registries hear from this deployment. Counted per registry
     /// in redis, so every instance draws from the same budget.

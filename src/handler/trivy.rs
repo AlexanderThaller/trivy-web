@@ -20,6 +20,7 @@ use url::Url;
 use super::{
     process::Limits,
     registry::RateLimit,
+    scanner_cache::ScannerCache,
 };
 
 #[derive(Debug, Deserialize)]
@@ -345,6 +346,7 @@ pub(crate) async fn scan_image(
     password: Option<&str>,
     limits: &Limits,
     registry_rate_limit: &RateLimit,
+    scanner_cache: &ScannerCache,
 ) -> Result<TrivyResult, eyre::Error> {
     // run following command trivy image --format json
     // linuxserver/code-server:latest
@@ -352,6 +354,10 @@ pub(crate) async fn scan_image(
     let mut command = Command::new("trivy");
 
     let mut command = command.arg("image").arg("--format").arg("json");
+
+    // Rather than trivy's own `~/.cache/trivy`, which a service account does
+    // not have. See [`ScannerCache`].
+    command = command.env("TRIVY_CACHE_DIR", scanner_cache.trivy());
 
     if let Some(server) = server {
         command = command.arg("--server").arg(server);
@@ -417,6 +423,7 @@ mod test {
     use super::{
         Limits,
         RateLimit,
+        ScannerCache,
         TrivyResult,
     };
 
@@ -432,6 +439,13 @@ mod test {
     /// The same, for the registry the scan pulls from.
     fn registry_rate_limit() -> RateLimit {
         RateLimit::new(None, NonZeroU32::new(60).unwrap())
+    }
+
+    /// Wherever the defaults land, which for a test run is a developer's own
+    /// cache: the scans below are the better for not refetching a database
+    /// each time either.
+    fn scanner_cache() -> ScannerCache {
+        ScannerCache::new(None).unwrap()
     }
 
     #[test]
@@ -498,6 +512,7 @@ mod test {
             None,
             &limits,
             &registry_rate_limit,
+            &scanner_cache(),
         )
         .await
         .unwrap_err()
@@ -519,6 +534,7 @@ mod test {
             None,
             &limits(),
             &registry_rate_limit(),
+            &scanner_cache(),
         )
         .await
         .expect("should fail");
@@ -537,6 +553,7 @@ mod test {
             None,
             &limits(),
             &registry_rate_limit(),
+            &scanner_cache(),
         )
         .await
         .unwrap();

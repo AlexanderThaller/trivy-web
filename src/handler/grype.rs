@@ -33,6 +33,7 @@ use tracing::{
 use super::{
     process::Limits,
     registry::RateLimit,
+    scanner_cache::ScannerCache,
     trivy::{
         Severity,
         SeverityCount,
@@ -220,6 +221,7 @@ pub(crate) async fn scan_image(
     password: Option<&str>,
     limits: &Limits,
     registry_rate_limit: &RateLimit,
+    scanner_cache: &ScannerCache,
 ) -> Result<Grype> {
     let mut command = Command::new("grype");
 
@@ -230,7 +232,31 @@ pub(crate) async fn scan_image(
         .arg(format!("registry:{image}"))
         .arg("--output")
         .arg("json")
-        .arg("--quiet");
+        .arg("--quiet")
+        // The whole reason [`ScannerCache`] exists. grype's default is
+        // `~/.cache/grype/db`, which a service account has no home for, and
+        // the database behind it is a few hundred megabytes: without
+        // somewhere of its own to keep it, every single scan waits for that
+        // download.
+        .env("GRYPE_DB_CACHE_DIR", scanner_cache.grype_db())
+        // Two defaults that are for somebody running grype by hand rather than
+        // for a service running it a few times a minute, and that are paid per
+        // scan rather than once.
+        //
+        // The app update check is an http request asking whether a newer grype
+        // has been released, in front of a binary this image pins and can do
+        // nothing about the answer to. The hash validation confirms the
+        // database on disk is the file grype itself wrote, which is worth
+        // doing when it lands -- `grype db update` still does it, and so does
+        // the periodic job in deploy/freebsd -- rather than on every scan over
+        // a database nothing else on the host can reach.
+        //
+        // Neither is measurably slow on a warm cache: turning both off moved a
+        // scan by less than the noise. They are off because a scan should not
+        // be reaching out to the network or rereading the database for
+        // anything but the scan.
+        .env("GRYPE_CHECK_FOR_APP_UPDATE", "false")
+        .env("GRYPE_DB_VALIDATE_BY_HASH_ON_START", "false");
 
     // Both prefixes, because grype's own `grype config` documents these
     // three as `SYFT_REGISTRY_AUTH_*` -- the registry configuration is syft's
