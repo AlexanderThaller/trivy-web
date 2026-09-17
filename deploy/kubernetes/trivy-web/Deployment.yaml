@@ -25,6 +25,12 @@ spec:
             - "redis://redis-web.trivy-web.svc.cluster.local:6379"
             - "--jaeger-host"
             - "jaeger.trivy-web.svc.cluster.local"
+          env:
+            # Said here rather than left to the image: the mount below is only
+            # a cache if the binary is pointed at it, and this Deployment pins
+            # an image older than the variable.
+            - name: TRIVY_WEB_CACHE_DIR
+              value: /var/cache/trivy-web
           ports:
             - name: http
               containerPort: 16223

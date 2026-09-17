@@ -209,9 +209,15 @@
         # download (TRIVY_WEB_CACHE_DIR below). Worth a volume: grype's
         # vulnerability database is a few hundred megabytes, and without one it
         # is refetched every time the container is replaced.
+        #
+        # 0775 rather than 0777: root owns it and root runs this, and a
+        # deployment that runs the container as an arbitrary uid gets group
+        # zero with it, which is the shape that convention has. World writable
+        # would mean anything else in the container could rewrite the database
+        # the scan results come out of.
         extraCommands = ''
           mkdir -m 1777 -p tmp
-          mkdir -m 0777 -p var/cache/trivy-web
+          mkdir -m 0775 -p var/cache/trivy-web
         '';
 
         config = {

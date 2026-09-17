@@ -189,7 +189,15 @@ trivy_web_env="TRIVY_REDIS_SERVER=redis://127.0.0.1:6379"
 
 # /etc/periodic.conf
 daily_trivy_web_grype_db_enable="YES"
+daily_trivy_web_grype_db_user="www"                     # match trivy_web_user
+daily_trivy_web_grype_db_cachedir="/var/cache/trivy-web"  # match trivy_web_cachedir
 ----
+
+The two sets of knobs default to the same user and directory but do not
+read each other, so changing one in `rc.conf` means changing the other
+in `periodic.conf`. Pointed somewhere else, the job cheerfully keeps a
+database nothing scans against up to date while the scans go on
+refetching their own.
 
 The `rc.d` script creates the cache directory owned by `www` before
 starting -- one created by root is one every scan then fails to write

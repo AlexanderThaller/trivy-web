@@ -10,8 +10,8 @@
 //! wait for.
 //!
 //! So the cache directory is the deployment's to name and this process'
-//! to prepare: one root, created and proven writable at startup rather than
-//! discovered to be neither halfway through the first scan, with a
+//! to prepare: one root, created private and proven writable at startup rather
+//! than discovered to be neither halfway through the first scan, with a
 //! subdirectory per scanner because the three lay their caches out
 //! differently and grype in particular wants to be pointed at the database
 //! directory itself.
@@ -49,7 +49,7 @@ impl ScannerCache {
     /// which is exactly what naming it was meant to prevent.
     pub(crate) fn new(root: Option<PathBuf>) -> Result<Self> {
         if let Some(root) = root {
-            return Self::prepare(root.clone()).with_context(|| {
+            return Self::prepare(root.clone(), Trust::Named).with_context(|| {
                 format!(
                     "failed to use {root} as the scanner cache",
                     root = root.display()
@@ -61,8 +61,8 @@ impl ScannerCache {
 
         let mut last_error = None;
 
-        for candidate in &candidates {
-            match Self::prepare(candidate.clone()) {
+        for (candidate, trust) in &candidates {
+            match Self::prepare(candidate.clone(), *trust) {
                 Ok(cache) => return Ok(cache),
                 Err(err) => last_error = Some(err),
             }
@@ -70,7 +70,7 @@ impl ScannerCache {
 
         let tried = candidates
             .iter()
-            .map(|candidate| candidate.display().to_string())
+            .map(|(candidate, _)| candidate.display().to_string())
             .collect::<Vec<_>>()
             .join(", ");
 
@@ -113,7 +113,7 @@ impl ScannerCache {
     /// as `www`, where every `create_dir_all` succeeds and every scan then
     /// fails. Better to find that out here, with the name of the directory
     /// still in hand, than in a scanner's stderr.
-    fn prepare(root: PathBuf) -> Result<Self> {
+    fn prepare(root: PathBuf, trust: Trust) -> Result<Self> {
         let cache = Self {
             trivy: root.join("trivy"),
             syft: root.join("syft"),
@@ -122,22 +122,75 @@ impl ScannerCache {
         };
 
         for directory in [&cache.root, &cache.trivy, &cache.syft, &cache.grype_db] {
-            std::fs::create_dir_all(directory).with_context(|| {
-                format!(
-                    "failed to create {directory}",
-                    directory = directory.display()
-                )
-            })?;
+            create_private(directory)?;
 
-            writable(directory)?;
+            let probe = writable(directory)?;
+
+            if trust == Trust::Untrusted {
+                ours_alone(directory, &probe)?;
+            }
         }
 
         Ok(cache)
     }
 }
 
+/// Whether the directory is somewhere anyone else could have got to first.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Trust {
+    /// Named by the deployment, which has said where the cache belongs and is
+    /// entitled to have said something this process would not have picked --
+    /// group-writable, shared with the periodic job that refreshes grype's
+    /// database, whatever it is.
+    Named,
+
+    /// Landed on by [`default_roots`] under the temporary directory, which is
+    /// world writable and where the name this picks is entirely predictable.
+    Untrusted,
+}
+
+/// Creates `directory` and any parent of it, readable and writable by nobody
+/// but the user this runs as.
+///
+/// `0700` rather than whatever the umask leaves of `0777`: the cache holds the
+/// vulnerability database every scan result is derived from, and on a host
+/// where the umask is slack that would otherwise be a database anyone can
+/// rewrite. A directory that is already there keeps the mode it has, which is
+/// what lets the rc.d script hand over a `0750` one owned by `www`.
+fn create_private(directory: &Path) -> Result<()> {
+    let mut builder = std::fs::DirBuilder::new();
+
+    builder.recursive(true);
+
+    // The mode is still masked by the umask, but a umask can only take
+    // permissions away and there are none here to give.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+
+        builder.mode(0o700);
+    }
+
+    builder.create(directory).with_context(|| {
+        format!(
+            "failed to create {directory}",
+            directory = directory.display()
+        )
+    })
+}
+
+/// What making a file in a directory and taking it away again established.
+struct Probe {
+    /// The uid the file came out owned by, which is the one this process makes
+    /// files as. Somewhere for [`ours_alone`] to compare a directory's owner
+    /// against, and the reason there is no `getuid` anywhere here: this crate
+    /// forbids unsafe, and a file it has just made answers the same question.
+    #[cfg(unix)]
+    owner: u32,
+}
+
 /// Fails unless a file can be made in `directory` and taken away again.
-fn writable(directory: &Path) -> Result<()> {
+fn writable(directory: &Path) -> Result<Probe> {
     // The pid keeps two instances sharing one cache directory -- which is a
     // thing a deployment may well do -- from taking each other's probe away
     // mid-check.
@@ -153,6 +206,9 @@ fn writable(directory: &Path) -> Result<()> {
         )
     })?;
 
+    let made = std::fs::symlink_metadata(&probe)
+        .with_context(|| format!("failed to look at {probe}", probe = probe.display()))?;
+
     // Removing it is best effort: a probe that was written is what was being
     // asked, and a leftover empty dotfile is not worth failing a startup over.
     if let Err(err) = std::fs::remove_file(&probe)
@@ -162,6 +218,78 @@ fn writable(directory: &Path) -> Result<()> {
             probe = %probe.display(),
             "failed to remove the cache writability probe: {err}"
         );
+    }
+
+    Ok(Probe {
+        #[cfg(unix)]
+        owner: {
+            use std::os::unix::fs::MetadataExt;
+
+            made.uid()
+        },
+    })
+}
+
+/// Fails unless `directory` is a real directory belonging to whoever this runs
+/// as and writable by nobody else.
+///
+/// Only for the fallback under the temporary directory, which is world
+/// writable and whose name is one anybody can work out. Left unchecked,
+/// somebody else's directory could be sitting at it before this process ever
+/// starts, and what would be in it is the vulnerability database every scan
+/// result is read out of.
+///
+/// The [`Probe`] is where the owner to compare against comes from. There is no
+/// `getuid` here because this crate forbids unsafe and a file this process has
+/// just made answers the same question: it came out owned by the user files
+/// get made as, which is the only user this directory may belong to.
+///
+/// Refusing rather than replacing: this is the last candidate, so a deployment
+/// that lands here is one that should have named a directory, and it is told
+/// so instead of having a fresh one silently made somewhere else.
+fn ours_alone(directory: &Path, probe: &Probe) -> Result<()> {
+    // symlink_metadata, so a symlink pointing somewhere respectable does not
+    // pass for the directory itself.
+    let metadata = std::fs::symlink_metadata(directory).with_context(|| {
+        format!(
+            "failed to look at {directory}",
+            directory = directory.display()
+        )
+    })?;
+
+    if !metadata.is_dir() {
+        return Err(eyre::eyre!(
+            "{directory} is not a directory",
+            directory = directory.display()
+        ));
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+
+        if metadata.uid() != probe.owner {
+            return Err(eyre::eyre!(
+                "{directory} belongs to uid {owner} rather than to uid {us}, and a vulnerability \
+                 database somebody else put there is not one to scan against -- name a directory \
+                 with --cache-dir",
+                directory = directory.display(),
+                owner = metadata.uid(),
+                us = probe.owner
+            ));
+        }
+
+        // Writable by group or other is enough: what is being kept out is
+        // somebody else deciding what the scans match against.
+        let mode = metadata.mode() & 0o777;
+
+        if mode & 0o022 != 0 {
+            return Err(eyre::eyre!(
+                "{directory} is mode {mode:04o}, which lets somebody other than its owner write \
+                 the vulnerability database the scans read -- name a directory with --cache-dir",
+                directory = directory.display()
+            ));
+        }
     }
 
     Ok(())
@@ -175,18 +303,23 @@ fn writable(directory: &Path) -> Result<()> {
 /// process has no home it can write to, and it at least holds the database
 /// for as long as the machine is up instead of refetching it per scan. A
 /// service is meant to be given a real directory with `--cache-dir`.
-fn default_roots() -> Vec<PathBuf> {
+fn default_roots() -> Vec<(PathBuf, Trust)> {
     let mut roots = Vec::with_capacity(3);
 
     if let Some(xdg) = absolute_from_env("XDG_CACHE_HOME") {
-        roots.push(xdg.join("trivy-web"));
+        roots.push((xdg.join("trivy-web"), Trust::Named));
     }
 
     if let Some(home) = absolute_from_env("HOME") {
-        roots.push(home.join(".cache").join("trivy-web"));
+        roots.push((home.join(".cache").join("trivy-web"), Trust::Named));
     }
 
-    roots.push(std::env::temp_dir().join("trivy-web"));
+    // A stable name rather than a fresh one per process: a cache that is not
+    // there again on the next start is not a cache, and refetching the
+    // database every restart is the thing this module exists to stop. What
+    // that costs is a predictable name in a world writable directory, which is
+    // what [`ours_alone`] is for.
+    roots.push((std::env::temp_dir().join("trivy-web"), Trust::Untrusted));
 
     roots
 }
@@ -283,5 +416,60 @@ mod tests {
         let cache = ScannerCache::new(None).unwrap();
 
         assert!(cache.grype_db().is_dir(), "{cache:?}");
+    }
+
+    /// The fallback goes in a world writable directory under a name anybody
+    /// can work out, so one that anybody can write is one somebody else could
+    /// be deciding the vulnerability database in.
+    #[cfg(unix)]
+    #[test]
+    fn a_fallback_anybody_can_write_is_refused() {
+        use std::{
+            fs::Permissions,
+            os::unix::fs::PermissionsExt,
+        };
+
+        use super::{
+            Trust,
+            writable,
+        };
+
+        let root = scratch("world-writable");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::set_permissions(&root, Permissions::from_mode(0o777)).unwrap();
+
+        let probe = writable(&root).unwrap();
+        let err = super::ours_alone(&root, &probe).unwrap_err();
+
+        assert!(format!("{err:#}").contains("mode 0777"), "{err:#}");
+
+        // The same directory is fine once nobody else can write it, and fine
+        // as somewhere the deployment named either way.
+        std::fs::set_permissions(&root, Permissions::from_mode(0o700)).unwrap();
+        super::ours_alone(&root, &probe).unwrap();
+        ScannerCache::prepare(root.clone(), Trust::Named).unwrap();
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// The directories this makes are its own: a umask that would have left
+    /// them group or world readable does not get to, because what is in them
+    /// is what every scan result is derived from.
+    #[cfg(unix)]
+    #[test]
+    fn the_directories_are_private() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = scratch("private");
+
+        let cache = ScannerCache::new(Some(root.clone())).unwrap();
+
+        for directory in [cache.root(), cache.trivy(), cache.syft(), cache.grype_db()] {
+            let mode = std::fs::metadata(directory).unwrap().permissions().mode() & 0o777;
+
+            assert_eq!(mode, 0o700, "{directory:?} is mode {mode:04o}");
+        }
+
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }
