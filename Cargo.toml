@@ -50,13 +50,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = { version = "2", features = ["serde"] }
 x509-parser = "0.18"
-# `override` makes mimalloc define malloc/free themselves, so the C in the
-# tree (aws-lc's OPENSSL_malloc, most of all) allocates through it too rather
-# than through musl's allocator, which is what the static build would
-# otherwise link in for those callers. Verified on the unstripped binary:
-# malloc/free/calloc/realloc are aliases of their mi_ counterparts and
-# musl's allocator internals are absent.
-mimalloc = { version = "0.1", features = ["override"] }
+# The allocator itself is every target's; see the two target sections at the
+# bottom for why `override` is not.
+mimalloc = { version = "0.1" }
 
 [build-dependencies]
 chrono = "0.4"
@@ -87,3 +83,25 @@ panic = "abort"
 # No `strip` here: the binary that ships is built by Nix, whose cargo build
 # hook overrides the profile's strip setting with its own fixup phase --
 # see `stripAllList` in flake.nix, which is where the symbol table comes off.
+
+# `override` has mimalloc define malloc/free and friends as strong symbols in
+# the executable, so that the C in the tree -- aws-lc's OPENSSL_malloc, most of
+# all -- allocates through it too rather than through whatever allocator would
+# otherwise be linked in for those callers. That was worked out for, and
+# verified on, the statically linked musl binary the image ships: one link unit,
+# no libc of its own, nothing else in the process that could have handed out a
+# pointer. Verified on the unstripped binary at the time: malloc/free/calloc/
+# realloc are aliases of their mi_ counterparts and musl's allocator internals
+# are absent.
+#
+# None of that holds for a dynamically linked build against a system libc, where
+# interposing those symbols means libc and mimalloc each hand out pointers the
+# other may be asked to free, and freeing a foreign pointer in a release
+# mimalloc is undefined -- a SIGSEGV with nothing written anywhere, which is
+# not a thing a scan should be able to do to this process. So the interposition
+# is confined to the target it was established on, and everywhere else the
+# global allocator is mimalloc for Rust's own allocations and libc keeps its
+# own. What that costs is aws-lc allocating through the system allocator on
+# those targets, which is where it would have allocated anyway.
+[target.'cfg(target_env = "musl")'.dependencies]
+mimalloc = { version = "0.1", features = ["override"] }
