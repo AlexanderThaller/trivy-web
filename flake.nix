@@ -156,6 +156,34 @@
         };
       });
 
+      # syft and grype, the other two scanners a scan runs (see --scanners in
+      # src/args.rs). Not in the devShell, the same as trivy: `nix develop` is
+      # what CI runs cargo test, clippy and fmt under, and three Go builds
+      # that are not in any binary cache have no business standing between a
+      # push and `cargo fmt --check`. A local `just dev` finds whatever is on
+      # PATH, which is how trivy has always been found.
+      #
+      # Same treatment as trivy above and for the same reasons:
+      # nixpkgs packages both, and cgo off makes each a static binary using
+      # Go's own resolver and TLS rather than one linked against glibc, which
+      # is what keeps libc out of the image entirely.
+      #
+      # They are the two largest things in the image by some way. A deployment
+      # that only wants trivy can say `--scanners trivy` and leave them
+      # unused, but they are in the image either way: an image whose contents
+      # depend on a runtime flag is not one that can be published once.
+      syft = pkgs.syft.overrideAttrs (old: {
+        env = (old.env or { }) // {
+          CGO_ENABLED = 0;
+        };
+      });
+
+      grype = pkgs.grype.overrideAttrs (old: {
+        env = (old.env or { }) // {
+          CGO_ENABLED = 0;
+        };
+      });
+
       # No cosign: both kinds of signature verification (keyless and against
       # a supplied key) run in-process through the sigstore crate (see
       # src/handler/cosign.rs), and the binary was a third of the compressed
@@ -166,12 +194,16 @@
         contents = [
           trivy-web
           trivy
+          syft
+          grype
           pkgs.cacert
         ];
 
         # sigstore's trust-root fetch (see SigstoreTrustRoot in
         # src/handler/cosign.rs) needs somewhere to stage a temp directory;
-        # buildLayeredImage does not create /tmp on its own.
+        # buildLayeredImage does not create /tmp on its own. syft and grype
+        # want one too -- both stage the image layers they pull through it,
+        # and grype unpacks its vulnerability database there.
         extraCommands = ''
           mkdir -m 1777 -p tmp
         '';
@@ -190,6 +222,7 @@
         inherit trivy-web image;
         default = trivy-web;
       };
+
 
       # `nix develop` for local work, and what CI (see nix.yml) runs `cargo
       # test`/`clippy`/`fmt` under -- the same pinned versions either way,

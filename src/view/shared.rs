@@ -55,6 +55,26 @@ pub(crate) async fn error_block(title: &str, message: String) -> Result<impl Vie
     })
 }
 
+/// The line under the severity counts saying what they leave out.
+///
+/// Both vulnerability cards count what is left after the image's own VEX
+/// statements have been read, so both have to say so -- a count that silently
+/// differs from the number of findings below it is worse than no count.
+/// Renders nothing when no finding was closed, which is the ordinary case.
+#[component]
+pub(crate) async fn suppressed_note(suppressed: usize) -> Result<impl View> {
+    Ok(view! {
+        if suppressed > 0 {
+            <p class="table-note">
+                "The counts above leave out the "
+                (suppressed)
+                " finding" if suppressed != 1 { "s" }
+                " the image's own VEX statements close — see “Closed by VEX” below."
+            </p>
+        }
+    })
+}
+
 /// The five severity tallies, as a badge row.
 #[component]
 pub(crate) async fn severity_counts(counts: &SeverityCount) -> Result<impl View> {

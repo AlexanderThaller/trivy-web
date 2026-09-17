@@ -6,8 +6,10 @@
 //! it needs.
 
 pub(crate) mod format;
+pub(crate) mod grype;
 pub(crate) mod image;
 pub(crate) mod layout;
 pub(crate) mod scan;
 pub(crate) mod shared;
+pub(crate) mod syft;
 pub(crate) mod trivy;

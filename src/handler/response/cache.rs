@@ -36,21 +36,27 @@ use tracing::{
 
 use crate::handler::{
     cosign,
+    grype,
     process::Limits,
     registry::RateLimit,
+    syft,
     trivy::{
         self,
         Vulnerability,
         get_vulnerabilities_count,
     },
+    vex,
 };
 
 use super::{
     CosignInformation,
     DockerInformation,
+    GrypeInformation,
     KeylessVerificationInformation,
     SbomInformation,
+    SyftInformation,
     TrivyInformation,
+    VexInformation,
 };
 
 pub(crate) const REDIS_KEY_PREFIX: &str = "trivy-web";
@@ -338,7 +344,7 @@ impl Fetch for TrivyInformationFetcher<'_> {
     fn key(&self) -> String {
         // The version is part of the key so cached entries of older versions
         // which do not contain all information are not used anymore.
-        format!("{REDIS_KEY_PREFIX}:trivy:v2:{image}", image = self.image)
+        format!("{REDIS_KEY_PREFIX}:trivy:v3:{image}", image = self.image)
     }
 
     /// A scan run with caller supplied registry credentials can cover an image
@@ -376,6 +382,168 @@ impl Fetch for TrivyInformationFetcher<'_> {
             vulnerabilities,
             severity_count,
             report_summary,
+            repo_digests: trivy_result.metadata.repo_digests,
+            architecture: trivy_result.metadata.image_config.architecture,
+            fetch_time: Utc::now(),
+        })
+    }
+}
+
+/// The SBOM syft builds from the image itself.
+pub(crate) struct SyftInformationFetcher<'a> {
+    pub(crate) image: &'a Image,
+    pub(crate) username: Option<&'a str>,
+    pub(crate) password: Option<&'a str>,
+    pub(crate) limits: &'a Limits,
+    pub(crate) registry_rate_limit: &'a RateLimit,
+}
+
+/// A second opinion on the vulnerabilities, from grype.
+pub(crate) struct GrypeInformationFetcher<'a> {
+    pub(crate) image: &'a Image,
+    pub(crate) username: Option<&'a str>,
+    pub(crate) password: Option<&'a str>,
+    pub(crate) limits: &'a Limits,
+    pub(crate) registry_rate_limit: &'a RateLimit,
+}
+
+/// Hand written for the same reason [`TrivyInformationFetcher`]'s is: the
+/// submitted credentials must not reach a log or a trace through the `Debug`
+/// that `cache_or_fetch`'s instrumentation records.
+impl std::fmt::Debug for SyftInformationFetcher<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SyftInformationFetcher")
+            .field("image", &self.image)
+            .field("username", &self.username.map(|_| "REDACTED"))
+            .field("password", &self.password.map(|_| "REDACTED"))
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for GrypeInformationFetcher<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GrypeInformationFetcher")
+            .field("image", &self.image)
+            .field("username", &self.username.map(|_| "REDACTED"))
+            .field("password", &self.password.map(|_| "REDACTED"))
+            .finish_non_exhaustive()
+    }
+}
+
+impl Fetch for SyftInformationFetcher<'_> {
+    type Output = SyftInformation;
+
+    /// None, because the scan counts itself: syft pulls the image, but only
+    /// once it has a slot. See [`TrivyInformationFetcher::registry`].
+    fn registry(&self) -> Option<&str> {
+        None
+    }
+
+    fn key(&self) -> String {
+        format!("{REDIS_KEY_PREFIX}:syft:v1:{image}", image = self.image)
+    }
+
+    /// Same as [`TrivyInformationFetcher::cacheable`]: an SBOM built with
+    /// caller supplied credentials describes an image the next caller may not
+    /// be allowed to pull, and the key is the image alone.
+    fn cacheable(&self) -> bool {
+        self.username.is_none() && self.password.is_none()
+    }
+
+    async fn fetch(&self) -> Result<Self::Output> {
+        let syft = syft::scan_image(
+            self.image,
+            self.username,
+            self.password,
+            self.limits,
+            self.registry_rate_limit,
+        )
+        .await?;
+
+        Ok(SyftInformation {
+            syft,
+            fetch_time: Utc::now(),
+        })
+    }
+}
+
+impl Fetch for GrypeInformationFetcher<'_> {
+    type Output = GrypeInformation;
+
+    /// None, because the scan counts itself, as above.
+    fn registry(&self) -> Option<&str> {
+        None
+    }
+
+    fn key(&self) -> String {
+        format!("{REDIS_KEY_PREFIX}:grype:v1:{image}", image = self.image)
+    }
+
+    fn cacheable(&self) -> bool {
+        self.username.is_none() && self.password.is_none()
+    }
+
+    async fn fetch(&self) -> Result<Self::Output> {
+        let grype = grype::scan_image(
+            self.image,
+            self.username,
+            self.password,
+            self.limits,
+            self.registry_rate_limit,
+        )
+        .await?;
+
+        Ok(GrypeInformation {
+            grype,
+            fetch_time: Utc::now(),
+        })
+    }
+}
+
+/// The `OpenVEX` documents attached to the image.
+///
+/// Keyed by the digest rather than by the reference, so a tag that has moved
+/// since is not answered with the statements about what it used to point at.
+/// The repository is part of the key too: a digest identifies the manifest
+/// but not what is attached to it, and the same image mirrored to two
+/// registries can carry a different VEX document under each.
+#[derive(Debug)]
+pub(crate) struct VexInformationFetcher<'a> {
+    pub(crate) docker_registry_client: &'a DockerRegistryClient,
+    pub(crate) image: &'a Image,
+    pub(crate) digest: &'a str,
+}
+
+impl Fetch for VexInformationFetcher<'_> {
+    type Output = VexInformation;
+
+    /// One claim for what is up to three requests -- the referrers index, a
+    /// referrer's manifest and its blob -- the same way
+    /// [`SbomInformationFetcher`] claims once for a manifest and a blob
+    /// apiece. The budget bounds how often a registry hears from this
+    /// deployment at all, and a lookup is what it hears.
+    fn registry(&self) -> Option<&str> {
+        Some(self.image.registry.registry_domain())
+    }
+
+    fn key(&self) -> String {
+        format!(
+            "{REDIS_KEY_PREFIX}:vex:{registry}/{path}@{digest}",
+            registry = self.image.registry.registry_domain(),
+            path = self.image.path(),
+            digest = self.digest,
+        )
+    }
+
+    async fn fetch(&self) -> Result<Self::Output> {
+        let attestations =
+            vex::attestation::attestations(self.docker_registry_client, self.image, self.digest)
+                .instrument(info_span!("get vex attestations"))
+                .await
+                .context("failed to get the vex attestations")?;
+
+        Ok(VexInformation {
+            attestations,
             fetch_time: Utc::now(),
         })
     }
@@ -671,6 +839,32 @@ mod tests {
 
         let with_digest = Ok(docker_information(Some("sha256:c0ffee")));
         assert_eq!(Some("ghcr.io"), fetcher(&with_digest).registry());
+    }
+
+    /// A digest says which manifest, not which registry it was pulled from,
+    /// and what is attached to a manifest is attached in one repository. The
+    /// same image mirrored elsewhere has to be a different cache entry or one
+    /// mirror's VEX statements would answer for the other's.
+    #[test]
+    fn the_vex_key_is_the_repository_and_the_digest() {
+        let client = docker_registry_client::Client::default();
+
+        let key = |image: &str| {
+            let image: docker_registry_client::Image = image.parse().unwrap();
+
+            super::VexInformationFetcher {
+                docker_registry_client: &client,
+                image: &image,
+                digest: "sha256:c0ffee",
+            }
+            .key()
+        };
+
+        assert_ne!(key("ghcr.io/foo/bar:1"), key("docker.io/foo/bar:1"));
+
+        // The tag is not part of it: two tags of one digest are one image
+        // with one set of attestations.
+        assert_eq!(key("ghcr.io/foo/bar:1"), key("ghcr.io/foo/bar:2"));
     }
 
     /// A manifest as it comes back from a registry, with the digest under test.

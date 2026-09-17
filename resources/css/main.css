@@ -616,36 +616,52 @@ td.num {
   background-color: var(--unknown-bg);
 }
 
-#cves tbody tr {
+/*
+ * The severity stripe down the left of a findings row. Both vulnerability
+ * tables get it -- trivy's and grype's -- since a row in either is the same
+ * kind of thing and should be scannable the same way.
+ */
+#cves tbody tr,
+#grype_matches tbody tr {
   border-left: 3px solid transparent;
 }
 
-#cves tbody tr.CRITICAL {
+#cves tbody tr.CRITICAL,
+#grype_matches tbody tr.CRITICAL {
   border-left-color: var(--critical-color);
 }
 
-#cves tbody tr.HIGH {
+#cves tbody tr.HIGH,
+#grype_matches tbody tr.HIGH {
   border-left-color: var(--high-color);
 }
 
-#cves tbody tr.MEDIUM {
+#cves tbody tr.MEDIUM,
+#grype_matches tbody tr.MEDIUM {
   border-left-color: var(--medium-color);
 }
 
-#cves tbody tr.LOW {
+#cves tbody tr.LOW,
+#grype_matches tbody tr.LOW {
   border-left-color: var(--low-color);
 }
 
-#cves tbody tr.UNKNOWN {
+#cves tbody tr.UNKNOWN,
+#grype_matches tbody tr.UNKNOWN {
   border-left-color: var(--unknown-color);
 }
 
-#cves td.id {
+#cves td.id,
+#grype_matches td.id,
+#grype_matches_vexed td.id {
   font-family: var(--font-mono);
   white-space: nowrap;
 }
 
-#cves td.package {
+#cves td.package,
+#grype_matches td.package,
+#grype_matches_vexed td.package,
+#syft_packages td.package {
   font-family: var(--font-mono);
   white-space: nowrap;
 }
@@ -655,11 +671,120 @@ td.num {
   color: var(--text-muted);
 }
 
+/*
+ * A package URL is long and is the one cell a reader may want to compare
+ * character by character, so it wraps rather than pushing the table sideways.
+ */
+#syft_packages td.purl {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/*
+ * How many packages of each ecosystem syft found: the same badge row as the
+ * severity counts, without the colours -- an ecosystem is not a verdict, and
+ * there is an open-ended number of them.
+ */
+.ecosystems {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ecosystems li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-inset);
+}
+
+.ecosystems .label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.ecosystems .count {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
 .fixed_version,
 .fixed-version {
   color: var(--fixed-color);
   font-family: var(--font-mono);
   white-space: nowrap;
+}
+
+/* VEX --------------------------------------------------------------------- */
+
+/*
+ * The status a VEX statement gives a finding, as a badge the same shape as a
+ * severity one: a `not_affected` sits in the same column a severity does in
+ * the closed-by-VEX table, and two badge shapes in one row would read as two
+ * different kinds of thing.
+ */
+.vex-status {
+  display: inline-block;
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* The two that close a finding, in the same green a fixed version gets. */
+.vex-status-not-affected,
+.vex-status-fixed {
+  color: var(--fixed-color);
+  background-color: var(--fixed-bg);
+}
+
+/* The two that do not. `affected` is the publisher confirming the finding. */
+.vex-status-affected {
+  color: var(--high-color);
+  background-color: var(--high-bg);
+}
+
+.vex-status-under-investigation,
+.vex-status-other {
+  color: var(--unknown-color);
+  background-color: var(--unknown-bg);
+}
+
+#cves_vexed td.id,
+#cves_vexed td.package,
+.vex-statements td.id {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+/*
+ * Package URLs, which is what a product almost always is: long, and the one
+ * thing in the row a reader may want to compare character by character. They
+ * get the monospace treatment without `td.digest`'s `nowrap`, which would
+ * push the notes column off the side of even a wide table.
+ */
+.vex-statements td.digest {
+  font-family: var(--font-mono);
+  white-space: normal;
+  word-break: break-all;
+}
+
+.vex-statements td.title {
+  min-width: 16rem;
+  color: var(--text-muted);
 }
 
 /* Severity count strip ---------------------------------------------------- */

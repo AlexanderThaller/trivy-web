@@ -9,9 +9,29 @@ use std::{
 
 use clap::{
     Parser,
+    ValueEnum,
     value_parser,
 };
 use tracing::Level;
+
+/// A scanner this service can run against an image.
+///
+/// Each is a child process and each pulls the image itself, so which of them
+/// run is what a scan costs. All three by default: they answer different
+/// questions -- two vulnerability scanners that do not agree, and the SBOM of
+/// what is actually in the image -- and an operator who only wants one can
+/// say so.
+#[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Scanner {
+    /// Vulnerabilities, with trivy.
+    Trivy,
+
+    /// The SBOM of the image, generated with syft.
+    Syft,
+
+    /// Vulnerabilities again, with grype.
+    Grype,
+}
 
 /// Simple uploading service
 #[derive(Parser, Debug)]
@@ -74,6 +94,20 @@ pub(super) struct Args {
         env = "TRIVY_WEB_SCAN_TIMEOUT"
     )]
     pub scan_timeout: u64,
+
+    /// Which scanners to run against an image
+    ///
+    /// Every scanner named here is a child process per scan that pulls the
+    /// image itself, so this is what one uncached scan costs the host and the
+    /// registry. Comma separated.
+    #[clap(
+        long,
+        value_name = "trivy,syft,grype",
+        value_delimiter = ',',
+        default_value = "trivy,syft,grype",
+        env = "TRIVY_WEB_SCANNERS"
+    )]
+    pub scanners: Vec<Scanner>,
 
     /// How often a single registry may be reached out to in a minute
     ///

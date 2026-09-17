@@ -739,7 +739,8 @@ pub(crate) async fn cosign_keyless_verify(
 
 /// Builds the Distribution API URL for the cosign tag that carries `digest`'s
 /// signature (`suffix = "sig"`), SBOM (`suffix = "sbom"`), or attestations
-/// (`suffix = "att"`).
+/// (`suffix = "att"` -- see [`vex::attestation`](super::vex::attestation),
+/// which looks for `OpenVEX` documents there).
 ///
 /// This has to go through `image.path()` rather than joining
 /// `image.repository` and `image.image_name` by hand: that join drops
@@ -750,7 +751,7 @@ pub(crate) async fn cosign_keyless_verify(
 /// some registries (e.g. GHCR) redirect it to a human-facing web page instead
 /// of answering with a 404, which then fails to parse as a manifest.
 #[tracing::instrument]
-fn triangulate(image: &Image, digest: &str, suffix: &str) -> Result<Url> {
+pub(crate) fn triangulate(image: &Image, digest: &str, suffix: &str) -> Result<Url> {
     format!(
         "https://{registry}/v2/{path}/manifests/{digest}.{suffix}",
         registry = image.registry.registry_domain(),

@@ -4746,6 +4746,7 @@ dependencies = [
 name = "trivy-web"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "clap",
  "docker-registry-client",

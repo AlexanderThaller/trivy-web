@@ -9,6 +9,11 @@ rust-version = "1.98"
 ci = []
 
 [dependencies]
+# Decodes the base64 payload of the DSSE envelopes VEX attestations are
+# published in (see `src/handler/vex/attestation.rs`). Already in the tree
+# through `sigstore`, so this is a direct dependency on a crate that is built
+# either way rather than a new one.
+base64 = "0.22"
 chrono = "0.4"
 clap = { version = "4", features = ["derive", "env", "cargo"] }
 docker-registry-client = "0.4.1"

@@ -27,6 +27,33 @@ use super::{
 pub(crate) struct TrivyResult {
     #[serde(default)]
     pub(crate) results: Vec<Results>,
+
+    /// What trivy scanned, as opposed to what it found. Only the handful of
+    /// fields that say which image this was: a VEX statement names its
+    /// product by digest and architecture (see
+    /// [`vex::image_identifiers`](super::vex::image_identifiers)), and taking
+    /// those from the scan is taking them from the thing that was actually
+    /// pulled rather than resolving the reference a second time.
+    #[serde(default)]
+    pub(crate) metadata: Metadata,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub(crate) struct Metadata {
+    /// `repository@sha256:...`, one per repository the image is known under.
+    #[serde(default)]
+    pub(crate) repo_digests: Vec<String>,
+
+    #[serde(default)]
+    pub(crate) image_config: ImageConfig,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct ImageConfig {
+    /// Lower case in the config blob, unlike everything else trivy reports.
+    #[serde(default)]
+    pub(crate) architecture: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -129,6 +156,26 @@ pub(crate) struct Vulnerability {
 
     #[serde(rename = "CVSS")]
     pub(crate) cvss: Option<BTreeMap<String, Cvss>>,
+
+    /// How the package is named outside trivy, which is how a VEX statement
+    /// names it too. Optional because trivy only started reporting it in
+    /// recent versions -- a scan without it can still be matched against
+    /// statements about the image as a whole, just not against statements
+    /// about one of its packages.
+    ///
+    /// Last in the struct on purpose: the derived ordering is what keeps the
+    /// findings sorted by severity, and a field ahead of `severity` would
+    /// reorder every result.
+    #[serde(default)]
+    pub(crate) pkg_identifier: Option<PkgIdentifier>,
+}
+
+/// What trivy calls a package outside its own vulnerability database.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[serde(rename_all = "PascalCase")]
+pub(crate) struct PkgIdentifier {
+    #[serde(rename = "PURL")]
+    pub(crate) purl: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -212,19 +259,32 @@ impl std::fmt::Display for Severity {
 pub(crate) fn get_vulnerabilities_count<'a>(
     vulnerabilities: impl IntoIterator<Item = &'a Vulnerability>,
 ) -> SeverityCount {
-    let mut vulnerabilities_count = SeverityCount::default();
+    count_severities(
+        vulnerabilities
+            .into_iter()
+            .map(|vulnerability| vulnerability.severity),
+    )
+}
 
-    for vulnerability in vulnerabilities {
-        match vulnerability.severity {
-            Severity::Critical => vulnerabilities_count.critical += 1,
-            Severity::High => vulnerabilities_count.high += 1,
-            Severity::Medium => vulnerabilities_count.medium += 1,
-            Severity::Low => vulnerabilities_count.low += 1,
-            Severity::Unknown => vulnerabilities_count.unknown += 1,
+/// The same tally, off the severities alone.
+///
+/// What the VEX assessment counts with, since it is handed findings from
+/// whichever scanner produced them (see
+/// [`vex::Scanned`](super::vex::Scanned)) rather than trivy's own.
+pub(crate) fn count_severities(severities: impl IntoIterator<Item = Severity>) -> SeverityCount {
+    let mut count = SeverityCount::default();
+
+    for severity in severities {
+        match severity {
+            Severity::Critical => count.critical += 1,
+            Severity::High => count.high += 1,
+            Severity::Medium => count.medium += 1,
+            Severity::Low => count.low += 1,
+            Severity::Unknown => count.unknown += 1,
         }
     }
 
-    vulnerabilities_count
+    count
 }
 
 impl Results {
@@ -238,6 +298,22 @@ impl Results {
             secrets: self.secrets,
             severity_count: get_vulnerabilities_count(self.vulnerabilities.iter().flatten()),
         }
+    }
+}
+
+impl super::vex::Scanned for Vulnerability {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
+    fn purl(&self) -> Option<&str> {
+        self.pkg_identifier
+            .as_ref()
+            .and_then(|identifier| identifier.purl.as_deref())
+    }
+
+    fn severity(&self) -> Severity {
+        self.severity
     }
 }
 

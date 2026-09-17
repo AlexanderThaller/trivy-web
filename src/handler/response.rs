@@ -36,12 +36,15 @@ pub(crate) mod cache;
 
 use crate::handler::{
     cosign,
+    grype,
     response::cache::REDIS_TTL,
+    syft,
     trivy::{
         ReportSummary,
         SeverityCount,
         Vulnerability,
     },
+    vex,
 };
 
 use super::{
@@ -70,6 +73,39 @@ pub(crate) struct TrivyInformation {
     #[serde(default)]
     pub(crate) report_summary: Vec<ReportSummary>,
 
+    /// `repository@sha256:...` for every repository the scanned image is
+    /// known under, straight out of trivy's report. This is what the VEX
+    /// lookup is pointed at: the digest of the image that was really pulled,
+    /// rather than whatever the reference in the form resolves to now.
+    #[serde(default)]
+    pub(crate) repo_digests: Vec<String>,
+
+    /// The architecture of the image trivy pulled, which is part of how a VEX
+    /// statement names its product.
+    #[serde(default)]
+    pub(crate) architecture: Option<String>,
+
+    pub(crate) fetch_time: DateTime<Utc>,
+}
+
+/// Everything the "SBOM (syft)" card renders.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub(crate) struct SyftInformation {
+    pub(crate) syft: syft::Syft,
+    pub(crate) fetch_time: DateTime<Utc>,
+}
+
+/// Everything the "Vulnerabilities (grype)" card renders.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub(crate) struct GrypeInformation {
+    pub(crate) grype: grype::Grype,
+    pub(crate) fetch_time: DateTime<Utc>,
+}
+
+/// The `OpenVEX` documents attached to the image, if any.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub(crate) struct VexInformation {
+    pub(crate) attestations: Vec<vex::Attestation>,
     pub(crate) fetch_time: DateTime<Utc>,
 }
 
@@ -284,6 +320,48 @@ impl SbomInformation {
     }
 }
 
+impl SyftInformation {
+    pub(crate) fn fetch_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.fetch_time)
+    }
+
+    pub(crate) fn expires(&self) -> DateTime<Utc> {
+        self.fetch_time + Duration::seconds(REDIS_TTL)
+    }
+
+    pub(crate) fn expires_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.expires())
+    }
+}
+
+impl GrypeInformation {
+    pub(crate) fn fetch_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.fetch_time)
+    }
+
+    pub(crate) fn expires(&self) -> DateTime<Utc> {
+        self.fetch_time + Duration::seconds(REDIS_TTL)
+    }
+
+    pub(crate) fn expires_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.expires())
+    }
+}
+
+impl VexInformation {
+    pub(crate) fn fetch_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.fetch_time)
+    }
+
+    pub(crate) fn expires(&self) -> DateTime<Utc> {
+        self.fetch_time + Duration::seconds(REDIS_TTL)
+    }
+
+    pub(crate) fn expires_duration(&self) -> Duration {
+        Utc::now().signed_duration_since(self.expires())
+    }
+}
+
 impl KeylessVerificationInformation {
     pub(crate) fn fetch_duration(&self) -> Duration {
         Utc::now().signed_duration_since(self.fetch_time)
@@ -346,6 +424,12 @@ mod tests {
             vulnerabilities,
             severity_count,
             report_summary,
+            repo_digests: vec![
+                "linuxserver/code-server@sha256:\
+                 db900338f383082b1674249348a0d73e9aa25c62fd5d7d4c85e6cf3c83c0f9a6"
+                    .to_owned(),
+            ],
+            architecture: Some("amd64".to_owned()),
             fetch_time: chrono::Utc::now(),
         };
 

@@ -5,3 +5,10 @@
   only two left now that htmx is gone
 * [ ] Expire tokens correctly
 * [ ] Store tokens in redis when using the docker client library
+* [ ] Pass registry credentials to the VEX attestation lookup -- it reaches
+  the registry anonymously like every other image lookup here, so a VEX
+  document on a private image is not found even when the scan itself is
+  credentialed
+* [ ] Let a VEX document be pasted in or fetched from a URL, the way the
+  cosign public key can be, for images whose statements are published
+  somewhere other than the registry

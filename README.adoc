@@ -3,7 +3,11 @@
 Webinterface for the link:https://github.com/aquasecurity/trivy[trivy image scanner].
 
 Point it at a container image reference and it scans the image with
-trivy and shows the vulnerabilities found, alongside whatever
+link:https://github.com/aquasecurity/trivy[trivy],
+link:https://github.com/anchore/grype[grype] and
+link:https://github.com/anchore/syft[syft] -- two vulnerability
+scanners that do not always agree, and an SBOM of what is actually in
+the image -- alongside whatever
 link:https://github.com/sigstore/cosign[cosign] has to say about that
 image: its signatures, an SBOM if one was attached, and a
 cryptographic verification of any keyless signature -- not just what
@@ -12,10 +16,47 @@ chains to Sigstore's trust root. Given a public key (pasted in, or a
 URL to one) it verifies key-based signatures against that too. Both
 verifications run in-process; the `cosign` binary is not involved.
 
+== VEX
+
+A scanner reports what a package's version is known to be vulnerable
+to. Whether the image is *exploitable* is a different question, and one
+the publisher has usually already answered: a vulnerable library that
+is never called, a CVE in a code path the build left out, a fix
+backported by a distribution. link:https://openvex.dev[OpenVEX] is how
+that answer is published -- with `cosign attest --type openvex` or
+link:https://github.com/openvex/vexctl[vexctl] -- and trivy-web reads
+it.
+
+Both vulnerability cards are shown against the image's own VEX
+statements. A finding a statement calls `not_affected` or `fixed` drops
+out of the severity counts and into a "Closed by VEX" table of its own,
+next to the justification and whoever signed the document that says so.
+A statement that says `affected` or `under_investigation` leaves the
+finding where it is and labels it.
+
+Nothing is hidden and nothing is verified. Suppressing a vulnerability
+is a claim somebody is making about their own image, and the page shows
+who is making it rather than quietly acting on it.
+
+The documents themselves are found the way trivy's `--vex oci` finds
+them: OCI 1.1 referrers first (what a recent cosign publishes), then
+the legacy `<digest>.att` tag behind it, unwrapping a Sigstore bundle,
+a bare DSSE envelope or a bare in-toto statement as needed. The "VEX"
+card shows every document found, where it was attached and every
+statement it makes, whether or not any of them matched a finding.
+
+=== Which scanners run
+
+Each scanner is a child process that pulls the image itself, so which
+of them run is what one uncached scan costs. All three by default;
+`--scanners trivy` (or any comma separated subset) narrows it. The
+published image carries all three either way -- an image whose contents
+depend on a runtime flag is not one that can be published once.
+
 == Running
 
-The published image carries `trivy` and `trivy-web` and needs nothing
-else to scan public images:
+The published image carries `trivy`, `syft`, `grype` and `trivy-web`
+and needs nothing else to scan public images:
 
 [source,shell]
 ----
@@ -66,10 +107,16 @@ limit across instances. Without it, both are in-memory and per-instance.
 |A trivy server to scan through instead of running `trivy` as a child
 process locally.
 
+|`--scanners`
+|`TRIVY_WEB_SCANNERS`
+|Which scanners to run, comma separated (default `trivy,syft,grype`).
+Each one is a child process and a registry pull per uncached scan.
+
 |`--max-concurrent-scans`
 |`TRIVY_WEB_MAX_CONCURRENT_SCANS`
-|How many trivy child processes may run at once (default `4`) -- the
-ceiling an unauthenticated request can push the host to.
+|How many scanner child processes may run at once (default `4`) -- the
+ceiling an unauthenticated request can push the host to. One scan takes
+one slot per scanner it runs.
 
 |`--registry-requests-per-minute`
 |`TRIVY_WEB_REGISTRY_REQUESTS_PER_MINUTE`
@@ -101,16 +148,25 @@ reformat the tree to its own defaults); CI runs the same `cargo
 test`/`clippy`/`fmt` under it a contributor would locally, rather than
 whatever `cargo` happens to resolve to on a given machine.
 
-The image itself is `trivy-web` and `trivy` (the latter straight from
-nixpkgs, not a URL and a checksum to keep in step by hand) plus CA
-certificates, with `dockerTools.buildLayeredImage` computing the actual
-closure rather than layers assembled by hand. Both binaries are
-statically linked -- `trivy-web` for musl through `pkgsStatic`, `trivy`
-as pure Go with cgo off -- so there is no libc in the image at all,
-only the few data files Go's standard library reads (time zones,
-`/etc/services`, MIME types). No `cosign` either: both kinds of
-signature verification run in-process (see `src/handler/cosign.rs`),
-and the binary was a third of the compressed image.
+The image itself is `trivy-web` and the three scanners -- `trivy`,
+`syft` and `grype`, all straight from nixpkgs rather than a URL and a
+checksum to keep in step by hand -- plus CA certificates, with
+`dockerTools.buildLayeredImage` computing the actual closure rather
+than layers assembled by hand. Every binary is statically linked --
+`trivy-web` for musl through `pkgsStatic`, the scanners as pure Go with
+cgo off -- so there is no libc in the image at all, only the few data
+files Go's standard library reads (time zones, `/etc/services`, MIME
+types). No `cosign` either: both kinds of signature verification run
+in-process (see `src/handler/cosign.rs`), and the binary was a third of
+the compressed image.
+
+The scanners are the bulk of it, and none of the three is in the public
+binary cache with cgo off, so CI compiles them -- a minute or so each,
+and only again when nixpkgs bumps one. They are deliberately not in the
+devShell: `nix develop` is what CI runs `cargo test`, `clippy` and
+`fmt` under, and three Go builds have no business standing between a
+push and `cargo fmt --check`. A local `just dev` finds whatever is on
+`PATH`.
 
 [source,shell]
 ----

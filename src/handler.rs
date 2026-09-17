@@ -32,22 +32,30 @@ use topcoat::{
 use tokio::fs::read_to_string;
 
 pub(crate) mod cosign;
+pub(crate) mod grype;
 mod process;
 mod registry;
 pub(crate) mod response;
+pub(crate) mod syft;
 pub(crate) mod trivy;
+pub(crate) mod vex;
 
 pub(super) use process::Limits;
 pub(super) use registry::RateLimit;
 pub(super) use response::cache::Cache;
 
-use crate::view::{
-    image::image_information,
-    scan::{
-        loading_card,
-        scan_form,
+use crate::{
+    args::Scanner,
+    view::{
+        grype::grype_information,
+        image::image_information,
+        scan::{
+            loading_card,
+            scan_form,
+        },
+        syft::syft_information,
+        trivy::scan_information,
     },
-    trivy::scan_information,
 };
 
 #[derive(Clone)]
@@ -68,6 +76,11 @@ pub(crate) struct AppState {
     /// Sigstore's trust root, fetched once and shared by every keyless
     /// verification this instance runs.
     pub(crate) sigstore_trust_root: cosign::SigstoreTrustRoot,
+
+    /// Which scanners a scan runs. Each one named here is a child process and
+    /// a registry pull per uncached scan, so this is what a deployment has
+    /// decided one scan may cost.
+    pub(crate) scanners: Vec<Scanner>,
 }
 
 /// The application state, registered on the router with `.app_context`.
@@ -173,16 +186,50 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
                 )
             </div>
 
-            <div id="scan_information" aria-live="polite">
-                suspense(
-                    fallback: view! { loading_card(title: "Vulnerabilities") },
-                    scan_information(
-                        image: &image,
-                        username: &form.username.0,
-                        password: &form.password.0,
+            if state(cx).scanners.contains(&Scanner::Trivy) {
+                <div id="scan_information" aria-live="polite">
+                    suspense(
+                        fallback: view! {
+                            loading_card(title: "Vulnerabilities")
+                            loading_card(title: "VEX")
+                        },
+                        scan_information(
+                            image: &image,
+                            username: &form.username.0,
+                            password: &form.password.0,
+                        )
                     )
-                )
-            </div>
+                </div>
+            }
+
+            // Its own region rather than part of the one above: the two
+            // scanners take different amounts of time and neither should be
+            // waiting on the other to reach the page.
+            if state(cx).scanners.contains(&Scanner::Grype) {
+                <div id="grype_information" aria-live="polite">
+                    suspense(
+                        fallback: view! { loading_card(title: "Vulnerabilities (grype)") },
+                        grype_information(
+                            image: &image,
+                            username: &form.username.0,
+                            password: &form.password.0,
+                        )
+                    )
+                </div>
+            }
+
+            if state(cx).scanners.contains(&Scanner::Syft) {
+                <div id="syft_information" aria-live="polite">
+                    suspense(
+                        fallback: view! { loading_card(title: "SBOM (syft)") },
+                        syft_information(
+                            image: &image,
+                            username: &form.username.0,
+                            password: &form.password.0,
+                        )
+                    )
+                </div>
+            }
         }
     }
     .boxed())
@@ -205,7 +252,7 @@ pub(crate) async fn css_main() -> Result<impl topcoat::router::response::IntoRes
             ),
             (
                 header::ETAG,
-                HeaderValue::from_static("\"ad37e0795a78e9c0d8e9ef1534a7f6c1\""),
+                HeaderValue::from_static("\"791d157298875ac48caf9b57af73c34d\""),
             ),
         ],
         include_str!("../resources/css/main.css"),

@@ -115,8 +115,20 @@ async fn main() -> Result<()> {
     let registry_rate_limit =
         handler::RateLimit::new(redis_client.clone(), opt.registry_requests_per_minute);
 
+    event!(
+        Level::INFO,
+        scanners = opt
+            .scanners
+            .iter()
+            .map(|scanner| format!("{scanner:?}").to_lowercase())
+            .collect::<Vec<_>>()
+            .join(","),
+        "Running these scanners per scan"
+    );
+
     let state = handler::AppState {
         server: opt.server,
+        scanners: opt.scanners,
         docker_registry_client: registry,
         // Waiting for a fetch that is already running is bounded by how long
         // that fetch can take, which is what the scan limits say.
