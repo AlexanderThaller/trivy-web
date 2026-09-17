@@ -68,7 +68,7 @@ pub(crate) async fn shell(slot: Slot<'_>) -> Result<impl View> {
                 // handling -- so it survives the move as its own file.
                 // `defer` runs it once the document is parsed, and delegation
                 // means it does not care that the table streams in later.
-                <script src="/js/filter.js" defer=""></script>
+                <script src=(crate::handler::filter_js_src()) defer=""></script>
             </head>
 
             <body>

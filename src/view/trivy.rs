@@ -1,10 +1,12 @@
-//! The "Vulnerabilities" and "VEX" cards.
+//! The trivy half of the "Vulnerabilities" card, and the "VEX" card under it.
+//!
+//! The card itself -- the tabs that switch between this and grype, and the
+//! one VEX lookup both are read against -- is `view::vulnerabilities`.
 
 use docker_registry_client::Image;
 use eyre::Context;
 use topcoat::{
     Result,
-    context::Cx,
     view::{
         View,
         ViewExt,
@@ -22,7 +24,6 @@ use crate::{
             cache::{
                 DockerInformationFetcher,
                 Fetch,
-                TrivyInformationFetcher,
                 VexInformationFetcher,
             },
         },
@@ -32,6 +33,7 @@ use crate::{
         },
         vex::{
             self,
+            Assessed,
             Attestation,
             Finding,
             ImageIdentifiers,
@@ -50,69 +52,6 @@ use crate::{
         },
     },
 };
-
-/// Runs the scan, reads what the publisher says about what it found, and
-/// renders both.
-///
-/// This is the component a `suspense` streams in. The scan is the slowest
-/// thing the page does, so the document, the form and the image card are all
-/// on screen long before it finishes.
-#[component]
-pub(crate) async fn scan_information(
-    cx: &Cx,
-    image: &str,
-    username: &str,
-    password: &str,
-) -> Result<impl View> {
-    let state = crate::handler::state(cx);
-
-    let (information, identifiers, vex) = match image.trim().parse::<Image>() {
-        Ok(image) => {
-            let information = TrivyInformationFetcher {
-                image: &image,
-                trivy_server: state.server.as_deref(),
-
-                trivy_username: (!username.is_empty()).then_some(username),
-                trivy_password: (!password.is_empty()).then_some(password),
-
-                limits: &state.limits,
-                registry_rate_limit: &state.registry_rate_limit,
-            }
-            .cache_or_fetch(&state.cache, &state.registry_rate_limit)
-            .await
-            .context("failed to fetch trivy information");
-
-            // Only once there is a scan for it to be about. A VEX document
-            // read on its own says nothing this page could show, and looking
-            // it up would spend a registry request on a scan that failed.
-            match &information {
-                Ok(scan) => {
-                    let (identifiers, vex) = vex_for(
-                        state,
-                        &image,
-                        &scan.repo_digests,
-                        scan.architecture.as_deref(),
-                    )
-                    .await;
-
-                    (information, identifiers, Some(vex))
-                }
-
-                Err(_) => (information, ImageIdentifiers::default(), None),
-            }
-        }
-
-        Err(err) => (
-            Err(eyre::Report::new(err).wrap_err("failed to parse the image reference")),
-            ImageIdentifiers::default(),
-            None,
-        ),
-    };
-
-    Ok(view! {
-        scan_results(information: information, identifiers: identifiers, vex: vex)
-    })
-}
 
 /// Looks up the `OpenVEX` documents attached to the image that was scanned,
 /// and works out every name a statement might call that image by.
@@ -179,43 +118,28 @@ fn repo_digest(repo_digests: &[String]) -> Option<&str> {
         .map(|(_repository, digest)| digest)
 }
 
-/// Both cards, from one place: the assessment that splits the findings is
-/// what the VEX card is showing the documents behind, so they are rendered
-/// from the same borrowed data rather than looked up twice.
+/// What trivy found, as one tab of the "Vulnerabilities" card.
+///
+/// The assessment is done by the caller rather than here: the VEX documents
+/// are looked up once for the card and read against both scanners' findings,
+/// so this is handed the answer rather than fetching its own.
 #[component]
-async fn scan_results(
-    information: eyre::Result<TrivyInformation>,
-    identifiers: ImageIdentifiers,
-    vex: Option<eyre::Result<VexInformation>>,
+pub(crate) async fn trivy_panel(
+    findings: eyre::Result<(TrivyInformation, Assessed<Vulnerability>)>,
 ) -> Result<impl View> {
-    let information = match information {
-        Ok(information) => information,
+    let (information, assessed) = match findings {
+        Ok(findings) => findings,
 
         Err(err) => {
             return Ok(view! {
-                <section class="card">
-                    <h2>"Vulnerabilities"</h2>
-                    error_block(title: "Scan failed", message: format::error(&err))
-                </section>
+                error_block(title: "trivy failed", message: format::error(&err))
             }
             .boxed());
         }
     };
 
-    // A VEX lookup that failed is reported in its own card. The findings are
-    // then shown as the scanner found them, which is what they are: the
-    // publisher's answer could not be read, not that there is none.
-    let attestations: &[Attestation] = match &vex {
-        Some(Ok(vex)) => &vex.attestations,
-        _ => &[],
-    };
-
-    let assessed = vex::assess(attestations, &information.vulnerabilities, &identifiers);
-
     Ok(view! {
-        <section class="card">
-            <h2>"Vulnerabilities"</h2>
-
+        <div>
             <dl class="meta">
                 <div>
                     <dt>"Scanned"</dt>
@@ -271,12 +195,7 @@ async fn scan_results(
                     suppressed_table(findings: &assessed.suppressed)
                 </section>
             }
-        </section>
-
-        <section class="card">
-            <h2>"VEX"</h2>
-            vex_documents(information: vex)
-        </section>
+        </div>
     }
     .boxed())
 }
@@ -345,7 +264,7 @@ async fn scan_targets(summaries: &[ReportSummary]) -> Result<impl View> {
 #[component]
 async fn findings_table(findings: &[Finding<Vulnerability>]) -> Result<impl View> {
     Ok(view! {
-        filter_toolbar(total: findings.len())
+        filter_toolbar(table: "cves", total: findings.len())
 
         <div class="table-scroll">
             <table id="cves">
@@ -524,7 +443,9 @@ async fn suppressed_table(findings: &[Finding<Vulnerability>]) -> Result<impl Vi
 /// The VEX card: every `OpenVEX` document attached to the image, statements and
 /// all.
 #[component]
-async fn vex_documents(information: Option<eyre::Result<VexInformation>>) -> Result<impl View> {
+pub(crate) async fn vex_documents(
+    information: Option<eyre::Result<VexInformation>>,
+) -> Result<impl View> {
     let information = match information {
         // No scan to be about, so nothing was looked up. The scan's own error
         // is already on the page above; repeating it here would say the same
@@ -743,13 +664,17 @@ async fn vex_products(statement: &Statement) -> Result<impl View> {
     })
 }
 
-/// The search box and severity checkboxes above the findings table.
+/// The search box and severity checkboxes above a findings table.
 ///
-/// The count starts out rendered by the server. `resources/js/filter.js` only
-/// has to keep it up to date from there, so nothing has to run when the table
-/// streams into the page.
+/// `table` is the id of the table it filters, which is what
+/// `resources/js/filter.js` reads off `data-table`: there is one of these per
+/// scanner now, and a toolbar that does not say what it filters would filter
+/// whichever table the script happened to find first.
+///
+/// The count starts out rendered by the server, so the first paint is already
+/// correct and nothing has to run when the table streams into the page.
 #[component]
-async fn filter_toolbar(total: usize) -> Result<impl View> {
+pub(crate) async fn filter_toolbar(table: &str, total: usize) -> Result<impl View> {
     const SEVERITIES: [(&str, &str); 5] = [
         ("CRITICAL", "Critical"),
         ("HIGH", "High"),
@@ -759,7 +684,7 @@ async fn filter_toolbar(total: usize) -> Result<impl View> {
     ];
 
     Ok(view! {
-        <div class="toolbar" id="cve_filter">
+        <div class="toolbar" data-table=(table)>
             <input
                 class="filter-input"
                 type="search"
@@ -779,7 +704,7 @@ async fn filter_toolbar(total: usize) -> Result<impl View> {
                 }
             </div>
 
-            <span class="filter-count" id="cve_count">(total) " vulnerabilities"</span>
+            <span class="filter-count">(total) " findings"</span>
         </div>
     })
 }

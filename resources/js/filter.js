@@ -1,31 +1,29 @@
-// Client side filtering of the findings table.
+// Client side filtering of the findings tables.
 //
-// The table streams into the page after this file has run, so nothing here
+// The tables stream into the page after this file has run, so nothing here
 // looks anything up at load time: the listeners are delegated from the body
-// and every call resolves the table again. The initial "N vulnerabilities"
+// and every call resolves its table again. The initial "N vulnerabilities"
 // count is rendered by the server, so the first paint is already correct and
-// this only ever runs in response to the user touching the toolbar.
+// this only ever runs in response to the user touching a toolbar.
+//
+// One toolbar per scanner -- trivy's findings and grype's matches each have
+// their own, and each says which table it filters in `data-table`, so this
+// stays one piece of code rather than one per table.
 
-function filterVulnerabilities() {
-  var table = document.getElementById('cves');
+function filterTable(toolbar) {
+  var table = document.getElementById(toolbar.dataset.table);
   if (!table) {
     return;
   }
 
-  var toolbar = document.getElementById('cve_filter');
-  var needle = '';
-  var severities = null;
-
-  if (toolbar) {
-    needle = toolbar.querySelector('.filter-input').value.trim().toLowerCase();
-    severities = new Set(
-      Array.from(toolbar.querySelectorAll('input[type=checkbox]:checked')).map(
-        function (checkbox) {
-          return checkbox.value;
-        }
-      )
-    );
-  }
+  var needle = toolbar.querySelector('.filter-input').value.trim().toLowerCase();
+  var severities = new Set(
+    Array.from(toolbar.querySelectorAll('input[type=checkbox]:checked')).map(
+      function (checkbox) {
+        return checkbox.value;
+      }
+    )
+  );
 
   var rows = table.tBodies[0].rows;
   var shown = 0;
@@ -38,7 +36,7 @@ function filterVulnerabilities() {
     }
 
     var visible =
-      (severities === null || severities.has(row.className)) &&
+      severities.has(row.className) &&
       (needle === '' || row.dataset.haystack.includes(needle));
 
     row.hidden = !visible;
@@ -47,23 +45,21 @@ function filterVulnerabilities() {
     }
   }
 
-  var count = document.getElementById('cve_count');
+  var count = toolbar.querySelector('.filter-count');
   if (count) {
     count.textContent =
       shown === rows.length
-        ? `${rows.length} vulnerabilities`
-        : `${shown} of ${rows.length} vulnerabilities`;
+        ? `${rows.length} findings`
+        : `${shown} of ${rows.length} findings`;
   }
 }
 
-document.body.addEventListener('input', function (event) {
-  if (event.target.closest('#cve_filter')) {
-    filterVulnerabilities();
+function onToolbarEvent(event) {
+  var toolbar = event.target.closest('.toolbar[data-table]');
+  if (toolbar) {
+    filterTable(toolbar);
   }
-});
+}
 
-document.body.addEventListener('change', function (event) {
-  if (event.target.closest('#cve_filter')) {
-    filterVulnerabilities();
-  }
-});
+document.body.addEventListener('input', onToolbarEvent);
+document.body.addEventListener('change', onToolbarEvent);

@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use docker_registry_client::Client as DockerRegistryClient;
 use serde::Deserialize;
 use topcoat::{
@@ -47,14 +49,13 @@ pub(super) use response::cache::Cache;
 use crate::{
     args::Scanner,
     view::{
-        grype::grype_information,
         image::image_information,
+        sbom::sbom_information,
         scan::{
             loading_card,
             scan_form,
         },
-        syft::syft_information,
-        trivy::scan_information,
+        vulnerabilities::vulnerabilities,
     },
 };
 
@@ -186,14 +187,20 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
                 )
             </div>
 
-            if state(cx).scanners.contains(&Scanner::Trivy) {
-                <div id="scan_information" aria-live="polite">
+            // One region for both vulnerability scanners: they are two tabs
+            // of one card, so the card cannot arrive until both have. Left
+                        // out entirely when neither scanner is running, since
+            // there would be nothing but the VEX card in it.
+            if state(cx).scanners.iter().any(|scanner| {
+                matches!(scanner, Scanner::Trivy | Scanner::Grype)
+            }) {
+                <div id="vulnerabilities" aria-live="polite">
                     suspense(
                         fallback: view! {
                             loading_card(title: "Vulnerabilities")
                             loading_card(title: "VEX")
                         },
-                        scan_information(
+                        vulnerabilities(
                             image: &image,
                             username: &form.username.0,
                             password: &form.password.0,
@@ -202,34 +209,20 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
                 </div>
             }
 
-            // Its own region rather than part of the one above: the two
-            // scanners take different amounts of time and neither should be
-            // waiting on the other to reach the page.
-            if state(cx).scanners.contains(&Scanner::Grype) {
-                <div id="grype_information" aria-live="polite">
-                    suspense(
-                        fallback: view! { loading_card(title: "Vulnerabilities (grype)") },
-                        grype_information(
-                            image: &image,
-                            username: &form.username.0,
-                            password: &form.password.0,
-                        )
+            // Not gated on a scanner the way the two above are: the card
+            // shows what the publisher attached whether or not syft is one of
+            // the scanners this deployment runs, and the syft half of it
+            // gates itself.
+            <div id="sbom_information" aria-live="polite">
+                suspense(
+                    fallback: view! { loading_card(title: "SBOM") },
+                    sbom_information(
+                        image: &image,
+                        username: &form.username.0,
+                        password: &form.password.0,
                     )
-                </div>
-            }
-
-            if state(cx).scanners.contains(&Scanner::Syft) {
-                <div id="syft_information" aria-live="polite">
-                    suspense(
-                        fallback: view! { loading_card(title: "SBOM (syft)") },
-                        syft_information(
-                            image: &image,
-                            username: &form.username.0,
-                            password: &form.password.0,
-                        )
-                    )
-                </div>
-            }
+                )
+            </div>
         }
     }
     .boxed())
@@ -238,6 +231,72 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
 #[route(GET "/healthz")]
 pub(crate) async fn healthz() -> Result<&'static str> {
     Ok("OK")
+}
+
+/// The stylesheet, and the script below it.
+///
+/// Both are served with a week of `max-age`, which is the whole point of
+/// serving them from the binary -- and the whole problem with it: a returning
+/// browser holds a copy of each for a week, and a copy of the script that is
+/// a week older than the markup it runs against is a filter that silently
+/// does nothing.
+///
+/// So neither is identified by hand. [`asset_version`] hashes the bytes that
+/// are actually compiled in, the stylesheet serves that as its `ETag` and the
+/// script's `<script src>` carries it as a query (see [`filter_js_src`]), so
+/// shipping a new file is the whole of changing its identity.
+const MAIN_CSS: &str = include_str!("../resources/css/main.css");
+
+const FILTER_JS: &str = include_str!("../resources/js/filter.js");
+
+/// A hash of an asset's bytes, computed while compiling it in.
+///
+/// FNV-1a, which is a few lines of `const fn` rather than a dependency and a
+/// build script. Nothing here is defending against a chosen collision -- this
+/// only has to differ when the file does.
+const fn asset_version(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+
+    // `at` rather than the obvious `index`: `#[page]` puts a unit struct of
+    // that name in this module for the handler below, and a local cannot
+    // shadow one.
+    let mut at = 0;
+
+    while at < bytes.len() {
+        hash ^= bytes[at] as u64;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        at += 1;
+    }
+
+    hash
+}
+
+/// The stylesheet's `ETag`, which is the hash of what is served under it.
+///
+/// Release only, like the route that sends it: a debug build serves the
+/// stylesheet off disk so an edit needs a reload rather than a rebuild, and
+/// the hash of what was compiled in would be a lie about what was sent.
+#[cfg(not(debug_assertions))]
+static MAIN_CSS_ETAG: LazyLock<HeaderValue> = LazyLock::new(|| {
+    HeaderValue::try_from(format!(
+        "\"{version:016x}\"",
+        version = asset_version(MAIN_CSS.as_bytes())
+    ))
+    .expect("a quoted hex string is a valid header value")
+});
+
+/// Where the document points at the filter script: its path plus the hash of
+/// its contents, so a browser holding last week's copy is asked for a URL it
+/// has never seen rather than handed a stale one.
+pub(crate) fn filter_js_src() -> &'static str {
+    static SRC: LazyLock<String> = LazyLock::new(|| {
+        format!(
+            "/js/filter.js?v={version:016x}",
+            version = asset_version(FILTER_JS.as_bytes())
+        )
+    });
+
+    &SRC
 }
 
 #[cfg(not(debug_assertions))]
@@ -250,12 +309,9 @@ pub(crate) async fn css_main() -> Result<impl topcoat::router::response::IntoRes
                 header::CACHE_CONTROL,
                 HeaderValue::from_static("max-age=604800, stale-while-revalidate=86400"),
             ),
-            (
-                header::ETAG,
-                HeaderValue::from_static("\"791d157298875ac48caf9b57af73c34d\""),
-            ),
+            (header::ETAG, MAIN_CSS_ETAG.clone()),
         ],
-        include_str!("../resources/css/main.css"),
+        MAIN_CSS,
     ))
 }
 
@@ -272,7 +328,7 @@ pub(crate) async fn css_main() -> Result<impl topcoat::router::response::IntoRes
 
         Err(err) => {
             tracing::debug!("serving the embedded main.css: {err}");
-            include_str!("../resources/css/main.css").to_string()
+            MAIN_CSS.to_string()
         }
     };
 
@@ -286,7 +342,8 @@ pub(crate) async fn css_main() -> Result<impl topcoat::router::response::IntoRes
 ///
 /// This is what is left of the page's JavaScript now that htmx is gone: no
 /// library, just the delegated handlers behind the severity checkboxes and the
-/// search box.
+/// search box. The `?v=` the document asks for is ignored here -- it is there
+/// to make the URL a new one when the file changes, not to be checked.
 #[route(GET "/js/filter.js")]
 pub(crate) async fn js_filter() -> Result<impl topcoat::router::response::IntoResponse> {
     Ok((
@@ -294,7 +351,7 @@ pub(crate) async fn js_filter() -> Result<impl topcoat::router::response::IntoRe
             header::CACHE_CONTROL,
             HeaderValue::from_static("max-age=604800, stale-while-revalidate=86400"),
         )],
-        Js(include_str!("../resources/js/filter.js")),
+        Js(FILTER_JS),
     ))
 }
 

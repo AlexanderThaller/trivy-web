@@ -1,14 +1,11 @@
-//! The "Vulnerabilities (grype)" card.
+//! The grype half of the "Vulnerabilities" card.
 //!
 //! The same image, matched against a different vulnerability database by a
-//! different matcher, read against the same VEX statements. Where this card
+//! different matcher, read against the same VEX statements. Where this tab
 //! and the trivy one disagree is the interesting part of the page.
 
-use docker_registry_client::Image;
-use eyre::Context;
 use topcoat::{
     Result,
-    context::Cx,
     view::{
         View,
         ViewExt,
@@ -20,19 +17,10 @@ use topcoat::{
 use crate::{
     handler::{
         grype::Match,
-        response::{
-            GrypeInformation,
-            VexInformation,
-            cache::{
-                Fetch,
-                GrypeInformationFetcher,
-            },
-        },
+        response::GrypeInformation,
         vex::{
-            self,
-            Attestation,
+            Assessed,
             Finding,
-            ImageIdentifiers,
         },
     },
     view::{
@@ -43,108 +31,32 @@ use crate::{
             severity_counts,
             suppressed_note,
         },
-        trivy::vex_for,
+        trivy::filter_toolbar,
     },
 };
 
-/// Runs grype and renders what it matched.
+/// What grype matched, as one tab of the "Vulnerabilities" card.
 ///
-/// Its own `suspense` region rather than part of the trivy one: the two scans
-/// take different amounts of time, and whichever finishes first is on the
-/// page first.
+/// Like [`trivy_panel`](crate::view::trivy::trivy_panel), the assessment is
+/// handed in: the VEX documents are looked up once for the card and read
+/// against both scanners.
 #[component]
-pub(crate) async fn grype_information(
-    cx: &Cx,
-    image: &str,
-    username: &str,
-    password: &str,
+pub(crate) async fn grype_panel(
+    findings: eyre::Result<(GrypeInformation, Assessed<Match>)>,
 ) -> Result<impl View> {
-    let state = crate::handler::state(cx);
-
-    let (information, identifiers, vex) = match image.trim().parse::<Image>() {
-        Ok(image) => {
-            let information = GrypeInformationFetcher {
-                image: &image,
-
-                username: (!username.is_empty()).then_some(username),
-                password: (!password.is_empty()).then_some(password),
-
-                limits: &state.limits,
-                registry_rate_limit: &state.registry_rate_limit,
-            }
-            .cache_or_fetch(&state.cache, &state.registry_rate_limit)
-            .await
-            .context("failed to run grype");
-
-            match &information {
-                Ok(scan) => {
-                    // grype reports the same repo digest trivy does, so this
-                    // is the lookup the trivy card already did and answers
-                    // from the same cache entry.
-                    let (identifiers, vex) = vex_for(
-                        state,
-                        &image,
-                        &scan.grype.repo_digests,
-                        scan.grype.architecture.as_deref(),
-                    )
-                    .await;
-
-                    (information, identifiers, Some(vex))
-                }
-
-                Err(_) => (information, ImageIdentifiers::default(), None),
-            }
-        }
-
-        Err(err) => (
-            Err(eyre::Report::new(err).wrap_err("failed to parse the image reference")),
-            ImageIdentifiers::default(),
-            None,
-        ),
-    };
-
-    Ok(view! {
-        grype_results(information: information, identifiers: identifiers, vex: vex)
-    })
-}
-
-/// The card itself.
-#[component]
-async fn grype_results(
-    information: eyre::Result<GrypeInformation>,
-    identifiers: ImageIdentifiers,
-    vex: Option<eyre::Result<VexInformation>>,
-) -> Result<impl View> {
-    let information = match information {
-        Ok(information) => information,
+    let (information, assessed) = match findings {
+        Ok(findings) => findings,
 
         Err(err) => {
             return Ok(view! {
-                <section class="card">
-                    <h2>"Vulnerabilities (grype)"</h2>
-                    error_block(title: "Scan failed", message: format::error(&err))
-                </section>
+                error_block(title: "grype failed", message: format::error(&err))
             }
             .boxed());
         }
     };
 
-    let attestations: &[Attestation] = match &vex {
-        Some(Ok(vex)) => &vex.attestations,
-        _ => &[],
-    };
-
-    let assessed = vex::assess(attestations, &information.grype.matches, &identifiers);
-
     Ok(view! {
-        <section class="card">
-            <div class="card-head">
-                <h2>"Vulnerabilities (grype)"</h2>
-                if let Some(version) = &information.grype.version {
-                    <span class="mono muted">"grype " (version)</span>
-                }
-            </div>
-
+        <div>
             <dl class="meta">
                 <div>
                     <dt>"Scanned"</dt>
@@ -154,6 +66,13 @@ async fn grype_results(
                         <span class="muted">"(" (format::duration(information.fetch_duration())) " ago)"</span>
                     </dd>
                 </div>
+
+                if let Some(version) = &information.grype.version {
+                    <div>
+                        <dt>"grype"</dt>
+                        <dd>(version)</dd>
+                    </div>
+                }
 
                 if let Some(built) = information.grype.database_built {
                     <div>
@@ -203,7 +122,7 @@ async fn grype_results(
                     suppressed_matches_table(findings: &assessed.suppressed)
                 </section>
             }
-        </section>
+        </div>
     }
     .boxed())
 }
@@ -212,6 +131,8 @@ async fn grype_results(
 #[component]
 async fn matches_table(findings: &[Finding<Match>]) -> Result<impl View> {
     Ok(view! {
+        filter_toolbar(table: "grype_matches", total: findings.len())
+
         <div class="table-scroll">
             <table id="grype_matches">
                 <thead>
