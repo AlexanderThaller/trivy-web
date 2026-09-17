@@ -42,6 +42,7 @@ use tokio::{
 use tracing::{
     Instrument,
     error,
+    info,
     info_span,
 };
 
@@ -131,6 +132,25 @@ impl Admitted {
     /// Fails with the child killed when it outruns the deadline or writes more
     /// than [`MAX_OUTPUT_BYTES`].
     pub(crate) async fn run(self, command: &mut Command) -> Result<Output> {
+        // Which scanner, said at INFO on the way in and on the way out.
+        // Everything else on the scan path is an `info_span!`, and the
+        // subscriber emits nothing for a span being entered, so a process that
+        // dies mid-scan otherwise leaves a log that stops at startup and no
+        // way to tell how far it got -- or whether it ever got as far as
+        // starting a child at all.
+        //
+        // The program only, never the arguments: the credentials reach the
+        // scanners through the environment, but the image reference is a
+        // caller's to choose and a log line is not where that should be found
+        // out.
+        let program = command
+            .as_std()
+            .get_program()
+            .to_string_lossy()
+            .into_owned();
+
+        info!(program = %program, "Running a scanner");
+
         let child = command
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -155,7 +175,7 @@ impl Admitted {
             .take()
             .expect("stderr was piped above");
 
-        timeout(self.run_timeout, async {
+        let output = timeout(self.run_timeout, async {
             // Both pipes are drained while the child is waited on, not after
             // it exits: a child that fills a pipe buffer blocks until someone
             // reads it, and waiting first would hang for the whole deadline on
@@ -178,7 +198,11 @@ impl Admitted {
                 "the scan was killed after running for more than {seconds} seconds",
                 seconds = self.run_timeout.as_secs()
             )
-        })?
+        })??;
+
+        info!(program = %program, status = %output.status, "A scanner finished");
+
+        Ok(output)
     }
 }
 

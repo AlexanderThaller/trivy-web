@@ -45,6 +45,21 @@ async fn main() -> Result<()> {
         .with_max_level(opt.log_level)
         .init();
 
+    // Logged as well as returned. A `Result` out of `main` is printed by the
+    // runtime to stderr, and everything above goes through tracing to stdout;
+    // under a supervisor that captures the two into separate files -- which is
+    // what supervisord and daemon(8) both do -- that is the difference between
+    // a log that says why this stopped and one that simply ends mid-sentence.
+    let result = run(opt).await;
+
+    if let Err(err) = &result {
+        event!(Level::ERROR, "Stopping trivy-web: {err:#}");
+    }
+
+    result
+}
+
+async fn run(opt: args::Args) -> Result<()> {
     if let Some(server) = &opt.server {
         event!(
             Level::INFO,
@@ -168,6 +183,16 @@ async fn main() -> Result<()> {
     topcoat::serve(listener, router)
         .await
         .context("failed to start server")?;
+
+    // Reached when the serve loop is asked to stop, which it is by SIGINT or
+    // SIGTERM and by nothing else, and only once the in-flight requests have
+    // drained. Said out loud because the alternative is what it used to be: a
+    // process that exits 0 having logged nothing at all since startup, which
+    // to whoever restarted it is indistinguishable from a crash.
+    event!(
+        Level::INFO,
+        "Stopped trivy-web, asked to shut down by a signal"
+    );
 
     Ok(())
 }
