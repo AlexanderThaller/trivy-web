@@ -37,7 +37,7 @@ spec:
               memory: 2Gi
           volumeMounts:
             - name: cache
-              mountPath: /.cache
+              mountPath: /var/cache/trivy-web
         - name: jaeger
           image: jaegertracing/all-in-one:1.59.0
           ports:

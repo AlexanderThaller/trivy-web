@@ -219,6 +219,7 @@ async fn trivy_scan(
 
             limits: &state.limits,
             registry_rate_limit: &state.registry_rate_limit,
+            scanner_cache: &state.scanner_cache,
         }
         .cache_or_fetch(&state.cache, &state.registry_rate_limit)
         .await
@@ -246,6 +247,7 @@ async fn grype_scan(
 
             limits: &state.limits,
             registry_rate_limit: &state.registry_rate_limit,
+            scanner_cache: &state.scanner_cache,
         }
         .cache_or_fetch(&state.cache, &state.registry_rate_limit)
         .await

@@ -39,6 +39,7 @@ use crate::handler::{
     grype,
     process::Limits,
     registry::RateLimit,
+    scanner_cache::ScannerCache,
     syft,
     trivy::{
         self,
@@ -309,6 +310,7 @@ pub(crate) struct TrivyInformationFetcher<'a> {
     pub(crate) trivy_password: Option<&'a str>,
     pub(crate) limits: &'a Limits,
     pub(crate) registry_rate_limit: &'a RateLimit,
+    pub(crate) scanner_cache: &'a ScannerCache,
 }
 
 /// Hand written so the submitted credentials never reach a log or a trace:
@@ -365,6 +367,7 @@ impl Fetch for TrivyInformationFetcher<'_> {
             self.trivy_password,
             self.limits,
             self.registry_rate_limit,
+            self.scanner_cache,
         )
         .await?;
 
@@ -396,6 +399,7 @@ pub(crate) struct SyftInformationFetcher<'a> {
     pub(crate) password: Option<&'a str>,
     pub(crate) limits: &'a Limits,
     pub(crate) registry_rate_limit: &'a RateLimit,
+    pub(crate) scanner_cache: &'a ScannerCache,
 }
 
 /// A second opinion on the vulnerabilities, from grype.
@@ -405,6 +409,7 @@ pub(crate) struct GrypeInformationFetcher<'a> {
     pub(crate) password: Option<&'a str>,
     pub(crate) limits: &'a Limits,
     pub(crate) registry_rate_limit: &'a RateLimit,
+    pub(crate) scanner_cache: &'a ScannerCache,
 }
 
 /// Hand written for the same reason [`TrivyInformationFetcher`]'s is: the
@@ -457,6 +462,7 @@ impl Fetch for SyftInformationFetcher<'_> {
             self.password,
             self.limits,
             self.registry_rate_limit,
+            self.scanner_cache,
         )
         .await?;
 
@@ -490,6 +496,7 @@ impl Fetch for GrypeInformationFetcher<'_> {
             self.password,
             self.limits,
             self.registry_rate_limit,
+            self.scanner_cache,
         )
         .await?;
 
@@ -752,6 +759,11 @@ mod tests {
     static REGISTRY_RATE_LIMIT: LazyLock<RateLimit> =
         LazyLock::new(|| RateLimit::new(None, NonZeroU32::new(60).unwrap()));
 
+    /// These tests are about keys and cacheability and never run a scanner, so
+    /// wherever the cache lands is beside the point.
+    static SCANNER_CACHE: LazyLock<super::ScannerCache> =
+        LazyLock::new(|| super::ScannerCache::new(None).unwrap());
+
     fn fetcher<'a>(
         image: &'a docker_registry_client::Image,
         credentials: Option<(&'a str, &'a str)>,
@@ -763,6 +775,7 @@ mod tests {
             trivy_password: credentials.map(|(_, password)| password),
             limits: &LIMITS,
             registry_rate_limit: &REGISTRY_RATE_LIMIT,
+            scanner_cache: &SCANNER_CACHE,
         }
     }
 

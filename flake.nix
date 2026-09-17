@@ -204,8 +204,14 @@
         # buildLayeredImage does not create /tmp on its own. syft and grype
         # want one too -- both stage the image layers they pull through it,
         # and grype unpacks its vulnerability database there.
+        #
+        # /var/cache/trivy-web is where the three scanners keep what they
+        # download (TRIVY_WEB_CACHE_DIR below). Worth a volume: grype's
+        # vulnerability database is a few hundred megabytes, and without one it
+        # is refetched every time the container is replaced.
         extraCommands = ''
           mkdir -m 1777 -p tmp
+          mkdir -m 0777 -p var/cache/trivy-web
         '';
 
         config = {
@@ -213,7 +219,15 @@
           ExposedPorts = {
             "16223/tcp" = { };
           };
-          Env = [ "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt" ];
+          Env = [
+            "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+
+            # Named rather than left to the defaults: there is no $HOME in
+            # this image, so without it the scanners would fall back to a
+            # directory under /tmp and there would be nothing for a volume to
+            # be mounted at.
+            "TRIVY_WEB_CACHE_DIR=/var/cache/trivy-web"
+          ];
         };
       };
     in

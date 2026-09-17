@@ -149,6 +149,7 @@ async fn generated_sbom(
 
             limits: &state.limits,
             registry_rate_limit: &state.registry_rate_limit,
+            scanner_cache: &state.scanner_cache,
         }
         .cache_or_fetch(&state.cache, &state.registry_rate_limit)
         .await

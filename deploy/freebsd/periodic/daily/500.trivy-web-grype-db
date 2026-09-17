@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# Refresh the grype vulnerability database out of band.
+#
+# Install as /usr/local/etc/periodic/daily/500.trivy-web-grype-db, chmod 555,
+# and enable it in /etc/periodic.conf:
+#
+#	daily_trivy_web_grype_db_enable="YES"
+#
+# grype updates the database itself, on the first scan after the one it has
+# goes stale -- which means one scan a day pays for a few hundred megabytes of
+# download while somebody waits for a page. This moves that to the middle of
+# the night, the same way deploy/trivy-db-update.timer does for trivy.
+#
+# It has to run as the user trivy-web runs as, because the point is to fill the
+# cache that user reads. Running it as root would leave root-owned files in
+# there and break the scans it was meant to speed up.
+
+# If there is a global system configuration file, suck it in.
+if [ -r /etc/defaults/periodic.conf ]; then
+	. /etc/defaults/periodic.conf
+	source_periodic_confs
+fi
+
+: ${daily_trivy_web_grype_db_enable:="NO"}
+: ${daily_trivy_web_grype_db_user:="www"}
+: ${daily_trivy_web_grype_db_cachedir:="/var/cache/trivy-web"}
+
+case "$daily_trivy_web_grype_db_enable" in
+[Yy][Ee][Ss])
+	echo
+	echo 'Updating the grype vulnerability database:'
+
+	# The database directory, not the cache root: GRYPE_DB_CACHE_DIR names
+	# the one grype keeps the database in, and trivy-web puts it under
+	# <cachedir>/grype/db.
+	db="${daily_trivy_web_grype_db_cachedir}/grype/db"
+
+	if ! install -d -o "${daily_trivy_web_grype_db_user}" -m 0750 "${db}"; then
+		echo "failed to create ${db}"
+		rc=3
+	else
+		# su -m keeps the invoking shell rather than the target user's,
+		# which matters here: www's shell is /usr/sbin/nologin.
+		su -m "${daily_trivy_web_grype_db_user}" -c \
+		    "env GRYPE_DB_CACHE_DIR='${db}' grype db update"
+		rc=$?
+	fi
+	;;
+
+*)
+	rc=0
+	;;
+esac
+
+exit $rc

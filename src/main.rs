@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use docker_registry_client::Client as DockerRegistryClient;
 use eyre::{
@@ -115,6 +117,8 @@ async fn main() -> Result<()> {
     let registry_rate_limit =
         handler::RateLimit::new(redis_client.clone(), opt.registry_requests_per_minute);
 
+    let scanner_cache = scanner_cache(opt.cache_dir)?;
+
     event!(
         Level::INFO,
         scanners = opt
@@ -133,6 +137,7 @@ async fn main() -> Result<()> {
         // Waiting for a fetch that is already running is bounded by how long
         // that fetch can take, which is what the scan limits say.
         cache: handler::Cache::new(redis_client, limits.max_duration()),
+        scanner_cache,
         limits,
         registry_rate_limit,
         // Fetched lazily, on the first keyless verification this instance
@@ -165,6 +170,29 @@ async fn main() -> Result<()> {
         .context("failed to start server")?;
 
     Ok(())
+}
+
+/// Prepares the directory the scanner child processes cache in, and says which
+/// one it turned out to be.
+///
+/// Before the listener rather than on the first scan: a deployment whose
+/// scanners have nowhere to keep grype's vulnerability database is one where
+/// every scan refetches it, and that is worth failing a startup over rather
+/// than finding out per request. Which directory it is gets logged because
+/// without `--cache-dir` it is the first of several that could be created, and
+/// a deployment that means to give the cache a disk wants to see whether it
+/// did.
+fn scanner_cache(cache_dir: Option<PathBuf>) -> Result<handler::ScannerCache> {
+    let scanner_cache = handler::ScannerCache::new(cache_dir)
+        .context("failed to prepare the directory the scanners cache in")?;
+
+    event!(
+        Level::INFO,
+        cache_dir = scanner_cache.root().display().to_string(),
+        "Caching what the scanners download"
+    );
+
+    Ok(scanner_cache)
 }
 
 /// Formats a url for logging with any embedded credentials removed.

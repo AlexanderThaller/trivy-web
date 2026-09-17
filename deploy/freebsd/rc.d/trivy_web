@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# PROVIDE: trivy_web
+# REQUIRE: LOGIN NETWORKING
+# KEYWORD: shutdown
+#
+# Install as /usr/local/etc/rc.d/trivy_web, chmod 555.
+#
+# Add the following lines to /etc/rc.conf to enable trivy-web:
+#
+# trivy_web_enable (bool):	Set to NO by default. Set to YES to enable.
+# trivy_web_user (str):		User to run as. Default "www". Read by
+#				rc.subr(8) itself, which is what drops to it.
+# trivy_web_cachedir (str):	Where the scanners keep what they download.
+#				Default "/var/cache/trivy-web". Created here,
+#				owned by trivy_web_user, and handed to
+#				trivy-web as TRIVY_WEB_CACHE_DIR.
+#
+#				This is the one setting a FreeBSD deployment
+#				cannot do without: www is given /nonexistent
+#				as its home, so with nothing said about it
+#				grype has nowhere to keep its vulnerability
+#				database and refetches a few hundred megabytes
+#				of it on every scan.
+# trivy_web_logfile (str):	Where stdout and stderr go. Default
+#				"/var/log/trivy-web.log".
+# trivy_web_args (str):		Flags to pass. Default "". See trivy-web --help.
+# trivy_web_env (str):		Environment for the process, e.g.
+#				"TRIVY_REDIS_SERVER=redis://127.0.0.1:6379".
+#				Default "".
+
+. /etc/rc.subr
+
+name="trivy_web"
+rcvar="trivy_web_enable"
+desc="Webinterface for the trivy image scanner"
+
+load_rc_config $name
+
+: ${trivy_web_enable:="NO"}
+: ${trivy_web_user:="www"}
+: ${trivy_web_group:="www"}
+: ${trivy_web_cachedir:="/var/cache/trivy-web"}
+: ${trivy_web_logfile:="/var/log/trivy-web.log"}
+: ${trivy_web_args:=""}
+
+# Under a directory of its own because the process writing it has already been
+# dropped to trivy_web_user by the time it gets there, and /var/run belongs to
+# root.
+pidfile="/var/run/${name}/${name}.pid"
+procname="/usr/local/bin/trivy-web"
+
+# daemon(8) rather than the binary directly: trivy-web stays in the foreground,
+# and this is what backgrounds it and writes the pidfile. Dropping privileges
+# is left to rc.subr, which does it for ${name}_user on its own -- doing it
+# here as well would have daemon(8) try to setuid as a user that cannot.
+command="/usr/sbin/daemon"
+command_args="-p ${pidfile} -t ${desc} -o ${trivy_web_logfile} \
+    -- ${procname} ${trivy_web_args}"
+
+start_precmd="trivy_web_precmd"
+
+trivy_web_precmd()
+{
+	# Owned by the user that has to write it, not by root: a directory root
+	# made is one every scan then fails to write to, and trivy-web refuses
+	# to start rather than discovering that per request.
+	install -d -o "${trivy_web_user}" -g "${trivy_web_group}" -m 0750 \
+	    "${trivy_web_cachedir}" || return 1
+
+	install -d -o "${trivy_web_user}" -g "${trivy_web_group}" -m 0755 \
+	    "${pidfile%/*}" || return 1
+
+	# Only when it is not there yet: daemon(8) appends, and a restart has no
+	# business throwing the log away.
+	[ -e "${trivy_web_logfile}" ] || install -o "${trivy_web_user}" \
+	    -g "${trivy_web_group}" -m 0640 /dev/null "${trivy_web_logfile}"
+
+	# Exported rather than passed as a flag so that trivy_web_args stays
+	# the operator's alone, and because the periodic(8) job that refreshes
+	# grype's database is pointed at the same directory by the same name.
+	# rc.subr runs the command with the environment inherited, so this
+	# reaches trivy-web; ${name}_env is still the operator's to add to.
+	export TRIVY_WEB_CACHE_DIR="${trivy_web_cachedir}"
+}
+
+run_rc_command "$1"

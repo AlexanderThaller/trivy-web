@@ -128,7 +128,77 @@ one slot per scanner it runs.
 |`TRIVY_WEB_REGISTRY_REQUESTS_PER_MINUTE`
 |How often a single registry may be reached out to per minute (default
 `60`), counted per registry across every instance sharing a redis server.
+
+|`--cache-dir`
+|`TRIVY_WEB_CACHE_DIR`
+|Where the scanners keep what they download -- grype's vulnerability
+database above all. See below.
 |===
+
+=== The scanner cache
+
+grype's vulnerability database is a few hundred megabytes, and the
+default place to keep it is `~/.cache/grype/db`. A service account has
+no home worth the name -- FreeBSD gives `www` `/nonexistent`, and the
+published image has no `$HOME` at all -- so left to itself grype has
+nowhere to put the database and fetches the whole thing again on every
+single scan. trivy (`~/.cache/trivy`) and syft (`~/.cache/syft`) have
+the same problem, more cheaply.
+
+`--cache-dir` names one directory for all three; trivy-web creates it,
+checks at startup that it can actually be written to, and points each
+scanner at a subdirectory of it (`GRYPE_DB_CACHE_DIR`,
+`TRIVY_CACHE_DIR`, `SYFT_CACHE_DIR`). A directory that was asked for and
+cannot be used fails startup rather than being quietly swapped for
+somewhere the cache would not survive.
+
+Unset, it is the first of `$XDG_CACHE_HOME/trivy-web`,
+`$HOME/.cache/trivy-web` and a directory under the temporary directory
+that can be created -- fine for `just dev`, and the reason a process
+with no usable home still caches for as long as it is up. Which one it
+ended up with is logged at startup. A deployment should name one.
+
+The published image sets it to `/var/cache/trivy-web`, which is worth a
+volume:
+
+[source,shell]
+----
+docker run -p 16223:16223 \
+  -v trivy-web-cache:/var/cache/trivy-web \
+  ghcr.io/alexanderthaller/trivy-web:latest
+----
+
+==== FreeBSD
+
+`deploy/freebsd/` has an `rc.d` script that runs the service as `www`
+and a `periodic` job that keeps grype's database current:
+
+[source,shell]
+----
+install -m 555 deploy/freebsd/rc.d/trivy_web /usr/local/etc/rc.d/
+install -m 555 deploy/freebsd/periodic/daily/500.trivy-web-grype-db \
+  /usr/local/etc/periodic/daily/
+----
+
+[source,shell]
+----
+# /etc/rc.conf
+trivy_web_enable="YES"
+trivy_web_cachedir="/var/cache/trivy-web"    # the default; created for www
+trivy_web_env="TRIVY_REDIS_SERVER=redis://127.0.0.1:6379"
+
+# /etc/periodic.conf
+daily_trivy_web_grype_db_enable="YES"
+----
+
+The `rc.d` script creates the cache directory owned by `www` before
+starting -- one created by root is one every scan then fails to write
+to. The `periodic` job runs `grype db update` as `www` against the same
+directory, so that the daily refresh happens overnight rather than
+inside whichever scan first finds the database stale. It is the same
+idea as `deploy/trivy-db-update.timer`, which does it for trivy under
+systemd; the trivy equivalent on FreeBSD is
+`su -m www -c "env TRIVY_CACHE_DIR=/var/cache/trivy-web/trivy trivy image --download-db-only"`.
 
 == Development
 

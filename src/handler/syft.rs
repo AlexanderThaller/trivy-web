@@ -29,6 +29,7 @@ use tracing::{
 use super::{
     process::Limits,
     registry::RateLimit,
+    scanner_cache::ScannerCache,
 };
 
 /// What the card shows, which is what is kept.
@@ -169,6 +170,7 @@ pub(crate) async fn scan_image(
     password: Option<&str>,
     limits: &Limits,
     registry_rate_limit: &RateLimit,
+    scanner_cache: &ScannerCache,
 ) -> Result<Syft> {
     let mut command = Command::new("syft");
 
@@ -180,7 +182,10 @@ pub(crate) async fn scan_image(
         .arg(format!("registry:{image}"))
         .arg("--output")
         .arg("syft-json")
-        .arg("--quiet");
+        .arg("--quiet")
+        // Rather than syft's own `~/.cache/syft`, which a service account does
+        // not have. See [`ScannerCache`].
+        .env("SYFT_CACHE_DIR", scanner_cache.syft());
 
     let command = if let Some(username) = username
         && let Some(password) = password
