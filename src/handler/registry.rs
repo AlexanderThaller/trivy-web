@@ -57,6 +57,13 @@ const WINDOW_SECONDS: i64 = 60;
 /// window number comes round, which it does not within a lifetime.
 const KEY_TTL_SECONDS: i64 = WINDOW_SECONDS * 2;
 
+/// Size the local count has to reach before the registries that were last
+/// counted in an earlier window are swept out of it.
+///
+/// Only a cleanup: an entry of a past window is reset the next time its
+/// registry is counted either way, so sweeping it changes no count.
+const LOCAL_PRUNE_AT: usize = 1024;
+
 /// The rate at which the registries hear from this deployment.
 #[derive(Clone)]
 pub(crate) struct RateLimit {
@@ -69,9 +76,9 @@ pub(crate) struct RateLimit {
     ///
     /// One entry per registry rather than per registry and window: the entry
     /// carries the window it counts and is reset when a request arrives in a
-    /// later one. [`Registry`](docker_registry_client::Registry) is a closed
-    /// set of seven, so this holds seven entries at the most and needs no
-    /// pruning.
+    /// later one. The registry is whatever host the scanned reference names,
+    /// so the entries of past windows are swept out once there are
+    /// [`LOCAL_PRUNE_AT`] of them.
     local: Arc<Mutex<HashMap<String, Count>>>,
 
     requests_per_minute: NonZeroU32,
@@ -132,6 +139,10 @@ impl RateLimit {
             // ever read from and written to while the lock is held.
             Err(poisoned) => poisoned.into_inner(),
         };
+
+        if local.len() >= LOCAL_PRUNE_AT {
+            local.retain(|_registry, count| count.window == window);
+        }
 
         let count = local.entry(registry.to_owned()).or_insert(Count {
             window,
@@ -281,6 +292,34 @@ mod tests {
             .claim_at("ghcr.io", at(WINDOW_SECONDS))
             .await
             .unwrap();
+    }
+
+    /// The registry is whatever host a visitor typed, so the count cannot
+    /// keep an entry for every one of them forever -- but sweeping must not
+    /// forget what the current window has already spent.
+    #[tokio::test]
+    async fn past_windows_are_swept_without_losing_the_current_one() {
+        let rate_limit = rate_limit(1);
+
+        for registry in 0..super::LOCAL_PRUNE_AT {
+            rate_limit
+                .claim_at(&format!("registry-{registry}.example.com"), at(0))
+                .await
+                .unwrap();
+        }
+
+        rate_limit
+            .claim_at("ghcr.io", at(WINDOW_SECONDS))
+            .await
+            .unwrap();
+
+        assert_eq!(1, rate_limit.local.lock().unwrap().len());
+        assert!(
+            rate_limit
+                .claim_at("ghcr.io", at(WINDOW_SECONDS))
+                .await
+                .is_err()
+        );
     }
 
     /// What the redis is for: two instances of this service draw from one
