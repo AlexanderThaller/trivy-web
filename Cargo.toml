@@ -57,6 +57,10 @@ mimalloc = { version = "0.1" }
 # Already in the tree through `sigstore`, which verifies signatures with it,
 # so this is the same client rather than a second one; `rustls-tls` for the
 # same reason sigstore gets it.
+# The registry credentials a scan is submitted with, from the form to the
+# registry client: redacted in every `Debug` they pass through, and zeroed
+# when they are dropped.
+secrecy = { version = "0.10", features = ["serde"] }
 oci-client = { version = "0.17", default-features = false, features = [
   "rustls-tls",
 ] }

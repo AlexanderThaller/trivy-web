@@ -79,9 +79,23 @@ pub(crate) struct RateLimit {
     /// later one. The registry is whatever host the scanned reference names,
     /// so the entries of past windows are swept out once there are
     /// [`LOCAL_PRUNE_AT`] of them.
-    local: Arc<Mutex<HashMap<String, Count>>>,
+    local: Arc<Mutex<LocalCount>>,
 
     requests_per_minute: NonZeroU32,
+}
+
+/// The count kept without redis, and when it was last swept.
+#[derive(Default)]
+struct LocalCount {
+    counts: HashMap<String, Count>,
+
+    /// The window the entries of earlier ones were last swept out in.
+    ///
+    /// A sweep leaves only the current window's entries, so a second one in
+    /// the same window would find nothing to remove: remembering this is what
+    /// keeps a window with more than [`LOCAL_PRUNE_AT`] registries of its own
+    /// from scanning the whole map on every request.
+    swept: Option<i64>,
 }
 
 /// What one registry was sent in one window.
@@ -140,11 +154,14 @@ impl RateLimit {
             Err(poisoned) => poisoned.into_inner(),
         };
 
-        if local.len() >= LOCAL_PRUNE_AT {
-            local.retain(|_registry, count| count.window == window);
+        if local.counts.len() >= LOCAL_PRUNE_AT && local.swept != Some(window) {
+            local
+                .counts
+                .retain(|_registry, count| count.window == window);
+            local.swept = Some(window);
         }
 
-        let count = local.entry(registry.to_owned()).or_insert(Count {
+        let count = local.counts.entry(registry.to_owned()).or_insert(Count {
             window,
             requests: 0,
         });
@@ -313,7 +330,13 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(1, rate_limit.local.lock().unwrap().len());
+        {
+            let local = rate_limit.local.lock().unwrap();
+
+            assert_eq!(1, local.counts.len());
+            assert_eq!(Some(1), local.swept);
+        }
+
         assert!(
             rate_limit
                 .claim_at("ghcr.io", at(WINDOW_SECONDS))

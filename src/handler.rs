@@ -1,5 +1,9 @@
 use std::sync::LazyLock;
 
+use secrecy::{
+    ExposeSecret,
+    SecretString,
+};
 use serde::Deserialize;
 use topcoat::{
     Result,
@@ -137,9 +141,9 @@ pub(crate) struct ScanForm {
     #[serde(default)]
     image: String,
     #[serde(default)]
-    username: Secret,
+    username: SecretString,
     #[serde(default)]
-    password: Secret,
+    password: SecretString,
     #[serde(default)]
     cosign_key: String,
 }
@@ -148,9 +152,6 @@ pub(crate) struct ScanForm {
 pub(crate) struct IndexQuery {
     image: Option<String>,
 }
-
-#[derive(Default, Deserialize)]
-struct Secret(String);
 
 /// The scanner.
 ///
@@ -216,8 +217,8 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
                     image_information(
                         image: &image,
                         cosign_key: &form.cosign_key,
-                        username: &form.username.0,
-                        password: &form.password.0,
+                        username: form.username.expose_secret(),
+                        password: form.password.expose_secret(),
                     )
                 )
             </div>
@@ -237,8 +238,8 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
                         },
                         vulnerabilities(
                             image: &image,
-                            username: &form.username.0,
-                            password: &form.password.0,
+                            username: form.username.expose_secret(),
+                            password: form.password.expose_secret(),
                         )
                     )
                 </div>
@@ -253,8 +254,8 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
                     fallback: view! { loading_card(title: "SBOM") },
                     sbom_information(
                         image: &image,
-                        username: &form.username.0,
-                        password: &form.password.0,
+                        username: form.username.expose_secret(),
+                        password: form.password.expose_secret(),
                     )
                 )
             </div>
@@ -484,7 +485,9 @@ pub(crate) async fn site_webmanifest() -> Result<impl topcoat::router::response:
 impl ScanForm {
     /// Whether this scan carries anything that must not end up in the URL.
     fn has_credentials(&self) -> bool {
-        !self.username.0.is_empty() || !self.password.0.is_empty() || !self.cosign_key.is_empty()
+        !self.username.expose_secret().is_empty()
+            || !self.password.expose_secret().is_empty()
+            || !self.cosign_key.is_empty()
     }
 }
 
@@ -522,19 +525,14 @@ impl std::fmt::Debug for AppState {
     }
 }
 
-impl std::fmt::Debug for Secret {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("REDACTED")
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
 
+    use secrecy::SecretString;
+
     use super::{
         ScanForm,
-        Secret,
         urlencode,
     };
 
@@ -568,11 +566,11 @@ mod tests {
     fn any_secret_keeps_the_scan_on_the_post() {
         for form in [
             ScanForm {
-                username: Secret("user".to_owned()),
+                username: SecretString::from("user"),
                 ..ScanForm::default()
             },
             ScanForm {
-                password: Secret("hunter2".to_owned()),
+                password: SecretString::from("hunter2"),
                 ..ScanForm::default()
             },
             ScanForm {

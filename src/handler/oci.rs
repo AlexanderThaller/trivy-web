@@ -15,7 +15,15 @@
 //! reports in one of three shapes. [`RegistryClient::manifest_if_exists`]
 //! turns them back into `None`.
 
-use std::time::Duration;
+use std::{
+    io,
+    pin::Pin,
+    task::{
+        Context as TaskContext,
+        Poll,
+    },
+    time::Duration,
+};
 
 use eyre::{
     Context,
@@ -35,6 +43,10 @@ use oci_client::{
     },
     secrets::RegistryAuth,
 };
+use secrecy::{
+    ExposeSecret,
+    SecretString,
+};
 use serde::{
     Deserialize,
     Serialize,
@@ -43,6 +55,13 @@ use tracing::{
     Instrument,
     info_span,
 };
+
+/// How large a blob may be to be read into memory.
+///
+/// Blobs are only read for what is attached to an image -- SBOMs and
+/// attestations -- never for its layers. The largest real SBOMs are tens of
+/// megabytes; anything past this is not one worth holding whole.
+const MAX_BLOB_BYTES: i64 = 64 * 1024 * 1024;
 
 /// How long connecting to a registry may take.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -56,12 +75,12 @@ const READ_TIMEOUT: Duration = Duration::from_secs(30);
 /// A username and password to pull with, for a registry that does not let
 /// everyone pull.
 ///
-/// `Debug` shows the username only, so everything carrying these can be
-/// logged and traced like everything that does not.
-#[derive(Clone, PartialEq, Eq)]
+/// Both halves are [`SecretString`]s, so `Debug` shows neither and everything
+/// carrying these can be logged and traced like everything that does not.
+#[derive(Clone, Debug)]
 pub(crate) struct Credentials {
-    username: String,
-    password: String,
+    username: SecretString,
+    password: SecretString,
 }
 
 impl Credentials {
@@ -72,26 +91,19 @@ impl Credentials {
     /// with.
     pub(crate) fn from_form(username: &str, password: &str) -> Option<Self> {
         (!username.is_empty() && !password.is_empty()).then(|| Self {
-            username: username.to_owned(),
-            password: password.to_owned(),
+            username: SecretString::from(username),
+            password: SecretString::from(password),
         })
     }
 
+    /// For handing the username to a client that needs it in the clear.
     pub(crate) fn username(&self) -> &str {
-        &self.username
+        self.username.expose_secret()
     }
 
+    /// For handing the password to a client that needs it in the clear.
     pub(crate) fn password(&self) -> &str {
-        &self.password
-    }
-}
-
-impl std::fmt::Debug for Credentials {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Credentials")
-            .field("username", &self.username)
-            .field("password", &"REDACTED")
-            .finish()
+        self.password.expose_secret()
     }
 }
 
@@ -140,7 +152,10 @@ impl RegistryClient {
     pub(crate) fn with_credentials(credentials: &Credentials) -> Self {
         Self {
             client: new_client(),
-            auth: RegistryAuth::Basic(credentials.username.clone(), credentials.password.clone()),
+            auth: RegistryAuth::Basic(
+                credentials.username().to_owned(),
+                credentials.password().to_owned(),
+            ),
         }
     }
 
@@ -180,13 +195,29 @@ impl RegistryClient {
     /// The content of the blob `descriptor` describes, from the repository of
     /// `image`.
     ///
-    /// Read whole into memory, so callers that care about size check the
-    /// descriptor's before asking. The digest is checked against the content
-    /// by the client.
+    /// Read whole into memory, so it is bounded twice: the size the
+    /// descriptor declares has to be at most [`MAX_BLOB_BYTES`], and the
+    /// registry is not read past that declared size, whatever it sends. The
+    /// digest is checked against the content by the client.
     pub(crate) async fn blob(&self, image: &Image, descriptor: &OciDescriptor) -> Result<Vec<u8>> {
+        let limit = usize::try_from(descriptor.size)
+            .ok()
+            .filter(|_| descriptor.size <= MAX_BLOB_BYTES)
+            .ok_or_else(|| {
+                eyre::eyre!(
+                    "the blob {digest} is declared as {size} bytes, which is not between 0 and \
+                     the {MAX_BLOB_BYTES} bytes read into memory here",
+                    digest = descriptor.digest,
+                    size = descriptor.size,
+                )
+            })?;
+
         self.authorize(image).await;
 
-        let mut blob = Vec::new();
+        let mut blob = Bounded {
+            blob: Vec::with_capacity(limit),
+            limit,
+        };
 
         self.client
             .pull_blob(image, descriptor, &mut blob)
@@ -194,7 +225,7 @@ impl RegistryClient {
             .await
             .with_context(|| format!("failed to get the blob {}", descriptor.digest))?;
 
-        Ok(blob)
+        Ok(blob.blob)
     }
 
     /// What refers to `digest` in the repository of `image`.
@@ -223,6 +254,42 @@ impl RegistryClient {
         self.client
             .store_auth_if_needed(image.resolve_registry(), &self.auth)
             .await;
+    }
+}
+
+/// Where [`RegistryClient::blob`] reads a blob into: a buffer that refuses to
+/// grow past the size the blob was declared as.
+struct Bounded {
+    blob: Vec<u8>,
+    limit: usize,
+}
+
+impl tokio::io::AsyncWrite for Bounded {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut TaskContext<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let this = self.get_mut();
+
+        if this.blob.len() + buf.len() > this.limit {
+            return Poll::Ready(Err(io::Error::other(format!(
+                "the registry sent more than the {limit} bytes the blob was declared as",
+                limit = this.limit,
+            ))));
+        }
+
+        this.blob.extend_from_slice(buf);
+
+        Poll::Ready(Ok(buf.len()))
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 }
 
@@ -299,6 +366,40 @@ mod tests {
         registry_domain,
     };
 
+    /// A registry that sends more than it declared is cut off rather than
+    /// read to the end.
+    #[tokio::test]
+    async fn a_blob_is_not_read_past_its_declared_size() {
+        use tokio::io::AsyncWriteExt as _;
+
+        let mut blob = super::Bounded {
+            blob: Vec::new(),
+            limit: 4,
+        };
+
+        blob.write_all(b"1234").await.unwrap();
+        assert!(blob.write_all(b"5").await.is_err());
+        assert_eq!(b"1234".as_slice(), blob.blob.as_slice());
+    }
+
+    #[tokio::test]
+    async fn a_blob_declared_too_large_or_negative_is_not_asked_for() {
+        let client = RegistryClient::default();
+        let image: Image = "registry.invalid/foo/bar:1".parse().unwrap();
+
+        for size in [-1, super::MAX_BLOB_BYTES + 1] {
+            let descriptor = oci_client::manifest::OciDescriptor {
+                digest: "sha256:c0ffee".to_owned(),
+                size,
+                ..Default::default()
+            };
+
+            let err = client.blob(&image, &descriptor).await.unwrap_err();
+
+            assert!(err.to_string().contains("is declared as"), "{err}");
+        }
+    }
+
     #[test]
     fn credentials_need_both_halves() {
         assert!(Credentials::from_form("", "").is_none());
@@ -308,11 +409,12 @@ mod tests {
     }
 
     #[test]
-    fn debug_redacts_the_password() {
-        let credentials = Credentials::from_form("user", "hunter2").unwrap();
+    fn debug_redacts_the_credentials() {
+        let credentials = Credentials::from_form("scanbot", "hunter2").unwrap();
         let client = RegistryClient::with_credentials(&credentials);
 
         for debug in [format!("{credentials:?}"), format!("{client:?}")] {
+            assert!(!debug.contains("scanbot"), "{debug}");
             assert!(!debug.contains("hunter2"), "{debug}");
         }
     }
