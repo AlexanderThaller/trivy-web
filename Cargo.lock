@@ -1047,25 +1047,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "docker-registry-client"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18d53dedec4717e990da30436b4b32bf82d4bc25568f66360f8fc92ac54f845d"
-dependencies = [
- "async-trait",
- "chrono",
- "dyn-clone",
- "either",
- "fred",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3527,6 +3508,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "secrecy"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
+dependencies = [
+ "serde",
+ "zeroize",
+]
+
+[[package]]
 name = "security-framework"
 version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4749,12 +4740,13 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
- "docker-registry-client",
  "eyre",
  "fred",
  "mimalloc",
+ "oci-client",
  "pretty_assertions",
  "reqwest",
+ "secrecy",
  "serde",
  "serde_json",
  "sigstore",

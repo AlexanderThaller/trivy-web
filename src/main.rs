@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use docker_registry_client::Client as DockerRegistryClient;
 use eyre::{
     Context,
     Result,
@@ -102,12 +101,6 @@ async fn run(opt: args::Args) -> Result<()> {
         None
     };
 
-    let mut registry = DockerRegistryClient::default();
-
-    if let Some(redis_client) = &redis_client {
-        registry.set_cache_redis(redis_client.clone());
-    }
-
     let limits = handler::Limits::new(
         opt.max_concurrent_scans,
         opt.scan_queue_timeout(),
@@ -148,7 +141,9 @@ async fn run(opt: args::Args) -> Result<()> {
     let state = handler::AppState {
         server: opt.server,
         scanners: opt.scanners,
-        docker_registry_client: registry,
+        // Anonymous only: a scan that brings credentials gets a client of its
+        // own, see `AppState::registry_client`.
+        registry_client: handler::RegistryClient::default(),
         // Waiting for a fetch that is already running is bounded by how long
         // that fetch can take, which is what the scan limits say.
         cache: handler::Cache::new(redis_client, limits.max_duration()),

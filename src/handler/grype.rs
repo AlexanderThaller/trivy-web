@@ -15,7 +15,6 @@ use chrono::{
     DateTime,
     Utc,
 };
-use docker_registry_client::Image;
 use eyre::{
     Context,
     Result,
@@ -39,6 +38,10 @@ use super::{
         SeverityCount,
         count_severities,
     },
+};
+use crate::handler::oci::{
+    Image,
+    registry_domain,
 };
 
 /// What the card shows, which is what is kept.
@@ -268,16 +271,10 @@ pub(crate) async fn scan_image(
         && let Some(password) = password
     {
         command
-            .env(
-                "GRYPE_REGISTRY_AUTH_AUTHORITY",
-                image.registry.registry_domain(),
-            )
+            .env("GRYPE_REGISTRY_AUTH_AUTHORITY", registry_domain(image))
             .env("GRYPE_REGISTRY_AUTH_USERNAME", username)
             .env("GRYPE_REGISTRY_AUTH_PASSWORD", password)
-            .env(
-                "SYFT_REGISTRY_AUTH_AUTHORITY",
-                image.registry.registry_domain(),
-            )
+            .env("SYFT_REGISTRY_AUTH_AUTHORITY", registry_domain(image))
             .env("SYFT_REGISTRY_AUTH_USERNAME", username)
             .env("SYFT_REGISTRY_AUTH_PASSWORD", password)
     } else {
@@ -287,7 +284,7 @@ pub(crate) async fn scan_image(
     let admitted = limits.admit().await?;
 
     registry_rate_limit
-        .claim(image.registry.registry_domain())
+        .claim(registry_domain(image))
         .await
         .context("not allowed to reach out to the registry")?;
 

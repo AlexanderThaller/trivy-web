@@ -16,7 +16,6 @@ ci = []
 base64 = "0.22"
 chrono = "0.4"
 clap = { version = "4", features = ["derive", "env", "cargo"] }
-docker-registry-client = "0.4.1"
 eyre = "0.6"
 fred = { version = "10", features = ["i-keys"], default-features = false }
 serde_json = "1"
@@ -53,6 +52,18 @@ x509-parser = "0.18"
 # The allocator itself is every target's; see the two target sections at the
 # bottom for why `override` is not.
 mimalloc = { version = "0.1" }
+# Every registry request that is not a scanner's: manifests, blobs and
+# referrers, anonymously or with the credentials a scan was submitted with.
+# Already in the tree through `sigstore`, which verifies signatures with it,
+# so this is the same client rather than a second one; `rustls-tls` for the
+# same reason sigstore gets it.
+# The registry credentials a scan is submitted with, from the form to the
+# registry client: redacted in every `Debug` they pass through, and zeroed
+# when they are dropped.
+secrecy = { version = "0.10", features = ["serde"] }
+oci-client = { version = "0.17", default-features = false, features = [
+  "rustls-tls",
+] }
 
 [build-dependencies]
 chrono = "0.4"

@@ -109,10 +109,9 @@
           );
         };
 
-        # docker-registry-client (and every other non-crates.io dependency
-        # here) is published to a private registry, not crates.io or git --
-        # cargoLock.lockFile vendors it correctly anyway, reading the same
-        # .cargo/config.toml registry replacement Cargo itself does.
+        # Every dependency comes from crates.io, through whatever registry
+        # replacement .cargo/config.toml sets up -- cargoLock.lockFile vendors
+        # them reading the same replacement Cargo itself does.
         cargoLock.lockFile = ./Cargo.lock;
 
         # [profile.deploy] in Cargo.toml: LTO, one codegen unit,

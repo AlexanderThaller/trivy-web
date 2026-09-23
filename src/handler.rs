@@ -1,6 +1,9 @@
 use std::sync::LazyLock;
 
-use docker_registry_client::Client as DockerRegistryClient;
+use secrecy::{
+    ExposeSecret,
+    SecretString,
+};
 use serde::Deserialize;
 use topcoat::{
     Result,
@@ -35,6 +38,7 @@ use tokio::fs::read_to_string;
 
 pub(crate) mod cosign;
 pub(crate) mod grype;
+pub(crate) mod oci;
 mod process;
 mod registry;
 pub(crate) mod response;
@@ -47,6 +51,9 @@ pub(super) use process::Limits;
 pub(super) use registry::RateLimit;
 pub(super) use response::cache::Cache;
 pub(super) use scanner_cache::ScannerCache;
+
+use oci::Credentials;
+pub(super) use oci::RegistryClient;
 
 use crate::{
     args::Scanner,
@@ -64,7 +71,7 @@ use crate::{
 #[derive(Clone)]
 pub(crate) struct AppState {
     pub(crate) server: Option<String>,
-    pub(crate) docker_registry_client: DockerRegistryClient,
+    pub(crate) registry_client: RegistryClient,
     pub(crate) cache: Cache,
 
     /// The ceiling every trivy scan runs under. Scanning starts a child
@@ -104,6 +111,26 @@ pub(crate) fn state(cx: &Cx) -> &AppState {
 pub(crate) struct SubmitFormImage {
     pub(crate) image: String,
     pub(crate) cosign_key: String,
+
+    /// What the manifest, the signatures and the SBOM are pulled with.
+    /// `Debug` shows the username only.
+    pub(crate) credentials: Option<Credentials>,
+}
+
+impl AppState {
+    /// The registry client to pull with: the shared one for an anonymous
+    /// scan, one of its own for a scan that brings credentials.
+    ///
+    /// The one of its own shares nothing with the shared one (see
+    /// [`RegistryClient::with_credentials`]), and everything fetched through
+    /// it stays out of the response cache, because
+    /// [`Fetch::cacheable`](response::cache::Fetch::cacheable) asks the client.
+    pub(crate) fn registry_client(&self, credentials: Option<&Credentials>) -> RegistryClient {
+        match credentials {
+            Some(credentials) => RegistryClient::with_credentials(credentials),
+            None => self.registry_client.clone(),
+        }
+    }
 }
 
 /// A submitted scan.
@@ -114,9 +141,9 @@ pub(crate) struct ScanForm {
     #[serde(default)]
     image: String,
     #[serde(default)]
-    username: Secret,
+    username: SecretString,
     #[serde(default)]
-    password: Secret,
+    password: SecretString,
     #[serde(default)]
     cosign_key: String,
 }
@@ -125,9 +152,6 @@ pub(crate) struct ScanForm {
 pub(crate) struct IndexQuery {
     image: Option<String>,
 }
-
-#[derive(Default, Deserialize)]
-struct Secret(String);
 
 /// The scanner.
 ///
@@ -190,7 +214,12 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
                         loading_card(title: "Image")
                         loading_card(title: "Cosign")
                     },
-                    image_information(image: &image, cosign_key: &form.cosign_key)
+                    image_information(
+                        image: &image,
+                        cosign_key: &form.cosign_key,
+                        username: form.username.expose_secret(),
+                        password: form.password.expose_secret(),
+                    )
                 )
             </div>
 
@@ -209,8 +238,8 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
                         },
                         vulnerabilities(
                             image: &image,
-                            username: &form.username.0,
-                            password: &form.password.0,
+                            username: form.username.expose_secret(),
+                            password: form.password.expose_secret(),
                         )
                     )
                 </div>
@@ -225,8 +254,8 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
                     fallback: view! { loading_card(title: "SBOM") },
                     sbom_information(
                         image: &image,
-                        username: &form.username.0,
-                        password: &form.password.0,
+                        username: form.username.expose_secret(),
+                        password: form.password.expose_secret(),
                     )
                 )
             </div>
@@ -456,7 +485,9 @@ pub(crate) async fn site_webmanifest() -> Result<impl topcoat::router::response:
 impl ScanForm {
     /// Whether this scan carries anything that must not end up in the URL.
     fn has_credentials(&self) -> bool {
-        !self.username.0.is_empty() || !self.password.0.is_empty() || !self.cosign_key.is_empty()
+        !self.username.expose_secret().is_empty()
+            || !self.password.expose_secret().is_empty()
+            || !self.cosign_key.is_empty()
     }
 }
 
@@ -489,14 +520,8 @@ impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppState")
             .field("server", &self.server)
-            .field("docker_registry_client", &self.docker_registry_client)
+            .field("registry_client", &self.registry_client)
             .finish_non_exhaustive()
-    }
-}
-
-impl std::fmt::Debug for Secret {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("REDACTED")
     }
 }
 
@@ -504,9 +529,10 @@ impl std::fmt::Debug for Secret {
 mod tests {
     use pretty_assertions::assert_eq;
 
+    use secrecy::SecretString;
+
     use super::{
         ScanForm,
-        Secret,
         urlencode,
     };
 
@@ -540,11 +566,11 @@ mod tests {
     fn any_secret_keeps_the_scan_on_the_post() {
         for form in [
             ScanForm {
-                username: Secret("user".to_owned()),
+                username: SecretString::from("user"),
                 ..ScanForm::default()
             },
             ScanForm {
-                password: Secret("hunter2".to_owned()),
+                password: SecretString::from("hunter2"),
                 ..ScanForm::default()
             },
             ScanForm {

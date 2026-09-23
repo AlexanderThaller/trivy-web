@@ -12,10 +12,6 @@ use std::{
 };
 
 use chrono::Utc;
-use docker_registry_client::{
-    Client as DockerRegistryClient,
-    Image,
-};
 use eyre::{
     Context,
     Result,
@@ -37,6 +33,12 @@ use tracing::{
 use crate::handler::{
     cosign,
     grype,
+    oci::{
+        Credentials,
+        Image,
+        RegistryClient,
+        registry_domain,
+    },
     process::Limits,
     registry::RateLimit,
     scanner_cache::ScannerCache,
@@ -270,7 +272,7 @@ pub(crate) trait Fetch {
 
 #[derive(Debug)]
 pub(crate) struct DockerInformationFetcher<'a> {
-    pub(crate) docker_registry_client: &'a docker_registry_client::Client,
+    pub(crate) registry_client: &'a RegistryClient,
     pub(crate) image: &'a Image,
 }
 
@@ -278,21 +280,29 @@ impl Fetch for DockerInformationFetcher<'_> {
     type Output = DockerInformation;
 
     fn registry(&self) -> Option<&str> {
-        Some(self.image.registry.registry_domain())
+        Some(registry_domain(self.image))
     }
 
     fn key(&self) -> String {
         format!(
-            "{REDIS_KEY_PREFIX}:docker_manifest:{image}",
+            "{REDIS_KEY_PREFIX}:docker_manifest:v2:{image}",
             image = self.image
         )
     }
 
+    /// A manifest pulled with caller supplied credentials may be one the next
+    /// caller is not allowed to see, for the reasons
+    /// [`TrivyInformationFetcher::cacheable`] gives. The client is what knows
+    /// whether it has any, so it is the client that is asked, here and in the
+    /// three fetchers below that pull through one.
+    fn cacheable(&self) -> bool {
+        !self.registry_client.has_credentials()
+    }
+
     async fn fetch(&self) -> Result<Self::Output> {
         let response = self
-            .docker_registry_client
-            .get_manifest(self.image)
-            .instrument(info_span!("get docker manifest from docker registry"))
+            .registry_client
+            .manifest(self.image)
             .await
             .context("can not get manifest from docker registry")?;
 
@@ -516,7 +526,7 @@ impl Fetch for GrypeInformationFetcher<'_> {
 /// registries can carry a different VEX document under each.
 #[derive(Debug)]
 pub(crate) struct VexInformationFetcher<'a> {
-    pub(crate) docker_registry_client: &'a DockerRegistryClient,
+    pub(crate) registry_client: &'a RegistryClient,
     pub(crate) image: &'a Image,
     pub(crate) digest: &'a str,
 }
@@ -530,21 +540,26 @@ impl Fetch for VexInformationFetcher<'_> {
     /// apiece. The budget bounds how often a registry hears from this
     /// deployment at all, and a lookup is what it hears.
     fn registry(&self) -> Option<&str> {
-        Some(self.image.registry.registry_domain())
+        Some(registry_domain(self.image))
     }
 
     fn key(&self) -> String {
         format!(
             "{REDIS_KEY_PREFIX}:vex:{registry}/{path}@{digest}",
-            registry = self.image.registry.registry_domain(),
-            path = self.image.path(),
+            registry = registry_domain(self.image),
+            path = self.image.repository(),
             digest = self.digest,
         )
     }
 
+    /// See [`DockerInformationFetcher::cacheable`].
+    fn cacheable(&self) -> bool {
+        !self.registry_client.has_credentials()
+    }
+
     async fn fetch(&self) -> Result<Self::Output> {
         let attestations =
-            vex::attestation::attestations(self.docker_registry_client, self.image, self.digest)
+            vex::attestation::attestations(self.registry_client, self.image, self.digest)
                 .instrument(info_span!("get vex attestations"))
                 .await
                 .context("failed to get the vex attestations")?;
@@ -558,7 +573,7 @@ impl Fetch for VexInformationFetcher<'_> {
 
 #[derive(Debug)]
 pub(crate) struct CosignInformationFetcher<'a> {
-    pub(crate) docker_registry_client: &'a DockerRegistryClient,
+    pub(crate) registry_client: &'a RegistryClient,
     pub(crate) image: &'a Image,
     pub(crate) docker_manifest: &'a Result<DockerInformation>,
 }
@@ -567,45 +582,32 @@ impl Fetch for CosignInformationFetcher<'_> {
     type Output = CosignInformation;
 
     /// Only when the fetch below is going to get as far as the registry.
-    /// Without a manifest digest to look the signature up by it gives up
-    /// before it makes a request, and a request that is not made is not
-    /// counted.
+    /// Without a manifest, and so without a digest to look the signature up
+    /// by, it gives up before it makes a request, and a request that is not
+    /// made is not counted.
     fn registry(&self) -> Option<&str> {
-        self.docker_manifest
-            .as_ref()
-            .ok()?
-            .response
-            .digest
-            .as_ref()?;
+        self.docker_manifest.as_ref().ok()?;
 
-        Some(self.image.registry.registry_domain())
+        Some(registry_domain(self.image))
     }
 
     fn key(&self) -> String {
         format!("{REDIS_KEY_PREFIX}:cosign:{}", self.image)
     }
 
+    /// See [`DockerInformationFetcher::cacheable`].
+    fn cacheable(&self) -> bool {
+        !self.registry_client.has_credentials()
+    }
+
     async fn fetch(&self) -> Result<Self::Output> {
-        if self.docker_manifest.is_err() {
+        let Ok(docker_manifest) = self.docker_manifest else {
             return Err(eyre::eyre!("Failed to get docker manifest"));
-        }
+        };
 
-        let docker_manifest = self
-            .docker_manifest
-            .as_ref()
-            .expect("already checked if its an error");
+        let digest = &docker_manifest.response.digest;
 
-        if docker_manifest.response.digest.is_none() {
-            return Err(eyre::eyre!("Missing docker manifest digest"));
-        }
-
-        let digest = docker_manifest
-            .response
-            .digest
-            .as_ref()
-            .expect("already checked if digest is some");
-
-        let cosign = cosign::cosign_manifest(self.docker_registry_client, self.image, digest)
+        let cosign = cosign::cosign_manifest(self.registry_client, self.image, digest)
             .instrument(info_span!("get cosign manifest"))
             .await
             .context("failed to get cosign manifest")?;
@@ -619,7 +621,7 @@ impl Fetch for CosignInformationFetcher<'_> {
 
 #[derive(Debug)]
 pub(crate) struct SbomInformationFetcher<'a> {
-    pub(crate) docker_registry_client: &'a DockerRegistryClient,
+    pub(crate) registry_client: &'a RegistryClient,
     pub(crate) image: &'a Image,
     pub(crate) docker_manifest: &'a Result<DockerInformation>,
 }
@@ -628,44 +630,31 @@ impl Fetch for SbomInformationFetcher<'_> {
     type Output = SbomInformation;
 
     /// Same reasoning as [`CosignInformationFetcher::registry`]: without a
-    /// manifest digest to look the SBOM up by, nothing is sent to the
-    /// registry, so nothing is counted against it either.
+    /// manifest to look the SBOM up by, nothing is sent to the registry, so
+    /// nothing is counted against it either.
     fn registry(&self) -> Option<&str> {
-        self.docker_manifest
-            .as_ref()
-            .ok()?
-            .response
-            .digest
-            .as_ref()?;
+        self.docker_manifest.as_ref().ok()?;
 
-        Some(self.image.registry.registry_domain())
+        Some(registry_domain(self.image))
     }
 
     fn key(&self) -> String {
         format!("{REDIS_KEY_PREFIX}:sbom:{}", self.image)
     }
 
+    /// See [`DockerInformationFetcher::cacheable`].
+    fn cacheable(&self) -> bool {
+        !self.registry_client.has_credentials()
+    }
+
     async fn fetch(&self) -> Result<Self::Output> {
-        if self.docker_manifest.is_err() {
+        let Ok(docker_manifest) = self.docker_manifest else {
             return Err(eyre::eyre!("Failed to get docker manifest"));
-        }
+        };
 
-        let docker_manifest = self
-            .docker_manifest
-            .as_ref()
-            .expect("already checked if its an error");
+        let digest = &docker_manifest.response.digest;
 
-        if docker_manifest.response.digest.is_none() {
-            return Err(eyre::eyre!("Missing docker manifest digest"));
-        }
-
-        let digest = docker_manifest
-            .response
-            .digest
-            .as_ref()
-            .expect("already checked if digest is some");
-
-        let sbom = cosign::sbom_manifest(self.docker_registry_client, self.image, digest)
+        let sbom = cosign::sbom_manifest(self.registry_client, self.image, digest)
             .instrument(info_span!("get sbom manifest"))
             .await
             .context("failed to get sbom manifest")?;
@@ -680,6 +669,10 @@ impl Fetch for SbomInformationFetcher<'_> {
 #[derive(Debug)]
 pub(crate) struct KeylessVerificationFetcher<'a> {
     pub(crate) sigstore_trust_root: &'a cosign::SigstoreTrustRoot,
+
+    /// Handed to sigstore's own registry client, which does not go through
+    /// [`RegistryClient`]. `Debug` shows the username only.
+    pub(crate) credentials: Option<&'a Credentials>,
     pub(crate) image: &'a Image,
     pub(crate) docker_manifest: &'a Result<DockerInformation>,
 }
@@ -691,18 +684,18 @@ impl Fetch for KeylessVerificationFetcher<'_> {
     /// resolved manifest there is no image reference worth asking sigstore
     /// to verify.
     fn registry(&self) -> Option<&str> {
-        self.docker_manifest
-            .as_ref()
-            .ok()?
-            .response
-            .digest
-            .as_ref()?;
+        self.docker_manifest.as_ref().ok()?;
 
-        Some(self.image.registry.registry_domain())
+        Some(registry_domain(self.image))
     }
 
     fn key(&self) -> String {
         format!("{REDIS_KEY_PREFIX}:keyless_verification:{}", self.image)
+    }
+
+    /// See [`DockerInformationFetcher::cacheable`].
+    fn cacheable(&self) -> bool {
+        self.credentials.is_none()
     }
 
     async fn fetch(&self) -> Result<Self::Output> {
@@ -711,7 +704,7 @@ impl Fetch for KeylessVerificationFetcher<'_> {
         }
 
         let keyless_verification =
-            cosign::cosign_keyless_verify(self.sigstore_trust_root, self.image)
+            cosign::cosign_keyless_verify(self.sigstore_trust_root, self.credentials, self.image)
                 .instrument(info_span!("keyless verify"))
                 .await
                 .context("failed to verify keyless signatures")?;
@@ -743,9 +736,15 @@ mod tests {
     use super::{
         Cache,
         CosignInformationFetcher,
+        Credentials,
         DockerInformation,
+        DockerInformationFetcher,
         Fetch,
+        Image,
+        RegistryClient,
+        SbomInformationFetcher,
         TrivyInformationFetcher,
+        VexInformationFetcher,
     };
 
     static LIMITS: LazyLock<Limits> = LazyLock::new(|| {
@@ -765,7 +764,7 @@ mod tests {
         LazyLock::new(|| super::ScannerCache::new(None).unwrap());
 
     fn fetcher<'a>(
-        image: &'a docker_registry_client::Image,
+        image: &'a Image,
         credentials: Option<(&'a str, &'a str)>,
     ) -> TrivyInformationFetcher<'a> {
         TrivyInformationFetcher {
@@ -830,16 +829,56 @@ mod tests {
         let _other = cache.lock_key("trivy-web:trivy:v2:debian").await.unwrap();
     }
 
+    /// Manifests, signatures, attached SBOMs and VEX documents pulled with
+    /// caller supplied credentials stay out of the shared cache, for the same
+    /// reason credentialed scans do.
+    #[test]
+    fn credentialed_registry_fetches_do_not_share_the_cache() {
+        let image: Image = "registry.example.com/private/image:1".parse().unwrap();
+        let anonymous = RegistryClient::default();
+        let credentialed = RegistryClient::with_credentials(
+            &Credentials::from_form("scanbot", "hunter2").unwrap(),
+        );
+        let docker_manifest = Ok(docker_information("sha256:c0ffee"));
+
+        for (client, cacheable) in [(&anonymous, true), (&credentialed, false)] {
+            let manifest = DockerInformationFetcher {
+                registry_client: client,
+                image: &image,
+            };
+            let cosign = CosignInformationFetcher {
+                registry_client: client,
+                image: &image,
+                docker_manifest: &docker_manifest,
+            };
+            let sbom = SbomInformationFetcher {
+                registry_client: client,
+                image: &image,
+                docker_manifest: &docker_manifest,
+            };
+            let vex = VexInformationFetcher {
+                registry_client: client,
+                image: &image,
+                digest: "sha256:c0ffee",
+            };
+
+            assert_eq!(cacheable, manifest.cacheable());
+            assert_eq!(cacheable, cosign.cacheable());
+            assert_eq!(cacheable, sbom.cacheable());
+            assert_eq!(cacheable, vex.cacheable());
+        }
+    }
+
     /// The cosign fetch gives up before it makes a request when there is no
-    /// manifest digest to look a signature up by, and a request that is not
-    /// made is not counted against the registry.
+    /// manifest to look a signature up by, and a request that is not made is
+    /// not counted against the registry.
     #[test]
     fn a_cosign_fetch_that_cannot_reach_the_registry_is_not_counted() {
-        let image: docker_registry_client::Image = "ghcr.io/foo/bar:1".parse().unwrap();
-        let client = docker_registry_client::Client::default();
+        let image: Image = "ghcr.io/foo/bar:1".parse().unwrap();
+        let client = RegistryClient::default();
 
         let fetcher = |docker_manifest| CosignInformationFetcher {
-            docker_registry_client: &client,
+            registry_client: &client,
             image: &image,
             docker_manifest,
         };
@@ -847,11 +886,8 @@ mod tests {
         let failed = Err(eyre::eyre!("no manifest"));
         assert_eq!(None, fetcher(&failed).registry());
 
-        let without_digest = Ok(docker_information(None));
-        assert_eq!(None, fetcher(&without_digest).registry());
-
-        let with_digest = Ok(docker_information(Some("sha256:c0ffee")));
-        assert_eq!(Some("ghcr.io"), fetcher(&with_digest).registry());
+        let manifest = Ok(docker_information("sha256:c0ffee"));
+        assert_eq!(Some("ghcr.io"), fetcher(&manifest).registry());
     }
 
     /// A digest says which manifest, not which registry it was pulled from,
@@ -860,13 +896,13 @@ mod tests {
     /// mirror's VEX statements would answer for the other's.
     #[test]
     fn the_vex_key_is_the_repository_and_the_digest() {
-        let client = docker_registry_client::Client::default();
+        let client = RegistryClient::default();
 
         let key = |image: &str| {
-            let image: docker_registry_client::Image = image.parse().unwrap();
+            let image: Image = image.parse().unwrap();
 
             super::VexInformationFetcher {
-                docker_registry_client: &client,
+                registry_client: &client,
                 image: &image,
                 digest: "sha256:c0ffee",
             }
@@ -881,15 +917,15 @@ mod tests {
     }
 
     /// A manifest as it comes back from a registry, with the digest under test.
-    fn docker_information(digest: Option<&str>) -> DockerInformation {
+    fn docker_information(digest: &str) -> DockerInformation {
         let manifest = serde_json::from_str(include_str!(
             "../resources/tests/trivy-manifest-response.json"
         ))
         .unwrap();
 
         DockerInformation {
-            response: docker_registry_client::Response {
-                digest: digest.map(ToOwned::to_owned),
+            response: crate::handler::oci::Manifest {
+                digest: digest.to_owned(),
                 manifest,
             },
             fetch_time: chrono::Utc::now(),

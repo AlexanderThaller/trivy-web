@@ -11,7 +11,6 @@
 //! worth it for a comparison that is the point of running both, and the VEX
 //! lookup is now done once for the card instead of once per scanner.
 
-use docker_registry_client::Image;
 use eyre::Context;
 use topcoat::{
     Result,
@@ -28,9 +27,11 @@ use crate::{
     args::Scanner,
     handler::{
         AppState,
+        oci::Image,
         response::{
             GrypeInformation,
             TrivyInformation,
+            VexInformation,
             cache::{
                 Fetch,
                 GrypeInformationFetcher,
@@ -102,14 +103,7 @@ pub(crate) async fn vulnerabilities(
     // the two scanners fails or is switched off.
     let scanned = scanned_image(trivy.as_ref(), grype.as_ref());
 
-    let (identifiers, vex) = match scanned {
-        Some((repo_digests, architecture)) => {
-            let (identifiers, vex) = vex_for(state, &image, repo_digests, architecture).await;
-            (identifiers, Some(vex))
-        }
-
-        None => (ImageIdentifiers::default(), None),
-    };
+    let (identifiers, vex) = scanned_vex(state, &image, username, password, scanned).await;
 
     // A VEX lookup that failed is reported in the card below. The findings
     // are then shown as the scanners found them, which is what they are: the
@@ -253,6 +247,28 @@ async fn grype_scan(
         .await
         .context("failed to run grype"),
     )
+}
+
+/// The VEX statements about the image a scanner reported pulling.
+///
+/// `None` when neither scan got far enough to say which image that was: there
+/// is no digest to look the statements up by, which is not a lookup that
+/// failed.
+async fn scanned_vex(
+    state: &AppState,
+    image: &Image,
+    username: &str,
+    password: &str,
+    scanned: Option<(&[String], Option<&str>)>,
+) -> (ImageIdentifiers, Option<eyre::Result<VexInformation>>) {
+    let Some((repo_digests, architecture)) = scanned else {
+        return (ImageIdentifiers::default(), None);
+    };
+
+    let (identifiers, vex) =
+        vex_for(state, image, username, password, repo_digests, architecture).await;
+
+    (identifiers, Some(vex))
 }
 
 /// The repo digests and architecture of the image that was really pulled, out

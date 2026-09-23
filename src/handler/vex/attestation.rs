@@ -9,28 +9,20 @@
 //! the caller should have to know about: [`attestations`] answers with the
 //! documents.
 //!
-//! Neither lookup is authenticated beyond the anonymous pull token the
-//! registry hands out, the same as every other registry lookup this service
-//! makes (see the credentials entry in `TODO.adoc`).
-
-use std::{
-    collections::BTreeMap,
-    time::Duration,
-};
+//! Both lookups go through the scan's [`RegistryClient`], so they pull with
+//! the credentials the scan was submitted with, if it was.
 
 use base64::{
     Engine as _,
     engine::general_purpose::STANDARD as BASE64,
 };
-use docker_registry_client::{
-    Client as DockerRegistryClient,
-    ClientError as DockerClientError,
-    Image,
-    Manifest as DockerManifest,
-};
 use eyre::{
     Context,
     Result,
+};
+use oci_client::manifest::{
+    ImageIndexEntry,
+    OciManifest,
 };
 use serde::{
     Deserialize,
@@ -45,6 +37,13 @@ use tracing::{
 use url::Url;
 
 use super::Document;
+use crate::handler::oci::{
+    Image,
+    RegistryClient,
+    attached,
+    by_digest,
+    registry_domain,
+};
 
 /// The predicate type an `OpenVEX` document is published under.
 ///
@@ -83,11 +82,7 @@ const MAX_ATTESTATIONS: usize = 100;
 /// registry client hands back a whole `Vec<u8>`, so the only place left to
 /// turn down an absurdly large blob is before asking for it. Real `OpenVEX`
 /// documents are kilobytes; 20 MiB is the same ceiling trivy applies.
-const MAX_ATTESTATION_BYTES: u64 = 20 * 1024 * 1024;
-
-/// How long the referrers lookup -- the one request here that does not go
-/// through the registry client -- may take, including the token round trip.
-const REFERRERS_TIMEOUT: Duration = Duration::from_secs(30);
+const MAX_ATTESTATION_BYTES: i64 = 20 * 1024 * 1024;
 
 /// One `OpenVEX` document as it was found on an image.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -143,7 +138,7 @@ impl Source {
 /// the expected case, not an error.
 #[tracing::instrument(skip(client))]
 pub(crate) async fn attestations(
-    client: &DockerRegistryClient,
+    client: &RegistryClient,
     image: &Image,
     digest: &str,
 ) -> Result<Vec<Attestation>> {
@@ -164,18 +159,22 @@ pub(crate) async fn attestations(
 
 /// The `OpenVEX` documents published as OCI 1.1 referrers of `digest`.
 async fn referrer_attestations(
-    client: &DockerRegistryClient,
+    client: &RegistryClient,
     image: &Image,
     digest: &str,
 ) -> Result<Vec<Attestation>> {
-    let descriptors = referrers(image, digest).await?;
+    let descriptors = client
+        .referrers(image, digest)
+        .await
+        .context("failed to get the referrers")?
+        .manifests;
 
     let mut attestations = Vec::new();
 
     for descriptor in candidates(descriptors).into_iter().take(MAX_ATTESTATIONS) {
         let location = manifest_url(image, &descriptor.digest)?;
 
-        match referrer_document(client, image, &location).await {
+        match referrer_document(client, &by_digest(image, &descriptor.digest)).await {
             Ok(Some((predicate_type, document))) => attestations.push(Attestation {
                 source: Source::Referrer,
                 location,
@@ -201,18 +200,17 @@ async fn referrer_attestations(
 
 /// Downloads one referrer and decodes it, if it is an `OpenVEX` attestation.
 async fn referrer_document(
-    client: &DockerRegistryClient,
-    image: &Image,
-    location: &Url,
+    client: &RegistryClient,
+    referrer: &Image,
 ) -> Result<Option<(String, Document)>> {
     let manifest = client
-        .get_manifest_url(location, image)
+        .manifest(referrer)
         .instrument(info_span!("get vex referrer manifest"))
         .await
         .context("failed to get the referrer manifest")?
         .manifest;
 
-    let DockerManifest::Image(manifest) = manifest else {
+    let OciManifest::Image(manifest) = manifest else {
         return Err(eyre::Report::msg(
             "referrer manifest is not a single manifest",
         ));
@@ -234,7 +232,7 @@ async fn referrer_document(
     }
 
     let blob = client
-        .get_blob(image, &layer.digest)
+        .blob(referrer, layer)
         .instrument(info_span!("get vex referrer blob"))
         .await
         .with_context(|| format!("failed to fetch the referrer blob {}", layer.digest))?;
@@ -248,27 +246,24 @@ async fn referrer_document(
 /// `cosign attest` call, so an image may carry an SBOM attestation and a VEX
 /// one as two layers of it.
 async fn tag_attestations(
-    client: &DockerRegistryClient,
+    client: &RegistryClient,
     image: &Image,
     digest: &str,
 ) -> Result<Vec<Attestation>> {
     let location = super::super::cosign::triangulate(image, digest, "att")
         .context("failed to triangulate the attestation url")?;
 
-    let manifest = match client
-        .get_manifest_url(&location, image)
+    let Some(response) = client
+        .manifest_if_exists(&attached(image, digest, "att"))
         .instrument(info_span!("get vex attestation manifest"))
         .await
-    {
-        Ok(response) => response.manifest,
-
+        .context("failed to get the attestation manifest")?
+    else {
         // Nothing is attached, which is the ordinary case and not a failure.
-        Err(DockerClientError::ManifestNotFound(_)) => return Ok(Vec::new()),
-
-        Err(err) => return Err(err).context("failed to get the attestation manifest"),
+        return Ok(Vec::new());
     };
 
-    let DockerManifest::Image(manifest) = manifest else {
+    let OciManifest::Image(manifest) = response.manifest else {
         return Err(eyre::Report::msg(
             "attestation manifest is not a single manifest",
         ));
@@ -289,7 +284,7 @@ async fn tag_attestations(
         }
 
         let blob = match client
-            .get_blob(image, &layer.digest)
+            .blob(image, layer)
             .instrument(info_span!("get vex attestation blob"))
             .await
         {
@@ -427,19 +422,6 @@ fn is_openvex_predicate_type(predicate_type: &str) -> bool {
         || predicate_type.starts_with(&format!("{OPENVEX_PREDICATE_TYPE}/"))
 }
 
-/// One entry of a registry's referrers index.
-#[derive(Debug, Default, Deserialize)]
-struct Descriptor {
-    #[serde(default)]
-    digest: String,
-
-    #[serde(default, rename = "artifactType")]
-    artifact_type: Option<String>,
-
-    #[serde(default)]
-    annotations: BTreeMap<String, String>,
-}
-
 /// Narrows the referrers to the ones that may carry an `OpenVEX` document,
 /// keeping the registry's order.
 ///
@@ -456,7 +438,7 @@ struct Descriptor {
 /// * not announced at all -- kept, but only when nothing announced itself as
 ///   `OpenVEX`, since the annotation is optional and plenty of publishers omit
 ///   it.
-fn candidates(descriptors: Vec<Descriptor>) -> Vec<Descriptor> {
+fn candidates(descriptors: Vec<ImageIndexEntry>) -> Vec<ImageIndexEntry> {
     let (announced, unannounced): (Vec<_>, Vec<_>) = descriptors
         .into_iter()
         .filter(|descriptor| {
@@ -469,17 +451,8 @@ fn candidates(descriptors: Vec<Descriptor>) -> Vec<Descriptor> {
                 )
             })
         })
-        .filter(|descriptor| {
-            descriptor
-                .annotations
-                .get(PREDICATE_TYPE_ANNOTATION)
-                .is_none_or(|predicate_type| is_openvex_predicate_type(predicate_type))
-        })
-        .partition(|descriptor| {
-            descriptor
-                .annotations
-                .contains_key(PREDICATE_TYPE_ANNOTATION)
-        });
+        .filter(|descriptor| predicate_type(descriptor).is_none_or(is_openvex_predicate_type))
+        .partition(|descriptor| predicate_type(descriptor).is_some());
 
     if announced.is_empty() {
         unannounced
@@ -488,219 +461,22 @@ fn candidates(descriptors: Vec<Descriptor>) -> Vec<Descriptor> {
     }
 }
 
-/// Asks the registry what refers to `digest`.
-///
-/// This is the one registry request in this crate that does not go through
-/// [`DockerRegistryClient`]: a referrers index is an OCI image index whose
-/// entries carry an artifact type and annotations and no platform, which is
-/// not one of the three manifest shapes that client parses. What it does
-/// share with the client is the authentication: an anonymous pull token,
-/// fetched from whatever realm the registry's challenge names.
-///
-/// A registry that does not implement the referrers API answers `404`, and
-/// the OCI fallback -- an index under the `sha256-<hex>` tag -- is tried
-/// instead. An empty index is not a failure: it is what an image with nothing
-/// attached looks like.
-#[tracing::instrument]
-async fn referrers(image: &Image, digest: &str) -> Result<Vec<Descriptor>> {
-    #[derive(Debug, Default, Deserialize)]
-    struct Index {
-        #[serde(default)]
-        manifests: Vec<Descriptor>,
-    }
-
-    let client = reqwest::Client::builder()
-        .timeout(REFERRERS_TIMEOUT)
-        .build()
-        .context("failed to build the http client")?;
-
-    let url = format!(
-        "https://{registry}/v2/{path}/referrers/{digest}",
-        registry = image.registry.registry_domain(),
-        path = image.path(),
-    );
-
-    if let Some(index) = get_json::<Index>(&client, image, &url).await? {
-        return Ok(index.manifests);
-    }
-
-    let fallback = format!(
-        "https://{registry}/v2/{path}/manifests/{tag}",
-        registry = image.registry.registry_domain(),
-        path = image.path(),
-        tag = digest.replace(':', "-"),
-    );
-
-    Ok(get_json::<Index>(&client, image, &fallback)
-        .await?
-        .unwrap_or_default()
-        .manifests)
+/// The predicate type a referrer announces in its annotations, if it does.
+fn predicate_type(descriptor: &ImageIndexEntry) -> Option<&str> {
+    descriptor
+        .annotations
+        .as_ref()?
+        .get(PREDICATE_TYPE_ANNOTATION)
+        .map(String::as_str)
 }
 
-/// `GET`s a registry URL as JSON, fetching an anonymous pull token if the
-/// registry asks for one.
-///
-/// `Ok(None)` is a `404`: for both callers above that means "the registry has
-/// nothing of this kind here", which is an answer rather than a failure.
-async fn get_json<T>(client: &reqwest::Client, image: &Image, url: &str) -> Result<Option<T>>
-where
-    T: serde::de::DeserializeOwned,
-{
-    const ACCEPT: &str = "application/vnd.oci.image.index.v1+json";
-
-    let response = client
-        .get(url)
-        .header(reqwest::header::ACCEPT, ACCEPT)
-        .send()
-        .instrument(info_span!("get registry index"))
-        .await
-        .with_context(|| format!("failed to request {url}"))?;
-
-    let response = if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-        let challenge = response
-            .headers()
-            .get(reqwest::header::WWW_AUTHENTICATE)
-            .and_then(|challenge| challenge.to_str().ok())
-            .map(ToOwned::to_owned);
-
-        let Some(challenge) = challenge else {
-            return Err(eyre::Report::msg(format!(
-                "{url} needs authentication but does not say how"
-            )));
-        };
-
-        let token = pull_token(client, image, &challenge)
-            .await
-            .with_context(|| format!("failed to get a pull token for {url}"))?;
-
-        client
-            .get(url)
-            .header(reqwest::header::ACCEPT, ACCEPT)
-            .bearer_auth(token)
-            .send()
-            .instrument(info_span!("get registry index, authenticated"))
-            .await
-            .with_context(|| format!("failed to request {url}"))?
-    } else {
-        response
-    };
-
-    if response.status() == reqwest::StatusCode::NOT_FOUND {
-        return Ok(None);
-    }
-
-    let response = response
-        .error_for_status()
-        .with_context(|| format!("failed to request {url}"))?;
-
-    let body = response
-        .text()
-        .await
-        .with_context(|| format!("failed to read {url}"))?;
-
-    serde_json::from_str(&body).with_context(|| format!("failed to parse the answer of {url}"))
-}
-
-/// Fetches the token a registry's `WWW-Authenticate` challenge asks for.
-async fn pull_token(client: &reqwest::Client, image: &Image, challenge: &str) -> Result<String> {
-    #[derive(Deserialize)]
-    struct Token {
-        token: Option<String>,
-
-        #[serde(rename = "access_token")]
-        access_token: Option<String>,
-    }
-
-    let challenge = Challenge::parse(challenge)
-        .ok_or_else(|| eyre::Report::msg(format!("cannot read the challenge {challenge:?}")))?;
-
-    let scope = challenge
-        .scope
-        .unwrap_or_else(|| format!("repository:{path}:pull", path = image.path()));
-
-    let mut url = Url::parse(&challenge.realm).context("the challenge realm is not a url")?;
-
-    {
-        let mut query = url.query_pairs_mut();
-        query.append_pair("scope", &scope);
-
-        if let Some(service) = &challenge.service {
-            query.append_pair("service", service);
-        }
-    }
-
-    let token: Token = client
-        .get(url.clone())
-        .send()
-        .instrument(info_span!("get registry pull token"))
-        .await
-        .with_context(|| format!("failed to request a token from {url}"))?
-        .error_for_status()
-        .with_context(|| format!("failed to request a token from {url}"))?
-        .json()
-        .await
-        .with_context(|| format!("failed to read the token from {url}"))?;
-
-    token
-        .token
-        .or(token.access_token)
-        .ok_or_else(|| eyre::Report::msg(format!("{url} answered without a token")))
-}
-
-/// The `Bearer realm="…",service="…",scope="…"` a registry answers a `401`
-/// with.
-#[derive(Debug, PartialEq, Eq)]
-struct Challenge {
-    realm: String,
-    service: Option<String>,
-    scope: Option<String>,
-}
-
-impl Challenge {
-    /// Reads the parameters out of a `WWW-Authenticate` header value.
-    ///
-    /// Only `Bearer` challenges, and only the three parameters that make up
-    /// the token request. A challenge without a realm is not one this can act
-    /// on, which is what `None` says.
-    fn parse(header: &str) -> Option<Self> {
-        let parameters = header.strip_prefix("Bearer ")?.trim();
-
-        let mut realm = None;
-        let mut service = None;
-        let mut scope = None;
-
-        // Comma separated `key="value"` pairs. A value is quoted in every
-        // registry's challenge, but unquoting what is there rather than
-        // requiring the quotes costs nothing.
-        for parameter in parameters.split(',') {
-            let Some((key, value)) = parameter.split_once('=') else {
-                continue;
-            };
-
-            let value = value.trim().trim_matches('"').to_owned();
-
-            match key.trim() {
-                "realm" => realm = Some(value),
-                "service" => service = Some(value),
-                "scope" => scope = Some(value),
-                _ => {}
-            }
-        }
-
-        Some(Self {
-            realm: realm?,
-            service,
-            scope,
-        })
-    }
-}
-
-/// The Distribution API URL of a manifest, by digest.
+/// The Distribution API URL of a manifest, by digest: what is shown as where
+/// a referrer was read from.
 fn manifest_url(image: &Image, digest: &str) -> Result<Url> {
     format!(
         "https://{registry}/v2/{path}/manifests/{digest}",
-        registry = image.registry.registry_domain(),
-        path = image.path(),
+        registry = registry_domain(image),
+        path = image.repository(),
     )
     .parse()
     .context("failed to parse the manifest url")
@@ -713,10 +489,10 @@ mod tests {
 
     use base64::Engine as _;
 
+    use oci_client::manifest::ImageIndexEntry;
+
     use super::{
         BASE64,
-        Challenge,
-        Descriptor,
         candidates,
         decode,
         is_openvex_predicate_type,
@@ -819,24 +595,29 @@ mod tests {
         assert!(!is_openvex_predicate_type("https://spdx.dev/Document"));
     }
 
-    fn descriptor(digest: &str, artifact_type: &str, predicate_type: Option<&str>) -> Descriptor {
-        Descriptor {
+    fn descriptor(
+        digest: &str,
+        artifact_type: &str,
+        predicate_type: Option<&str>,
+    ) -> ImageIndexEntry {
+        ImageIndexEntry {
+            media_type: "application/vnd.oci.image.manifest.v1+json".to_owned(),
             digest: digest.to_owned(),
+            size: 0,
+            platform: None,
             artifact_type: Some(artifact_type.to_owned()),
-            annotations: predicate_type
-                .map(|predicate_type| {
-                    [(
-                        super::PREDICATE_TYPE_ANNOTATION.to_owned(),
-                        predicate_type.to_owned(),
-                    )]
-                    .into_iter()
-                    .collect()
-                })
-                .unwrap_or_default(),
+            annotations: predicate_type.map(|predicate_type| {
+                [(
+                    super::PREDICATE_TYPE_ANNOTATION.to_owned(),
+                    predicate_type.to_owned(),
+                )]
+                .into_iter()
+                .collect()
+            }),
         }
     }
 
-    fn digests(descriptors: Vec<Descriptor>) -> Vec<String> {
+    fn digests(descriptors: Vec<ImageIndexEntry>) -> Vec<String> {
         descriptors
             .into_iter()
             .map(|descriptor| descriptor.digest)
@@ -916,7 +697,7 @@ mod tests {
     )]
     async fn an_image_with_nothing_attached_answers_with_nothing() {
         let got = super::attestations(
-            &docker_registry_client::Client::default(),
+            &crate::handler::oci::RegistryClient::default(),
             &"alpine:3.19".parse().unwrap(),
             "sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1",
         )
@@ -924,28 +705,5 @@ mod tests {
         .unwrap();
 
         assert!(got.is_empty(), "{got:?}");
-    }
-
-    #[test]
-    fn a_registry_challenge_comes_apart_into_a_token_request() {
-        let challenge = Challenge::parse(
-            r#"Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/alpine:pull""#,
-        )
-        .expect("a challenge");
-
-        assert_eq!(challenge.realm, "https://auth.docker.io/token");
-        assert_eq!(challenge.service.as_deref(), Some("registry.docker.io"));
-        assert_eq!(
-            challenge.scope.as_deref(),
-            Some("repository:library/alpine:pull")
-        );
-    }
-
-    /// A challenge that names no realm says nothing about where to ask, and a
-    /// challenge of another scheme is not one this can answer.
-    #[test]
-    fn a_challenge_this_cannot_answer_is_not_one() {
-        assert_eq!(None, Challenge::parse(r#"Bearer service="registry""#));
-        assert_eq!(None, Challenge::parse(r#"Basic realm="registry""#));
     }
 }
