@@ -8,7 +8,6 @@
 //! difference between them legible; showing them as two cards, as this did at
 //! first, only made the reader find the second one.
 
-use docker_registry_client::Image;
 use eyre::Context;
 use topcoat::{
     Result,
@@ -25,6 +24,10 @@ use crate::{
     args::Scanner,
     handler::{
         AppState,
+        oci::{
+            Credentials,
+            Image,
+        },
         response::{
             SbomInformation,
             SyftInformation,
@@ -85,7 +88,7 @@ pub(crate) async fn sbom_information(
     // registry lookup and the generated one is a scan, and neither has
     // anything to tell the other.
     let (attached, generated) = tokio::join!(
-        attached_sbom(state, &image),
+        attached_sbom(state, &image, username, password),
         generated_sbom(state, &image, username, password),
     );
 
@@ -106,9 +109,16 @@ pub(crate) async fn sbom_information(
 /// cards are separate `suspense` regions and neither can wait on the other.
 /// With a redis this is a cache read; without one it is a second manifest
 /// request, which is the price of the two cards arriving independently.
-async fn attached_sbom(state: &AppState, image: &Image) -> eyre::Result<SbomInformation> {
+async fn attached_sbom(
+    state: &AppState,
+    image: &Image,
+    username: &str,
+    password: &str,
+) -> eyre::Result<SbomInformation> {
+    let client = state.registry_client(Credentials::from_form(username, password).as_ref());
+
     let docker_manifest = DockerInformationFetcher {
-        docker_registry_client: &state.docker_registry_client,
+        registry_client: &client,
         image,
     }
     .cache_or_fetch(&state.cache, &state.registry_rate_limit)
@@ -116,7 +126,7 @@ async fn attached_sbom(state: &AppState, image: &Image) -> eyre::Result<SbomInfo
     .context("failed to fetch the docker manifest");
 
     SbomInformationFetcher {
-        docker_registry_client: &state.docker_registry_client,
+        registry_client: &client,
         image,
         docker_manifest: &docker_manifest,
     }

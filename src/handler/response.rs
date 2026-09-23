@@ -12,11 +12,6 @@ use chrono::{
     Duration,
     Utc,
 };
-use docker_registry_client::{
-    Client as DockerRegistryClient,
-    Image,
-    Response as DockerResponse,
-};
 use eyre::{
     Result,
     WrapErr,
@@ -36,6 +31,12 @@ pub(crate) mod cache;
 use crate::handler::{
     cosign,
     grype,
+    oci::{
+        Credentials,
+        Image,
+        Manifest,
+        RegistryClient,
+    },
     response::cache::REDIS_TTL,
     syft,
     trivy::{
@@ -131,7 +132,7 @@ pub(crate) struct KeylessVerificationInformation {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct DockerInformation {
-    pub(crate) response: DockerResponse,
+    pub(crate) response: Manifest,
     pub(crate) fetch_time: DateTime<Utc>,
 }
 
@@ -149,7 +150,8 @@ pub(crate) async fn image(
     // spawning them bought anyway.
     let (docker_and_cosign_manifest, cosign_verify) = tokio::join!(
         fetch_docker_and_cosign_manifest(
-            state.docker_registry_client.clone(),
+            state.registry_client(form.credentials.as_ref()),
+            form.credentials.clone(),
             image.clone(),
             state.cache.clone(),
             state.registry_rate_limit.clone(),
@@ -158,6 +160,7 @@ pub(crate) async fn image(
         .instrument(info_span!("fetch_docker_and_cosign_manifest")),
         fetch_cosign_verify(
             form.cosign_key,
+            form.credentials.clone(),
             image.clone(),
             state.registry_rate_limit.clone(),
         )
@@ -180,7 +183,8 @@ pub(crate) async fn image(
 
 #[tracing::instrument]
 async fn fetch_docker_and_cosign_manifest(
-    docker_registry_client: DockerRegistryClient,
+    registry_client: RegistryClient,
+    credentials: Option<Credentials>,
     image: Image,
     cache: Cache,
     registry_rate_limit: RateLimit,
@@ -191,7 +195,7 @@ async fn fetch_docker_and_cosign_manifest(
     Result<KeylessVerificationInformation>,
 ) {
     let docker_manifest = DockerInformationFetcher {
-        docker_registry_client: &docker_registry_client,
+        registry_client: &registry_client,
         image: &image,
     }
     .cache_or_fetch(&cache, &registry_rate_limit)
@@ -206,13 +210,14 @@ async fn fetch_docker_and_cosign_manifest(
     // to look up off the same manifest digest, so they are fetched
     // concurrently rather than one after the other.
     let cosign_fetcher = CosignInformationFetcher {
-        docker_registry_client: &docker_registry_client,
+        registry_client: &registry_client,
         image: &image,
         docker_manifest: &docker_manifest,
     };
 
     let keyless_verification_fetcher = KeylessVerificationFetcher {
         sigstore_trust_root: &sigstore_trust_root,
+        credentials: credentials.as_ref(),
         image: &image,
         docker_manifest: &docker_manifest,
     };
@@ -235,13 +240,22 @@ async fn fetch_docker_and_cosign_manifest(
 #[tracing::instrument]
 async fn fetch_cosign_verify(
     cosign_key: String,
+    credentials: Option<Credentials>,
     image: Image,
     registry_rate_limit: RateLimit,
 ) -> Option<Result<cosign::CosignVerify, eyre::Error>> {
     if cosign_key.is_empty() {
         None
     } else {
-        Some(cosign_verify(&cosign_key, &image, &registry_rate_limit).await)
+        Some(
+            cosign_verify(
+                &cosign_key,
+                credentials.as_ref(),
+                &image,
+                &registry_rate_limit,
+            )
+            .await,
+        )
     }
 }
 

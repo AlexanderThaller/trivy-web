@@ -4,16 +4,11 @@ use chrono::{
     DateTime,
     Utc,
 };
-use docker_registry_client::{
-    Client as DockerRegistryClient,
-    ClientError as DockerClientError,
-    Image,
-    Manifest as DockerManifest,
-};
 use eyre::{
     Context,
     Result,
 };
+use oci_client::manifest::OciManifest;
 use serde::{
     Deserialize,
     Serialize,
@@ -30,7 +25,16 @@ use x509_parser::{
     pem::parse_x509_pem,
 };
 
-use super::registry::RateLimit;
+use super::{
+    oci::{
+        Credentials,
+        Image,
+        RegistryClient,
+        attached,
+        registry_domain,
+    },
+    registry::RateLimit,
+};
 
 /// How large a public key fetched from a URL may be. A cosign public key is a
 /// few hundred bytes of PEM; whatever a URL serves beyond this is not one, and
@@ -81,7 +85,7 @@ pub(crate) struct Sbom {
 pub(crate) struct SbomLayer {
     pub(crate) media_type: String,
     pub(crate) digest: String,
-    pub(crate) size: u64,
+    pub(crate) size: i64,
     pub(crate) document: SbomDocument,
 }
 
@@ -237,30 +241,26 @@ impl std::fmt::Display for CertificateError {
 
 impl std::error::Error for CertificateError {}
 
-fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, eyre::Error> {
-    let DockerManifest::Image(manifest) = manifest else {
+fn signature_from_manifest(manifest: OciManifest) -> Result<Vec<Signature>, eyre::Error> {
+    let OciManifest::Image(manifest) = manifest else {
         return Err(eyre::Report::msg("Manifest is not a single manifest"));
     };
 
     let certificates = manifest
         .layers
         .into_iter()
-        .filter_map(|mut layer| {
-            layer
-                .annotations
-                .remove("dev.sigstore.cosign/certificate")
-                .map(|certificate| -> Result<Certificate, eyre::Error> {
-                    let (_, certificate) = parse_x509_pem(certificate.as_bytes())
-                        .context("Failed to parse x509 pem")?;
+        .filter_map(|layer| layer.annotations?.remove("dev.sigstore.cosign/certificate"))
+        .map(|certificate| -> Result<Certificate, eyre::Error> {
+            let (_, certificate) =
+                parse_x509_pem(certificate.as_bytes()).context("Failed to parse x509 pem")?;
 
-                    let (_, certificate) = parse_x509_certificate(&certificate.contents)
-                        .context("Failed to parse x509")?;
+            let (_, certificate) =
+                parse_x509_certificate(&certificate.contents).context("Failed to parse x509")?;
 
-                    let certificate = Certificate::try_from(certificate)
-                        .context("Failed to convert x509 certificate")?;
+            let certificate =
+                Certificate::try_from(certificate).context("Failed to convert x509 certificate")?;
 
-                    Ok(certificate)
-                })
+            Ok(certificate)
         })
         .collect::<Result<Vec<Certificate>, eyre::Error>>()
         .context("Failed to parse certificates")?;
@@ -295,32 +295,26 @@ fn signature_from_manifest(manifest: DockerManifest) -> Result<Vec<Signature>, e
 
 #[tracing::instrument]
 pub(crate) async fn cosign_manifest(
-    client: &DockerRegistryClient,
+    client: &RegistryClient,
     image: &Image,
     digest: &str,
 ) -> Result<Option<Cosign>, eyre::Error> {
     let manifest_location =
         triangulate(image, digest, "sig").context("failed to triangulate url")?;
 
-    let manifest = client
-        .get_manifest_url(&manifest_location, image)
+    let Some(response) = client
+        .manifest_if_exists(&attached(image, digest, "sig"))
         .instrument(info_span!("get manifest"))
         .await
-        .map(|response| signature_from_manifest(response.manifest));
-
-    let manifest = match manifest {
-        Ok(manifest) => Ok(manifest),
-
-        Err(err) => match err {
-            DockerClientError::ManifestNotFound(_) => return Ok(None),
-            _ => Err(err),
-        },
-    }
-    .context("Failed to get manifest")?;
+        .context("Failed to get manifest")?
+    else {
+        return Ok(None);
+    };
 
     Ok(Some(Cosign {
         manifest_location,
-        signatures: manifest.context("Failed to parse cosign signature from manifest")?,
+        signatures: signature_from_manifest(response.manifest)
+            .context("Failed to parse cosign signature from manifest")?,
     }))
 }
 
@@ -329,25 +323,23 @@ pub(crate) async fn cosign_manifest(
 /// downloads and parses each layer's content.
 #[tracing::instrument]
 pub(crate) async fn sbom_manifest(
-    client: &DockerRegistryClient,
+    client: &RegistryClient,
     image: &Image,
     digest: &str,
 ) -> Result<Option<Sbom>, eyre::Error> {
     let manifest_location =
         triangulate(image, digest, "sbom").context("failed to triangulate url")?;
 
-    let manifest = client
-        .get_manifest_url(&manifest_location, image)
+    let Some(response) = client
+        .manifest_if_exists(&attached(image, digest, "sbom"))
         .instrument(info_span!("get sbom manifest"))
-        .await;
-
-    let manifest = match manifest {
-        Ok(response) => response.manifest,
-        Err(DockerClientError::ManifestNotFound(_)) => return Ok(None),
-        Err(err) => return Err(err).context("Failed to get sbom manifest"),
+        .await
+        .context("Failed to get sbom manifest")?
+    else {
+        return Ok(None);
     };
 
-    let DockerManifest::Image(manifest) = manifest else {
+    let OciManifest::Image(manifest) = response.manifest else {
         return Err(eyre::Report::msg("SBOM manifest is not a single manifest"));
     };
 
@@ -355,7 +347,7 @@ pub(crate) async fn sbom_manifest(
 
     for layer in manifest.layers {
         let blob = client
-            .get_blob(image, &layer.digest)
+            .blob(image, &layer)
             .instrument(info_span!("get sbom blob"))
             .await
             .with_context(|| format!("Failed to fetch sbom layer {}", layer.digest))?;
@@ -459,12 +451,13 @@ fn parse_sbom_document(blob: &[u8]) -> Result<SbomDocument, eyre::Error> {
 /// should be able to do.
 ///
 /// Like [`cosign_keyless_verify`], the `sigstore` client reaches the registry
-/// through its own OCI client rather than [`DockerRegistryClient`], so the
+/// through its own OCI client rather than [`RegistryClient`], so the
 /// registry budget is claimed here by hand rather than by
 /// [`Fetch::rate_limited_fetch`](super::response::cache::Fetch::rate_limited_fetch).
 #[tracing::instrument]
 pub(crate) async fn cosign_verify(
     cosign_key: &str,
+    credentials: Option<&Credentials>,
     image: &Image,
     registry_rate_limit: &RateLimit,
 ) -> Result<CosignVerify, eyre::Error> {
@@ -487,7 +480,7 @@ pub(crate) async fn cosign_verify(
     // for a key that cannot be read has spent nothing the registry would have
     // seen a request for.
     registry_rate_limit
-        .claim(image.registry.registry_domain())
+        .claim(registry_domain(image))
         .await
         .context("not allowed to reach out to the registry")?;
 
@@ -506,7 +499,7 @@ pub(crate) async fn cosign_verify(
         .context("failed to convert the image reference for sigstore")?;
 
     let layers = client
-        .trusted_signature_layers(&sigstore::registry::Auth::Anonymous, &oci_reference)
+        .trusted_signature_layers(&sigstore_auth(credentials), &oci_reference)
         .instrument(info_span!("trusted signature layers"))
         .await
         .context("failed to fetch the signature layers")?;
@@ -679,7 +672,7 @@ pub(crate) enum SubjectKind {
 /// its own verification logic.
 ///
 /// Its `Client` fetches the manifest and signature layers itself through its
-/// own OCI client, a separate path from [`DockerRegistryClient`] -- so unlike
+/// own OCI client, a separate path from [`RegistryClient`] -- so unlike
 /// [`cosign_manifest`] and [`sbom_manifest`], which reach the registry
 /// through the same client [`RateLimit::claim`] is charged against by
 /// [`Fetch::rate_limited_fetch`](super::response::cache::Fetch::rate_limited_fetch)
@@ -688,6 +681,7 @@ pub(crate) enum SubjectKind {
 #[tracing::instrument(skip(trust_root))]
 pub(crate) async fn cosign_keyless_verify(
     trust_root: &SigstoreTrustRoot,
+    credentials: Option<&Credentials>,
     image: &Image,
 ) -> Result<KeylessVerification, eyre::Error> {
     use sigstore::cosign::CosignCapabilities;
@@ -706,7 +700,7 @@ pub(crate) async fn cosign_keyless_verify(
         .context("failed to convert the image reference for sigstore")?;
 
     let layers = client
-        .trusted_signature_layers(&sigstore::registry::Auth::Anonymous, &oci_reference)
+        .trusted_signature_layers(&sigstore_auth(credentials), &oci_reference)
         .instrument(info_span!("trusted signature layers"))
         .await
         .context("failed to fetch and verify signature layers")?;
@@ -737,25 +731,32 @@ pub(crate) async fn cosign_keyless_verify(
     })
 }
 
+/// The credentials in the shape sigstore's own registry client takes them.
+fn sigstore_auth(credentials: Option<&Credentials>) -> sigstore::registry::Auth {
+    match credentials {
+        Some(credentials) => sigstore::registry::Auth::Basic(
+            credentials.username().to_owned(),
+            credentials.password().to_owned(),
+        ),
+        None => sigstore::registry::Auth::Anonymous,
+    }
+}
+
 /// Builds the Distribution API URL for the cosign tag that carries `digest`'s
 /// signature (`suffix = "sig"`), SBOM (`suffix = "sbom"`), or attestations
 /// (`suffix = "att"` -- see [`vex::attestation`](super::vex::attestation),
 /// which looks for `OpenVEX` documents there).
 ///
-/// This has to go through `image.path()` rather than joining
-/// `image.repository` and `image.image_name` by hand: that join drops
-/// `image.namespace`, which is present for registries like `ghcr.io` that
-/// nest images under an owner (`ghcr.io/sigstore/cosign/cosign`). It also has
-/// to be a real `/v2/.../manifests/...` Distribution API path -- a bare
-/// `registry/repo:tag` string is a pull reference, not a request URL, and
-/// some registries (e.g. GHCR) redirect it to a human-facing web page instead
-/// of answering with a 404, which then fails to parse as a manifest.
+/// What is shown as where the artifact was read from; the request itself is
+/// made for [`attached`], which names the same tag. The repository is the
+/// whole path, namespace included, which registries like `ghcr.io` nest
+/// images under (`ghcr.io/sigstore/cosign/cosign`).
 #[tracing::instrument]
 pub(crate) fn triangulate(image: &Image, digest: &str, suffix: &str) -> Result<Url> {
     format!(
         "https://{registry}/v2/{path}/manifests/{digest}.{suffix}",
-        registry = image.registry.registry_domain(),
-        path = image.path(),
+        registry = registry_domain(image),
+        path = image.repository(),
         digest = digest.replace(':', "-"),
     )
     .parse()
@@ -768,7 +769,7 @@ pub(crate) fn triangulate(image: &Image, digest: &str, suffix: &str) -> Result<U
 mod test {
     use std::num::NonZeroU32;
 
-    use docker_registry_client::Manifest as DockerManifest;
+    use oci_client::manifest::OciManifest;
     use pretty_assertions::assert_eq;
 
     use crate::handler::{
@@ -780,6 +781,7 @@ mod test {
             sbom_manifest,
             signature_from_manifest,
         },
+        oci::RegistryClient,
         registry::RateLimit,
     };
 
@@ -815,7 +817,7 @@ OqxYbK0Iro6GzSmOzxkn+N2AKawLyXi84WSwJQBK//psATakCgAQKkNTAA==
         let registry_rate_limit = RateLimit::new(None, NonZeroU32::new(60).unwrap());
         let image = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
 
-        let got = cosign_verify(COSIGN_RELEASE_KEY, &image, &registry_rate_limit)
+        let got = cosign_verify(COSIGN_RELEASE_KEY, None, &image, &registry_rate_limit)
             .await
             .unwrap();
 
@@ -842,7 +844,7 @@ OqxYbK0Iro6GzSmOzxkn+N2AKawLyXi84WSwJQBK//psATakCgAQKkNTAA==
         let registry_rate_limit = RateLimit::new(None, NonZeroU32::new(60).unwrap());
         let image = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
 
-        let got = cosign_verify(COSIGN_RELEASE_KEY_URL, &image, &registry_rate_limit)
+        let got = cosign_verify(COSIGN_RELEASE_KEY_URL, None, &image, &registry_rate_limit)
             .await
             .unwrap();
 
@@ -858,7 +860,7 @@ OqxYbK0Iro6GzSmOzxkn+N2AKawLyXi84WSwJQBK//psATakCgAQKkNTAA==
         let registry_rate_limit = RateLimit::new(None, NonZeroU32::new(60).unwrap());
         let image = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
 
-        let err = cosign_verify(SOMEBODY_ELSES_KEY, &image, &registry_rate_limit)
+        let err = cosign_verify(SOMEBODY_ELSES_KEY, None, &image, &registry_rate_limit)
             .await
             .unwrap_err()
             .to_string();
@@ -877,7 +879,7 @@ OqxYbK0Iro6GzSmOzxkn+N2AKawLyXi84WSwJQBK//psATakCgAQKkNTAA==
         let registry_rate_limit = RateLimit::new(None, NonZeroU32::new(1).unwrap());
         let image = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
 
-        let err = cosign_verify("cosign.pub", &image, &registry_rate_limit)
+        let err = cosign_verify("cosign.pub", None, &image, &registry_rate_limit)
             .await
             .unwrap_err();
 
@@ -892,10 +894,10 @@ OqxYbK0Iro6GzSmOzxkn+N2AKawLyXi84WSwJQBK//psATakCgAQKkNTAA==
 
     #[tokio::test]
     async fn exists() {
-        let client = docker_registry_client::Client::new();
+        let client = RegistryClient::default();
         let image_name = "ghcr.io/aquasecurity/trivy:0.52.0".parse().unwrap();
-        let docker_response = client.get_manifest(&image_name).await.unwrap();
-        let got = cosign_manifest(&client, &image_name, &docker_response.digest.unwrap())
+        let docker_response = client.manifest(&image_name).await.unwrap();
+        let got = cosign_manifest(&client, &image_name, &docker_response.digest)
             .await
             .unwrap();
 
@@ -925,10 +927,10 @@ OqxYbK0Iro6GzSmOzxkn+N2AKawLyXi84WSwJQBK//psATakCgAQKkNTAA==
     /// signature list.
     #[tokio::test]
     async fn exists_for_a_namespaced_image() {
-        let client = docker_registry_client::Client::new();
+        let client = RegistryClient::default();
         let image_name = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
-        let docker_response = client.get_manifest(&image_name).await.unwrap();
-        let got = cosign_manifest(&client, &image_name, &docker_response.digest.unwrap())
+        let docker_response = client.manifest(&image_name).await.unwrap();
+        let got = cosign_manifest(&client, &image_name, &docker_response.digest)
             .await
             .unwrap()
             .expect("this image is signed");
@@ -946,10 +948,10 @@ OqxYbK0Iro6GzSmOzxkn+N2AKawLyXi84WSwJQBK//psATakCgAQKkNTAA==
     /// content as SPDX.
     #[tokio::test]
     async fn sbom_exists_for_a_namespaced_image() {
-        let client = docker_registry_client::Client::new();
+        let client = RegistryClient::default();
         let image_name = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
-        let docker_response = client.get_manifest(&image_name).await.unwrap();
-        let got = sbom_manifest(&client, &image_name, &docker_response.digest.unwrap())
+        let docker_response = client.manifest(&image_name).await.unwrap();
+        let got = sbom_manifest(&client, &image_name, &docker_response.digest)
             .await
             .unwrap()
             .expect("this image has an sbom attached");
@@ -990,7 +992,9 @@ OqxYbK0Iro6GzSmOzxkn+N2AKawLyXi84WSwJQBK//psATakCgAQKkNTAA==
         let trust_root = super::SigstoreTrustRoot::default();
         let image = "ghcr.io/sigstore/cosign/cosign:v2.4.1".parse().unwrap();
 
-        let got = cosign_keyless_verify(&trust_root, &image).await.unwrap();
+        let got = cosign_keyless_verify(&trust_root, None, &image)
+            .await
+            .unwrap();
 
         assert!(!got.verified_identities.is_empty(), "{got:?}");
 
@@ -1015,7 +1019,9 @@ OqxYbK0Iro6GzSmOzxkn+N2AKawLyXi84WSwJQBK//psATakCgAQKkNTAA==
         let trust_root = super::SigstoreTrustRoot::default();
         let image = "docker.io/library/alpine:3.20".parse().unwrap();
 
-        let got = cosign_keyless_verify(&trust_root, &image).await.unwrap();
+        let got = cosign_keyless_verify(&trust_root, None, &image)
+            .await
+            .unwrap();
 
         assert!(got.verified_identities.is_empty(), "{got:?}");
     }
@@ -1024,7 +1030,7 @@ OqxYbK0Iro6GzSmOzxkn+N2AKawLyXi84WSwJQBK//psATakCgAQKkNTAA==
     #[test]
     fn parse_manifest() {
         const INPUT: &str = include_str!("resources/tests/cosign_manifest.json");
-        let docker_manifest: DockerManifest = serde_json::from_str(INPUT).unwrap();
+        let docker_manifest: OciManifest = serde_json::from_str(INPUT).unwrap();
 
         let _got = signature_from_manifest(docker_manifest).unwrap();
 

@@ -3,7 +3,6 @@
 //! The card itself -- the tabs that switch between this and grype, and the
 //! one VEX lookup both are read against -- is `view::vulnerabilities`.
 
-use docker_registry_client::Image;
 use eyre::Context;
 use topcoat::{
     Result,
@@ -18,6 +17,10 @@ use topcoat::{
 use crate::{
     handler::{
         AppState,
+        oci::{
+            Credentials,
+            Image,
+        },
         response::{
             TrivyInformation,
             VexInformation,
@@ -70,25 +73,26 @@ use crate::{
 pub(crate) async fn vex_for(
     state: &AppState,
     image: &Image,
+    username: &str,
+    password: &str,
     repo_digests: &[String],
     architecture: Option<&str>,
 ) -> (ImageIdentifiers, eyre::Result<VexInformation>) {
+    // The attestations sit next to the image, so they are as private as it
+    // is: looked up with the credentials the scan was given, if any.
+    let client = state.registry_client(Credentials::from_form(username, password).as_ref());
+
     let digest = match repo_digest(repo_digests) {
         Some(digest) => Ok(digest.to_owned()),
 
         None => DockerInformationFetcher {
-            docker_registry_client: &state.docker_registry_client,
+            registry_client: &client,
             image,
         }
         .cache_or_fetch(&state.cache, &state.registry_rate_limit)
         .await
         .context("failed to resolve the image digest")
-        .and_then(|information| {
-            information
-                .response
-                .digest
-                .ok_or_else(|| eyre::eyre!("the registry answered without a manifest digest"))
-        }),
+        .map(|information| information.response.digest),
     };
 
     let digest = match digest {
@@ -99,7 +103,7 @@ pub(crate) async fn vex_for(
     let identifiers = vex::image_identifiers(image, &digest, repo_digests, architecture);
 
     let information = VexInformationFetcher {
-        docker_registry_client: &state.docker_registry_client,
+        registry_client: &client,
         image,
         digest: &digest,
     }

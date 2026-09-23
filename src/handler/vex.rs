@@ -31,7 +31,6 @@ use chrono::{
     DateTime,
     Utc,
 };
-use docker_registry_client::Image;
 use serde::{
     Deserialize,
     Deserializer,
@@ -48,6 +47,10 @@ use super::trivy::{
     Severity,
     SeverityCount,
     count_severities,
+};
+use crate::handler::oci::{
+    Image,
+    registry_domain,
 };
 
 /// An `OpenVEX` document.
@@ -433,8 +436,8 @@ pub(crate) fn image_identifiers(
 
     let repository = format!(
         "{registry}/{path}",
-        registry = image.registry.registry_domain(),
-        path = image.path()
+        registry = registry_domain(image),
+        path = image.repository()
     );
 
     push(format!("{repository}@{digest}"));

@@ -3,7 +3,6 @@ use std::collections::{
     BTreeSet,
 };
 
-use docker_registry_client::Image;
 use eyre::WrapErr;
 use serde::{
     Deserialize,
@@ -21,6 +20,10 @@ use super::{
     process::Limits,
     registry::RateLimit,
     scanner_cache::ScannerCache,
+};
+use crate::handler::oci::{
+    Image,
+    registry_domain,
 };
 
 #[derive(Debug, Deserialize)]
@@ -383,7 +386,7 @@ pub(crate) async fn scan_image(
     // scan turned away by that wait would have spent budget the registry never
     // saw a request for.
     registry_rate_limit
-        .claim(image.registry.registry_domain())
+        .claim(registry_domain(image))
         .await
         .context("not allowed to reach out to the registry")?;
 

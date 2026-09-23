@@ -1,6 +1,10 @@
 //! The "Image" and "Cosign" cards.
 
-use docker_registry_client::Manifest as DockerManifest;
+use oci_client::manifest::{
+    ImageIndexEntry,
+    OciManifest,
+    Platform,
+};
 use topcoat::{
     Result,
     context::Cx,
@@ -16,6 +20,7 @@ use crate::{
     handler::{
         SubmitFormImage,
         cosign::CosignVerify,
+        oci::Credentials,
         response::{
             CosignInformation,
             DockerInformation,
@@ -39,12 +44,19 @@ use crate::{
 /// This is the component a `suspense` streams in, so everything it awaits
 /// happens after the document shell has already reached the browser.
 #[component]
-pub(crate) async fn image_information(cx: &Cx, image: &str, cosign_key: &str) -> Result<impl View> {
+pub(crate) async fn image_information(
+    cx: &Cx,
+    image: &str,
+    cosign_key: &str,
+    username: &str,
+    password: &str,
+) -> Result<impl View> {
     let state = crate::handler::state(cx);
 
     let form = SubmitFormImage {
         image: image.to_owned(),
         cosign_key: cosign_key.to_owned(),
+        credentials: Credentials::from_form(username, password),
     };
 
     let response = match Box::pin(crate::handler::response::image(state, form)).await {
@@ -115,13 +127,7 @@ async fn docker_manifest(information: eyre::Result<DockerInformation>) -> Result
         <dl class="meta">
             <div>
                 <dt>"Digest"</dt>
-                <dd>
-                    if let Some(digest) = &information.response.digest {
-                        (digest)
-                    } else {
-                        <span class="muted">"not available"</span>
-                    }
-                </dd>
+                <dd>(&information.response.digest)</dd>
             </div>
             cache_meta(
                 fetched: format::timestamp(information.fetch_time),
@@ -132,7 +138,7 @@ async fn docker_manifest(information: eyre::Result<DockerInformation>) -> Result
         </dl>
 
         match &information.response.manifest {
-            DockerManifest::Image(image) => <div class="table-scroll">
+            OciManifest::Image(image) => <div class="table-scroll">
                 <table>
                     <thead>
                         <tr>
@@ -149,7 +155,7 @@ async fn docker_manifest(information: eyre::Result<DockerInformation>) -> Result
                 </table>
             </div>,
 
-            DockerManifest::List(list) => <div class="table-scroll">
+            OciManifest::ImageIndex(index) => <div class="table-scroll">
                 <table>
                     <thead>
                         <tr>
@@ -160,10 +166,10 @@ async fn docker_manifest(information: eyre::Result<DockerInformation>) -> Result
                         </tr>
                     </thead>
                     <tbody>
-                        for entry in &list.manifests {
+                        for entry in &index.manifests {
                             <tr>
-                                <td>(entry.platform.architecture.to_string())</td>
-                                <td>(entry.platform.os.to_string())</td>
+                                <td>(platform(entry, |platform| platform.architecture.to_string()))</td>
+                                <td>(platform(entry, |platform| platform.os.to_string()))</td>
                                 <td class="num">(format::human_bytes(entry.size))</td>
                                 <td class="digest">(&entry.digest)</td>
                             </tr>
@@ -172,29 +178,20 @@ async fn docker_manifest(information: eyre::Result<DockerInformation>) -> Result
                 </table>
             </div>,
 
-            DockerManifest::Single(single) => <div class="table-scroll">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>"Repository"</th>
-                            <th>"Tag"</th>
-                            <th>"Architecture"</th>
-                            <th class="num">"Layers"</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td class="digest">(&single.name)</td>
-                            <td>(&single.tag)</td>
-                            <td>(single.architecture.to_string())</td>
-                            <td class="num">(single.fs_layers.len())</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>,
         }
     }
     .boxed())
+}
+
+/// One detail of the platform an index entry is for.
+///
+/// An OCI index may leave the platform out, which the Docker manifest list
+/// never did: an attestation or an SBOM is not built for a platform.
+fn platform(entry: &ImageIndexEntry, detail: impl Fn(&Platform) -> String) -> String {
+    entry
+        .platform
+        .as_ref()
+        .map_or_else(|| "-".to_owned(), detail)
 }
 
 /// The signatures the cosign manifest lists for the image.
