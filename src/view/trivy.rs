@@ -448,7 +448,7 @@ async fn suppressed_table(findings: &[Finding<Vulnerability>]) -> Result<impl Vi
 /// all.
 #[component]
 pub(crate) async fn vex_documents(
-    information: Option<eyre::Result<VexInformation>>,
+    information: Option<&eyre::Result<VexInformation>>,
 ) -> Result<impl View> {
     let information = match information {
         // No scan to be about, so nothing was looked up. The scan's own error
@@ -467,7 +467,7 @@ pub(crate) async fn vex_documents(
             return Ok(view! {
                 error_block(
                     title: "Could not read the VEX attestations",
-                    message: format::error(&err),
+                    message: format::error(err),
                 )
             }
             .boxed());

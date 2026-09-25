@@ -31,6 +31,13 @@ pub(crate) enum Stage {
     Failed,
 }
 
+impl Stage {
+    /// Whether the scan is over, one way or the other.
+    pub(crate) fn has_ended(self) -> bool {
+        matches!(self, Self::Finished | Self::Failed)
+    }
+}
+
 /// The sending side of one scan's [`Stage`].
 ///
 /// Reporting never fails and never waits: a stage nobody is watching is

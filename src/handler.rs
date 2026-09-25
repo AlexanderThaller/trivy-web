@@ -224,14 +224,15 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
                 )
             </div>
 
-            // One region for both vulnerability scanners: they are two tabs
-            // of one card, so the card cannot arrive until both have. Left
-            // out entirely when neither scanner is running, since there
-            // would be nothing but the VEX card in it.
+            // One card for both vulnerability scanners, one tab each. Each
+            // tab fills in as soon as its own scan is done, rather than
+            // waiting for the slower one. Left out entirely when neither
+            // scanner is running, since there would be nothing but the VEX
+            // card in it.
             //
             // No `suspense` around it: the component is a live region, and
-            // what it renders first is its own loading card, which says
-            // where each scan has got to.
+            // what it renders first is the card itself, each panel saying
+            // where its scan has got to.
             if state(cx).scanners.iter().any(|scanner| {
                 matches!(scanner, Scanner::Trivy | Scanner::Grype)
             }) {
