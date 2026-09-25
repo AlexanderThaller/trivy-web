@@ -40,6 +40,7 @@ pub(crate) mod cosign;
 pub(crate) mod grype;
 pub(crate) mod oci;
 mod process;
+pub(crate) mod progress;
 mod registry;
 pub(crate) mod response;
 pub(crate) mod scanner_cache;
@@ -225,22 +226,20 @@ pub(crate) async fn index(cx: &Cx, form: Option<Form<ScanForm>>) -> Result<impl 
 
             // One region for both vulnerability scanners: they are two tabs
             // of one card, so the card cannot arrive until both have. Left
-                        // out entirely when neither scanner is running, since
-            // there would be nothing but the VEX card in it.
+            // out entirely when neither scanner is running, since there
+            // would be nothing but the VEX card in it.
+            //
+            // No `suspense` around it: the component is a live region, and
+            // what it renders first is its own loading card, which says
+            // where each scan has got to.
             if state(cx).scanners.iter().any(|scanner| {
                 matches!(scanner, Scanner::Trivy | Scanner::Grype)
             }) {
                 <div id="vulnerabilities" aria-live="polite">
-                    suspense(
-                        fallback: view! {
-                            loading_card(title: "Vulnerabilities")
-                            loading_card(title: "VEX")
-                        },
-                        vulnerabilities(
-                            image: &image,
-                            username: form.username.expose_secret(),
-                            password: form.password.expose_secret(),
-                        )
+                    vulnerabilities(
+                        image: &image,
+                        username: form.username.expose_secret(),
+                        password: form.password.expose_secret(),
                     )
                 </div>
             }

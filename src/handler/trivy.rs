@@ -18,6 +18,10 @@ use url::Url;
 
 use super::{
     process::Limits,
+    progress::{
+        Progress,
+        Stage,
+    },
     registry::RateLimit,
     scanner_cache::ScannerCache,
 };
@@ -342,6 +346,11 @@ impl Vulnerability {
         password = password.map(|_| "REDACTED")
     )
 )]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "each is a separate thing the scan needs from its caller; a struct of them would \
+              only repeat TrivyInformationFetcher"
+)]
 pub(crate) async fn scan_image(
     image: &Image,
     server: Option<&str>,
@@ -350,6 +359,7 @@ pub(crate) async fn scan_image(
     limits: &Limits,
     registry_rate_limit: &RateLimit,
     scanner_cache: &ScannerCache,
+    progress: &Progress,
 ) -> Result<TrivyResult, eyre::Error> {
     // run following command trivy image --format json
     // linuxserver/code-server:latest
@@ -379,7 +389,7 @@ pub(crate) async fn scan_image(
     // Through the limits rather than `Command::output`: the scan runs only
     // when the server has a slot for it, is killed if it overruns the deadline
     // and cannot buffer an unbounded amount of output.
-    let admitted = limits.admit().await?;
+    let admitted = limits.admit_reporting(progress).await?;
 
     // Counted against the registry only now that the scan has a slot and is
     // really going to pull from it. Counted before the wait for the slot, a
@@ -389,6 +399,8 @@ pub(crate) async fn scan_image(
         .claim(registry_domain(image))
         .await
         .context("not allowed to reach out to the registry")?;
+
+    progress.set(Stage::Scanning);
 
     let output = admitted
         .run(command)
@@ -425,6 +437,7 @@ mod test {
 
     use super::{
         Limits,
+        Progress,
         RateLimit,
         ScannerCache,
         TrivyResult,
@@ -516,6 +529,7 @@ mod test {
             &limits,
             &registry_rate_limit,
             &scanner_cache(),
+            &Progress::default(),
         )
         .await
         .unwrap_err()
@@ -538,6 +552,7 @@ mod test {
             &limits(),
             &registry_rate_limit(),
             &scanner_cache(),
+            &Progress::default(),
         )
         .await
         .expect("should fail");
@@ -557,6 +572,7 @@ mod test {
             &limits(),
             &registry_rate_limit(),
             &scanner_cache(),
+            &Progress::default(),
         )
         .await
         .unwrap();
