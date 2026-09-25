@@ -1,3 +1,9 @@
+// Topcoat 0.9's views nest a few more wrapper types per element than 0.8's
+// did, and proving the scan page's view `Send` walks all of them: at the
+// default limit of 128 that overflows in the VEX table, however its
+// components are split.
+#![recursion_limit = "256"]
+
 use std::path::PathBuf;
 
 use clap::Parser;
