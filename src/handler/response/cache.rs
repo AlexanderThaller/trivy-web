@@ -40,6 +40,10 @@ use crate::handler::{
         registry_domain,
     },
     process::Limits,
+    progress::{
+        Progress,
+        Stage,
+    },
     registry::RateLimit,
     scanner_cache::ScannerCache,
     syft,
@@ -114,8 +118,14 @@ impl Cache {
     /// Waits until no other fetch of `key` is running, and keeps the next one
     /// waiting until the returned guard is dropped.
     ///
-    /// Fails rather than waiting past [`Cache::fetch_wait_timeout`].
-    async fn lock_key(&self, key: &str) -> Result<tokio::sync::OwnedMutexGuard<()>> {
+    /// Fails rather than waiting past [`Cache::fetch_wait_timeout`]. Reports
+    /// the wait to `progress`, but only when there is one: a key nobody else
+    /// is fetching is taken straight away.
+    async fn lock_key(
+        &self,
+        key: &str,
+        progress: Option<&Progress>,
+    ) -> Result<tokio::sync::OwnedMutexGuard<()>> {
         let fetching = {
             let mut in_flight = match self.in_flight.lock() {
                 Ok(in_flight) => in_flight,
@@ -138,6 +148,14 @@ impl Cache {
                 fetching
             }
         };
+
+        if let Ok(fetching) = fetching.clone().try_lock_owned() {
+            return Ok(fetching);
+        }
+
+        if let Some(progress) = progress {
+            progress.set(Stage::WaitingForSameImage);
+        }
 
         tokio::time::timeout(self.fetch_wait_timeout, fetching.lock_owned())
             .await
@@ -219,6 +237,12 @@ pub(crate) trait Fetch {
         true
     }
 
+    /// Where to report the waits this fetch goes through, for a page that
+    /// shows them. Only the scans have waits worth showing.
+    fn progress(&self) -> Option<&Progress> {
+        None
+    }
+
     #[tracing::instrument]
     async fn cache_or_fetch(&self, cache: &Cache, rate_limit: &RateLimit) -> Result<Self::Output>
     where
@@ -242,7 +266,7 @@ pub(crate) trait Fetch {
         // own fetch, and a fetch here is a trivy scan: the first caller through
         // runs it and the ones behind it read what it cached.
         let _fetching = cache
-            .lock_key(&key)
+            .lock_key(&key, self.progress())
             .instrument(info_span!("wait for a running fetch of the same key"))
             .await?;
 
@@ -321,6 +345,7 @@ pub(crate) struct TrivyInformationFetcher<'a> {
     pub(crate) limits: &'a Limits,
     pub(crate) registry_rate_limit: &'a RateLimit,
     pub(crate) scanner_cache: &'a ScannerCache,
+    pub(crate) progress: &'a Progress,
 }
 
 /// Hand written so the submitted credentials never reach a log or a trace:
@@ -369,6 +394,10 @@ impl Fetch for TrivyInformationFetcher<'_> {
         self.trivy_username.is_none() && self.trivy_password.is_none()
     }
 
+    fn progress(&self) -> Option<&Progress> {
+        Some(self.progress)
+    }
+
     async fn fetch(&self) -> Result<Self::Output> {
         let trivy_result = trivy::scan_image(
             self.image,
@@ -378,6 +407,7 @@ impl Fetch for TrivyInformationFetcher<'_> {
             self.limits,
             self.registry_rate_limit,
             self.scanner_cache,
+            self.progress,
         )
         .await?;
 
@@ -420,6 +450,7 @@ pub(crate) struct GrypeInformationFetcher<'a> {
     pub(crate) limits: &'a Limits,
     pub(crate) registry_rate_limit: &'a RateLimit,
     pub(crate) scanner_cache: &'a ScannerCache,
+    pub(crate) progress: &'a Progress,
 }
 
 /// Hand written for the same reason [`TrivyInformationFetcher`]'s is: the
@@ -499,6 +530,10 @@ impl Fetch for GrypeInformationFetcher<'_> {
         self.username.is_none() && self.password.is_none()
     }
 
+    fn progress(&self) -> Option<&Progress> {
+        Some(self.progress)
+    }
+
     async fn fetch(&self) -> Result<Self::Output> {
         let grype = grype::scan_image(
             self.image,
@@ -507,6 +542,7 @@ impl Fetch for GrypeInformationFetcher<'_> {
             self.limits,
             self.registry_rate_limit,
             self.scanner_cache,
+            self.progress,
         )
         .await?;
 
@@ -763,6 +799,8 @@ mod tests {
     static SCANNER_CACHE: LazyLock<super::ScannerCache> =
         LazyLock::new(|| super::ScannerCache::new(None).unwrap());
 
+    static PROGRESS: LazyLock<super::Progress> = LazyLock::new(super::Progress::default);
+
     fn fetcher<'a>(
         image: &'a Image,
         credentials: Option<(&'a str, &'a str)>,
@@ -775,6 +813,7 @@ mod tests {
             limits: &LIMITS,
             registry_rate_limit: &REGISTRY_RATE_LIMIT,
             scanner_cache: &SCANNER_CACHE,
+            progress: &PROGRESS,
         }
     }
 
@@ -802,10 +841,13 @@ mod tests {
     async fn waiting_for_a_running_fetch_gives_up_eventually() {
         let cache = Cache::new(None, Duration::from_millis(50));
 
-        let running = cache.lock_key("trivy-web:trivy:v2:alpine").await.unwrap();
+        let running = cache
+            .lock_key("trivy-web:trivy:v2:alpine", None)
+            .await
+            .unwrap();
 
         let err = cache
-            .lock_key("trivy-web:trivy:v2:alpine")
+            .lock_key("trivy-web:trivy:v2:alpine", None)
             .await
             .unwrap_err()
             .to_string();
@@ -816,7 +858,10 @@ mod tests {
         drop(running);
 
         // And once the fetch in front is done, the next one is let through.
-        let _next = cache.lock_key("trivy-web:trivy:v2:alpine").await.unwrap();
+        let _next = cache
+            .lock_key("trivy-web:trivy:v2:alpine", None)
+            .await
+            .unwrap();
     }
 
     /// One key holding up another would turn the whole service into a queue of
@@ -825,8 +870,14 @@ mod tests {
     async fn a_running_fetch_only_holds_up_its_own_key() {
         let cache = Cache::new(None, Duration::from_millis(50));
 
-        let _running = cache.lock_key("trivy-web:trivy:v2:alpine").await.unwrap();
-        let _other = cache.lock_key("trivy-web:trivy:v2:debian").await.unwrap();
+        let _running = cache
+            .lock_key("trivy-web:trivy:v2:alpine", None)
+            .await
+            .unwrap();
+        let _other = cache
+            .lock_key("trivy-web:trivy:v2:debian", None)
+            .await
+            .unwrap();
     }
 
     /// Manifests, signatures, attached SBOMs and VEX documents pulled with

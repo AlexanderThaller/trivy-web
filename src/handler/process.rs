@@ -46,6 +46,11 @@ use tracing::{
     info_span,
 };
 
+use super::progress::{
+    Progress,
+    Stage,
+};
+
 /// How much a single run may write to each of stdout and stderr before it is
 /// killed.
 ///
@@ -116,6 +121,22 @@ impl Limits {
             permit,
             run_timeout: self.run_timeout,
         })
+    }
+
+    /// [`Limits::admit`], telling `progress` when there is a wait for the
+    /// slot -- and only then, so a scan that finds one free does not flash
+    /// past a wait it never had.
+    pub(crate) async fn admit_reporting(&self, progress: &Progress) -> Result<Admitted> {
+        if let Ok(permit) = self.permits.clone().try_acquire_owned() {
+            return Ok(Admitted {
+                permit,
+                run_timeout: self.run_timeout,
+            });
+        }
+
+        progress.set(Stage::WaitingForSlot);
+
+        self.admit().await
     }
 }
 

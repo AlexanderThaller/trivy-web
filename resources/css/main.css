@@ -1044,6 +1044,26 @@ td.num {
   }
 }
 
+/* One line per scanner while the vulnerability scans run. */
+.scan-progress {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A finished scan keeps its place in the list, without the motion. */
+.spinner.done {
+  border-color: var(--accent);
+  animation: none;
+}
+
+.spinner.failed {
+  border-color: var(--critical-color);
+  animation: none;
+}
+
 .skeleton {
   height: 0.75rem;
   margin-top: var(--space-3);

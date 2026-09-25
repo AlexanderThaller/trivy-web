@@ -31,6 +31,10 @@ use tracing::{
 
 use super::{
     process::Limits,
+    progress::{
+        Progress,
+        Stage,
+    },
     registry::RateLimit,
     scanner_cache::ScannerCache,
     trivy::{
@@ -225,6 +229,7 @@ pub(crate) async fn scan_image(
     limits: &Limits,
     registry_rate_limit: &RateLimit,
     scanner_cache: &ScannerCache,
+    progress: &Progress,
 ) -> Result<Grype> {
     let mut command = Command::new("grype");
 
@@ -281,12 +286,14 @@ pub(crate) async fn scan_image(
         command
     };
 
-    let admitted = limits.admit().await?;
+    let admitted = limits.admit_reporting(progress).await?;
 
     registry_rate_limit
         .claim(registry_domain(image))
         .await
         .context("not allowed to reach out to the registry")?;
+
+    progress.set(Stage::Scanning);
 
     let output = admitted
         .run(command)

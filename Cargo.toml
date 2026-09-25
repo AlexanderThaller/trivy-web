@@ -38,7 +38,7 @@ sigstore = { version = "0.14", default-features = false, features = [
   "sigstore-trust-root",
 ] }
 tokio = { version = "1", features = ["full", "tracing"] }
-topcoat = { version = "0.8", default-features = false, features = [
+topcoat = { version = "0.9", default-features = false, features = [
   "compression",
   "discover",
   "router",
